@@ -1,0 +1,185 @@
+import { parseDocument } from '../pipeline'
+import type { DocumentDiagnostic, ParseDocumentResult } from '../types'
+import type { ParseTaskRequest, ParsedTaskResponse, WorkerResponse } from './protocol'
+
+/**
+ * Main-thread worker client and the degraded fallback path
+ * (rendering-pipeline §6). When a Worker is unavailable or the worker dies,
+ * the exact same `parseDocument` runs in-process and the result carries a
+ * `PS_WORKER_FAILED` diagnostic — the tree/outline/blocks/segments stay
+ * identical to the worker product.
+ */
+
+export class TaskAbortedError extends Error {
+  readonly code = 'PS_TASK_CANCELLED'
+
+  constructor(taskId: string) {
+    super(`parse task ${taskId} was cancelled`)
+    this.name = 'TaskAbortedError'
+  }
+}
+
+export class WorkerUnavailableError extends Error {
+  readonly code = 'PS_WORKER_FAILED'
+
+  constructor(message = 'Web Worker is not available in this environment') {
+    super(message)
+    this.name = 'WorkerUnavailableError'
+  }
+}
+
+export interface PipelineWorkerClient {
+  parse(request: ParseTaskRequest): Promise<ParsedTaskResponse>
+  cancel(taskId: string): void
+  dispose(): void
+}
+
+export function createPipelineWorkerClient(): PipelineWorkerClient {
+  if (typeof Worker === 'undefined') throw new WorkerUnavailableError()
+
+  const worker = new Worker(new URL('./parse.worker.ts', import.meta.url), { type: 'module' })
+  const pending = new Map<
+    string,
+    { resolve: (response: ParsedTaskResponse) => void; reject: (error: Error) => void }
+  >()
+
+  worker.addEventListener('message', (event: MessageEvent<WorkerResponse>) => {
+    const response = event.data
+    const entry = pending.get(response.taskId)
+    if (!entry) return
+    pending.delete(response.taskId)
+    if (response.type === 'parsed') {
+      entry.resolve(response)
+    } else {
+      // An unexpected worker-side failure: the caller may retry in-process.
+      entry.reject(new WorkerUnavailableError(`parse worker failed: ${response.error.code}`))
+    }
+  })
+
+  worker.addEventListener('error', () => {
+    const error = new WorkerUnavailableError('parse worker failed')
+    for (const entry of pending.values()) entry.reject(error)
+    pending.clear()
+  })
+
+  return {
+    parse(request: ParseTaskRequest): Promise<ParsedTaskResponse> {
+      return new Promise<ParsedTaskResponse>((resolve, reject) => {
+        pending.set(request.taskId, { resolve, reject })
+        worker.postMessage(request)
+      })
+    },
+    cancel(taskId: string): void {
+      worker.postMessage({ type: 'cancel', taskId })
+      const entry = pending.get(taskId)
+      if (entry) {
+        pending.delete(taskId)
+        entry.reject(new TaskAbortedError(taskId))
+      }
+    },
+    dispose(): void {
+      const error = new WorkerUnavailableError('parse worker client was disposed')
+      for (const entry of pending.values()) entry.reject(error)
+      pending.clear()
+      worker.terminate()
+    },
+  }
+}
+
+let sharedClient: PipelineWorkerClient | null = null
+let sharedClientUnavailable = false
+
+function getSharedClient(): PipelineWorkerClient | null {
+  if (sharedClientUnavailable) return null
+  if (!sharedClient) {
+    try {
+      sharedClient = createPipelineWorkerClient()
+    } catch {
+      sharedClientUnavailable = true
+      return null
+    }
+  }
+  return sharedClient
+}
+
+/** Test/hot-reload helper: drop the lazily created shared worker client. */
+export function resetPipelineWorkerClient(): void {
+  sharedClient?.dispose()
+  sharedClient = null
+  sharedClientUnavailable = false
+}
+
+export interface ParseTaskToken {
+  taskId: string
+  generation: number
+  docId: string
+}
+
+export interface ParseWithFallbackDeps {
+  createClient?: () => PipelineWorkerClient
+  parseInProcess?: (
+    text: string,
+    options?: ParseTaskRequest['options'],
+  ) => Promise<ParseDocumentResult>
+}
+
+export interface ParseWithFallbackResult {
+  result: ParseDocumentResult
+  usedWorker: boolean
+}
+
+const WORKER_FAILED_DIAGNOSTIC: DocumentDiagnostic = {
+  code: 'PS_WORKER_FAILED',
+  category: 'internal',
+  messageKey: 'error.internal.worker',
+  retryable: true,
+}
+
+function withWorkerDiagnostic(result: ParseDocumentResult): ParseDocumentResult {
+  if (result.diagnostics.some((diagnostic) => diagnostic.code === 'PS_WORKER_FAILED')) return result
+  return { ...result, diagnostics: [...result.diagnostics, { ...WORKER_FAILED_DIAGNOSTIC }] }
+}
+
+/**
+ * Parse through the worker when possible, otherwise in-process with the same
+ * pipeline. Cancellation (`TaskAbortedError`) is rethrown and never silently
+ * converted into a fallback parse.
+ */
+export async function parseDocumentWithFallback(
+  text: string,
+  token: ParseTaskToken,
+  options: ParseTaskRequest['options'] = {},
+  deps: ParseWithFallbackDeps = {},
+): Promise<ParseWithFallbackResult> {
+  const parseInProcess = deps.parseInProcess ?? parseDocument
+  const request: ParseTaskRequest = {
+    type: 'parse',
+    taskId: token.taskId,
+    generation: token.generation,
+    docId: token.docId,
+    text,
+    options,
+  }
+
+  const runFallback = async (): Promise<ParseWithFallbackResult> => {
+    const result = await parseInProcess(text, options)
+    return { result: withWorkerDiagnostic(result), usedWorker: false }
+  }
+
+  let client: PipelineWorkerClient | null = null
+  try {
+    if (deps.createClient) client = deps.createClient()
+    else if (typeof Worker !== 'undefined') client = getSharedClient()
+  } catch {
+    client = null
+  }
+  if (!client) return runFallback()
+
+  try {
+    const response = await client.parse(request)
+    return { result: response.result, usedWorker: true }
+  } catch (error) {
+    if (error instanceof TaskAbortedError) throw error
+    return runFallback()
+  }
+}
