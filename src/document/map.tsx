@@ -22,6 +22,8 @@ export interface RenderDocumentInput {
   hast: Root | null
   blocks: readonly BlockRecord[]
   segments: readonly SearchSegment[]
+  /** Progressive mounting: render at most this many block groups (§2.12). */
+  blockLimit?: number
 }
 
 export interface RenderDocumentOptions {
@@ -41,7 +43,11 @@ export function renderDocument(
   options: RenderDocumentOptions = {},
 ): ReactNode {
   if (!input.hast) return null
-  const annotated = annotateTree(input.hast, { blocks: input.blocks, segments: input.segments })
+  const annotated = annotateTree(input.hast, {
+    blocks: input.blocks,
+    segments: input.segments,
+    ...(input.blockLimit === undefined ? {} : { blockLimit: input.blockLimit }),
+  })
   const processor = unified().use(rehypeReact, {
     Fragment,
     jsx,

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 
 import App from './App.tsx'
 import { getLocale } from './app/i18n'
+import 'katex/dist/katex.min.css'
 import './styles/tokens.css'
 import './styles/base.css'
 

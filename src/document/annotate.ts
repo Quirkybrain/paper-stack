@@ -20,6 +20,13 @@ import type { BlockRecord, SearchSegment, SegmentKind } from './types'
 export interface AnnotateInput {
   blocks: readonly BlockRecord[]
   segments: readonly SearchSegment[]
+  /**
+   * Mount only the first `blockLimit` block groups; everything after (and
+   * trailing position-less groups such as the GFM footnote section) is
+   * omitted. Used by the reader's progressive mounting (rendering-pipeline
+   * §2.12); omitted means a full render.
+   */
+  blockLimit?: number
 }
 
 const TEXT_SEGMENT_KINDS: ReadonlySet<SegmentKind> = new Set(['text', 'html-text'])
@@ -27,12 +34,15 @@ const TEXT_SEGMENT_KINDS: ReadonlySet<SegmentKind> = new Set(['text', 'html-text
 export function annotateTree(tree: Root, input: AnnotateInput): Root {
   const groups = groupChildren(tree.children, input.blocks)
   const children: RootContent[] = []
+  let emittedBlocks = 0
 
   for (const group of groups) {
     if (!group.block) {
       children.push(...group.children)
       continue
     }
+    if (input.blockLimit !== undefined && emittedBlocks >= input.blockLimit) break
+    emittedBlocks += 1
     const annotated = annotateChildren(group.children, group.block, input.segments)
     children.push({
       type: 'element',

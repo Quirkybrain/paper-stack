@@ -1,0 +1,291 @@
+/*
+ * Reader layout (ui-spec §3.2/§4): toolbar + conditional tab bar + centered
+ * body column, plus the minimal block styles for engine output (code gutter,
+ * formula error, Mermaid placeholder, image placeholder). Visually minimal by
+ * design; the full visual pass belongs to the UX regression task (wp-22).
+ */
+
+.ps-reader {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--ps-color-bg);
+}
+
+.ps-reader-main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--ps-color-surface);
+  scrollbar-width: thin;
+  scrollbar-color: var(--ps-color-border) transparent;
+}
+
+.ps-toolbar-anchor {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.ps-toolbar-filename {
+  font-weight: 600;
+  max-width: 40vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ps-toolbar-spacer {
+  flex: 1;
+}
+
+/* Tabs: 36px, only rendered with ≥2 tabs (INV-TL-08) */
+.ps-tabbar {
+  height: var(--ps-tabbar-h);
+  flex: 0 0 auto;
+  display: flex;
+  background: var(--ps-color-surface);
+  border-bottom: 1px solid var(--ps-color-border);
+}
+
+.ps-tabbar-scroll {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ps-color-border) transparent;
+}
+
+.ps-tab {
+  display: flex;
+  align-items: center;
+  border-right: 1px solid var(--ps-color-border);
+  flex: 0 0 auto;
+}
+
+.ps-tab-active {
+  background: var(--ps-color-bg);
+}
+
+.ps-tab-label {
+  display: flex;
+  align-items: center;
+  gap: var(--ps-space-1);
+  height: 100%;
+  max-width: 240px;
+  padding: 0 var(--ps-space-2);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ps-tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ps-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ps-color-muted);
+  cursor: pointer;
+}
+
+.ps-reader-notices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ps-space-2);
+  padding: var(--ps-space-2) var(--ps-space-3) 0;
+}
+
+.ps-reader-welcome,
+.ps-reader-notice {
+  max-width: var(--ps-content-max);
+  margin: 0 auto;
+  padding: var(--ps-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ps-space-3);
+  align-items: flex-start;
+}
+
+.ps-reader-welcome-note {
+  color: var(--ps-color-muted);
+}
+
+.ps-reader-notice-code {
+  color: var(--ps-color-muted);
+}
+
+.ps-document-body {
+  max-width: var(--ps-content-max);
+  margin: 0 auto;
+  padding: var(--ps-space-5);
+  overflow-wrap: break-word;
+}
+
+.ps-document-body img {
+  height: auto;
+}
+
+/* Wide tables scroll locally; the body column never scrolls horizontally. */
+.ps-document-body table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ps-color-border) transparent;
+}
+
+.ps-document-body th,
+.ps-document-body td {
+  border: 1px solid var(--ps-color-border);
+  padding: var(--ps-space-1) var(--ps-space-2);
+}
+
+.ps-document-body pre {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ps-color-border) transparent;
+}
+
+/* Code blocks: single container + aria-hidden line-number gutter (VC-05).
+   The gutter is separate from the literal code text, so copy payloads built
+   from the code element never include line numbers. */
+.code-block {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--ps-color-border);
+  border-radius: var(--ps-radius-sm);
+  background: var(--ps-color-surface);
+  margin: 0 0 var(--ps-space-4);
+  overflow: hidden;
+}
+
+.code-block-lines {
+  flex: 0 0 auto;
+  padding: var(--ps-space-3) var(--ps-space-2);
+  background: var(--ps-color-bg);
+  color: var(--ps-color-muted);
+  font-family: var(--ps-font-mono);
+  font-size: 14px;
+  line-height: 1.65;
+  text-align: right;
+  white-space: pre;
+  user-select: none;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: var(--ps-space-3);
+  flex: 1;
+  min-width: 0;
+}
+
+/* Formula failure placeholder (wp-26 adds inspect/copy/zoom tools). */
+.ps-math-error {
+  display: block;
+  border-left: 3px solid var(--ps-color-danger);
+  padding: var(--ps-space-1) var(--ps-space-2);
+  color: var(--ps-color-text);
+}
+
+.ps-math-error-display {
+  margin: 0 0 var(--ps-space-4);
+}
+
+.ps-math-error-label {
+  color: var(--ps-color-danger);
+  margin-right: var(--ps-space-2);
+}
+
+.ps-math-error-source {
+  overflow-wrap: anywhere;
+}
+
+/* Mermaid placeholder + on-demand render. */
+.ps-mermaid-block {
+  border: 1px solid var(--ps-color-border);
+  border-radius: var(--ps-radius-sm);
+  padding: var(--ps-space-3);
+  margin: 0 0 var(--ps-space-4);
+  background: var(--ps-color-surface);
+}
+
+.ps-mermaid-svg {
+  overflow-x: auto;
+}
+
+.ps-mermaid-svg svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.ps-mermaid-error-title {
+  color: var(--ps-color-warn);
+}
+
+.ps-mermaid-source {
+  margin-bottom: 0;
+  overflow-x: auto;
+}
+
+/* Image placeholder (missing/blocked): never a silent blank. */
+.ps-image-placeholder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ps-space-1);
+  padding: var(--ps-space-3);
+  border: 1px dashed var(--ps-color-border);
+  color: var(--ps-color-muted);
+}
+
+.ps-link-unsupported {
+  text-decoration: underline dotted;
+  cursor: default;
+}
+
+.ps-document-fallback {
+  max-width: var(--ps-content-max);
+  margin: 0 auto;
+  padding: var(--ps-space-5);
+}
+
+.ps-document-fallback-source {
+  max-height: 70vh;
+  overflow: auto;
+  border: 1px solid var(--ps-color-border);
+  padding: var(--ps-space-3);
+}
+
+.ps-root-error {
+  max-width: var(--ps-content-max);
+  margin: 0 auto;
+  padding: var(--ps-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ps-space-3);
+  align-items: flex-start;
+}
+
+.ps-block-error {
+  border-left: 3px solid var(--ps-color-danger);
+  padding: var(--ps-space-2);
+  margin: 0 0 var(--ps-space-4);
+}
+
+.ps-block-error-source {
+  max-height: 240px;
+  overflow: auto;
+}
+
+.ps-block-error-message {
+  color: var(--ps-color-danger);
+}

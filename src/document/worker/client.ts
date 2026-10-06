@@ -32,9 +32,18 @@ export interface PipelineWorkerClient {
   parse(request: ParseTaskRequest): Promise<ParsedTaskResponse>
   cancel(taskId: string): void
   dispose(): void
+  /** True once the worker failed at startup or on a fatal error; never reuse it. */
+  readonly failed: boolean
 }
 
-export function createPipelineWorkerClient(): PipelineWorkerClient {
+export interface PipelineWorkerClientOptions {
+  /** Called exactly once when the worker reports an unrecoverable error. */
+  onFatalError?: () => void
+}
+
+export function createPipelineWorkerClient(
+  options: PipelineWorkerClientOptions = {},
+): PipelineWorkerClient {
   if (typeof Worker === 'undefined') throw new WorkerUnavailableError()
 
   const worker = new Worker(new URL('./parse.worker.ts', import.meta.url), { type: 'module' })
@@ -42,6 +51,16 @@ export function createPipelineWorkerClient(): PipelineWorkerClient {
     string,
     { resolve: (response: ParsedTaskResponse) => void; reject: (error: Error) => void }
   >()
+  let failed = false
+
+  const fail = (message: string): void => {
+    if (failed) return
+    failed = true
+    const error = new WorkerUnavailableError(message)
+    for (const entry of pending.values()) entry.reject(error)
+    pending.clear()
+    options.onFatalError?.()
+  }
 
   worker.addEventListener('message', (event: MessageEvent<WorkerResponse>) => {
     const response = event.data
@@ -57,20 +76,24 @@ export function createPipelineWorkerClient(): PipelineWorkerClient {
   })
 
   worker.addEventListener('error', () => {
-    const error = new WorkerUnavailableError('parse worker failed')
-    for (const entry of pending.values()) entry.reject(error)
-    pending.clear()
+    fail('parse worker failed')
   })
 
   return {
+    get failed() {
+      return failed
+    },
     parse(request: ParseTaskRequest): Promise<ParsedTaskResponse> {
+      if (failed) {
+        return Promise.reject(new WorkerUnavailableError('parse worker is unavailable'))
+      }
       return new Promise<ParsedTaskResponse>((resolve, reject) => {
         pending.set(request.taskId, { resolve, reject })
         worker.postMessage(request)
       })
     },
     cancel(taskId: string): void {
-      worker.postMessage({ type: 'cancel', taskId })
+      if (!failed) worker.postMessage({ type: 'cancel', taskId })
       const entry = pending.get(taskId)
       if (entry) {
         pending.delete(taskId)
@@ -78,6 +101,7 @@ export function createPipelineWorkerClient(): PipelineWorkerClient {
       }
     },
     dispose(): void {
+      failed = true
       const error = new WorkerUnavailableError('parse worker client was disposed')
       for (const entry of pending.values()) entry.reject(error)
       pending.clear()
@@ -89,11 +113,19 @@ export function createPipelineWorkerClient(): PipelineWorkerClient {
 let sharedClient: PipelineWorkerClient | null = null
 let sharedClientUnavailable = false
 
+function dropSharedClient(): void {
+  sharedClientUnavailable = true
+  const client = sharedClient
+  sharedClient = null
+  client?.dispose()
+}
+
 function getSharedClient(): PipelineWorkerClient | null {
   if (sharedClientUnavailable) return null
-  if (!sharedClient) {
+  if (!sharedClient || sharedClient.failed) {
+    if (sharedClient?.failed) dropSharedClient()
     try {
-      sharedClient = createPipelineWorkerClient()
+      sharedClient = createPipelineWorkerClient({ onFatalError: dropSharedClient })
     } catch {
       sharedClientUnavailable = true
       return null
@@ -173,7 +205,7 @@ export async function parseDocumentWithFallback(
   } catch {
     client = null
   }
-  if (!client) return runFallback()
+  if (!client || client.failed) return runFallback()
 
   try {
     const response = await client.parse(request)

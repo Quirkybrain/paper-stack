@@ -46,6 +46,10 @@ class FakeWorker {
   emit(response: WorkerResponse): void {
     for (const listener of this.listeners.get('message') ?? []) listener({ data: response })
   }
+
+  emitError(): void {
+    for (const listener of this.listeners.get('error') ?? []) listener({ data: {} as WorkerResponse })
+  }
 }
 
 afterEach(() => {
@@ -153,6 +157,7 @@ describe('main-thread fallback', () => {
       parse: () => Promise.reject(new WorkerUnavailableError('worker crashed')),
       cancel: () => {},
       dispose: () => {},
+      failed: false,
     }
     const fallback = await parseDocumentWithFallback(
       SAMPLE,
@@ -171,6 +176,7 @@ describe('main-thread fallback', () => {
       parse: () => Promise.resolve(envelope),
       cancel: () => {},
       dispose: () => {},
+      failed: false,
     }
     const outcome = await parseDocumentWithFallback(
       SAMPLE,
@@ -188,6 +194,7 @@ describe('main-thread fallback', () => {
       parse: () => Promise.reject(new TaskAbortedError('t9')),
       cancel: () => {},
       dispose: () => {},
+      failed: false,
     }
     await expect(
       parseDocumentWithFallback(SAMPLE, token(), {}, { createClient: () => client }),
@@ -272,5 +279,33 @@ describe('worker client', () => {
     const outcome = await outcomePromise
     expect(outcome.usedWorker).toBe(true)
     expect(outcome.result).toEqual(envelope.result)
+  })
+
+  it('marks the client failed and rejects later parses after a fatal worker error', async () => {
+    vi.stubGlobal('Worker', FakeWorker)
+    const client = createPipelineWorkerClient()
+    const promise = client.parse(request({ taskId: 'x1' }))
+    FakeWorker.instances[0].emitError()
+    await expect(promise).rejects.toBeInstanceOf(WorkerUnavailableError)
+    expect(client.failed).toBe(true)
+    await expect(client.parse(request({ taskId: 'x2' }))).rejects.toBeInstanceOf(
+      WorkerUnavailableError,
+    )
+  })
+
+  it('never reuses a startup-failed shared worker (later parses fall back in-process)', async () => {
+    vi.stubGlobal('Worker', FakeWorker)
+    const first = parseDocumentWithFallback(SAMPLE, token('t1'))
+    await vi.waitFor(() => expect(FakeWorker.instances[0]?.posted.length).toBe(1))
+    FakeWorker.instances[0].emitError()
+    const outcome = await first
+    expect(outcome.usedWorker).toBe(false)
+    expect(outcome.result.diagnostics.some((entry) => entry.code === 'PS_WORKER_FAILED')).toBe(true)
+
+    const second = await parseDocumentWithFallback(SAMPLE, token('t2'))
+    expect(second.usedWorker).toBe(false)
+    // The dead worker was terminated and no replacement is created.
+    expect(FakeWorker.instances).toHaveLength(1)
+    expect(FakeWorker.instances[0].terminated).toBe(true)
   })
 })
