@@ -1,0 +1,84 @@
+/*
+ * PaperStack design tokens — exact values from ui-spec §5 (IXD §18.1/§18.2).
+ * Light is the default (`:root`); dark applies via [data-theme="dark"].
+ * Components consume these variables only; do not fork values per component.
+ */
+
+:root,
+[data-theme='light'] {
+  /* Colors (IXD §18.1) */
+  --ps-color-bg: #f5f6f8; /* app chrome and necessary auxiliary areas */
+  --ps-color-surface: #ffffff; /* document surface, dialogs */
+  --ps-color-text: #1d2939; /* primary text */
+  --ps-color-muted: #596579; /* secondary text; never the only status cue */
+  --ps-color-accent: #176b5b; /* links, selection, primary actions */
+  --ps-color-border: #dde3ea; /* area separators */
+  --ps-color-warn: #805009; /* new-version / resource-blocked text */
+  --ps-color-danger: #b42318; /* errors and explicit destructive actions */
+  /* Derived (VC-02/03/04) */
+  --ps-color-focus: var(--ps-color-accent);
+  --ps-color-selection: rgba(23, 107, 91, 0.22);
+  --ps-color-scrim: rgba(17, 24, 39, 0.38);
+  --ps-color-mark: rgba(23, 107, 91, 0.22);
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --ps-color-bg: #111827;
+  --ps-color-surface: #182231;
+  --ps-color-text: #e8edf5;
+  --ps-color-muted: #afbacb;
+  --ps-color-accent: #80d7be;
+  --ps-color-border: #354052;
+  --ps-color-warn: #f4d087;
+  --ps-color-danger: #ffb4ab;
+  --ps-color-focus: var(--ps-color-accent);
+  --ps-color-selection: rgba(128, 215, 190, 0.28);
+  --ps-color-scrim: rgba(0, 0, 0, 0.5);
+  --ps-color-mark: rgba(128, 215, 190, 0.28);
+  color-scheme: dark;
+}
+
+:root {
+  /* Spacing (IXD §18.2: 4/8/12/16/24/32) */
+  --ps-space-1: 4px;
+  --ps-space-2: 8px;
+  --ps-space-3: 12px;
+  --ps-space-4: 16px;
+  --ps-space-5: 24px;
+  --ps-space-6: 32px;
+  /* Controls and icons (IXD §18.2: 32–36px; 18–20px) */
+  --ps-control-h: 32px;
+  --ps-control-h-lg: 36px;
+  --ps-icon: 18px;
+  --ps-icon-lg: 20px;
+  --ps-radius-sm: 6px;
+  --ps-radius-lg: 10px;
+  --ps-hit-min: 32px; /* primary hit target ≥32×32px */
+  /* Structure (IXD §3.2) */
+  --ps-toolbar-h: 52px;
+  --ps-tabbar-h: 36px;
+  --ps-nav-w: 248px;
+  --ps-inspect-w: 340px;
+  --ps-content-max: 760px;
+  /* Motion (IXD §18.3: 120–160ms) */
+  --ps-transition-fast: 120ms ease-out;
+  --ps-transition: 160ms ease-out;
+  /* Focus ring (VC-02): 2px accent + 2px background isolation */
+  --ps-focus-ring: 0 0 0 2px var(--ps-color-bg), 0 0 0 4px var(--ps-color-focus);
+  /* Typography stacks (ui-spec §5): system UI sans and system mono; no
+     bundled/remote fonts; CJK glyphs fall back gracefully. */
+  --ps-font-ui:
+    system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    'Noto Sans CJK SC', 'Source Han Sans SC', sans-serif;
+  --ps-font-mono:
+    ui-monospace, 'SF Mono', 'Cascadia Mono', 'JetBrains Mono', 'Noto Sans Mono CJK SC',
+    'Source Han Mono SC', Consolas, 'Liberation Mono', monospace;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ps-transition-fast: 0ms;
+    --ps-transition: 0ms;
+  }
+}

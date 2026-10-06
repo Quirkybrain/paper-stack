@@ -1,11 +1,23 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import zhCN from '../locales/zh-CN.json'
-import { getLocale, setLocale, t } from './i18n'
+import {
+  DEFAULT_LOCALE,
+  getLocale,
+  hasLocale,
+  lookup,
+  registerLocale,
+  setLocale,
+  t,
+} from './i18n'
 
 const messages = zhCN as Record<string, string>
 
-describe('i18n scaffold (zh-CN)', () => {
+afterEach(() => {
+  setLocale(DEFAULT_LOCALE)
+})
+
+describe('i18n runtime (zh-CN baseline)', () => {
   it('resolves a sample of critical catalog keys verbatim', () => {
     expect(t('app.name')).toBe('纸栈 PaperStack')
     expect(t('welcome.openFile')).toBe('打开文件')
@@ -27,6 +39,8 @@ describe('i18n scaffold (zh-CN)', () => {
     expect(t('search.counter.aria', { current: 2, total: 7 })).toBe('第 2 项，共 7 项')
     expect(t('about.version', { version: '0.1.0' })).toBe('版本 0.1.0')
     expect(t('time.minutesAgo', { count: 5 })).toBe('5 分钟前')
+    expect(t('time.minutesAgo', { count: 0 })).toBe('0 分钟前')
+    expect(t('dialog.clear.usage', { count: '2', size: '1 KiB' })).toBe('2 项 · 1 KiB')
   })
 
   it('keeps placeholders without a matching parameter and ignores extras', () => {
@@ -34,7 +48,7 @@ describe('i18n scaffold (zh-CN)', () => {
     expect(t('app.name', { unused: 'x' })).toBe('纸栈 PaperStack')
   })
 
-  it('returns the key and warns in development when a key is missing', () => {
+  it('returns the key and warns in development when a key is missing everywhere', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     try {
       expect(t('does.not.exist')).toBe('does.not.exist')
@@ -42,6 +56,32 @@ describe('i18n scaffold (zh-CN)', () => {
     } finally {
       warn.mockRestore()
     }
+  })
+
+  it('falls back from a registered locale to the zh-CN baseline with a warning', () => {
+    registerLocale('en-US', { 'app.name': 'PaperStack', 'toolbar.open': 'Open' })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      setLocale('en-US')
+      expect(t('app.name')).toBe('PaperStack')
+      expect(t('toolbar.open')).toBe('Open')
+      // Missing in en-US but present in zh-CN: baseline fallback + dev warning.
+      expect(t('welcome.openFile')).toBe('打开文件')
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('welcome.openFile'))
+      // Missing everywhere: key returned, still no throw.
+      expect(t('en-US.only.missing')).toBe('en-US.only.missing')
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('exposes lookup and locale registration state', () => {
+    expect(hasLocale(DEFAULT_LOCALE)).toBe(true)
+    expect(hasLocale('fr-FR')).toBe(false)
+    registerLocale('fr-FR', { 'welcome.title': 'Ouvrir un document.' })
+    expect(hasLocale('fr-FR')).toBe(true)
+    expect(lookup('welcome.title', 'fr-FR')).toBe('Ouvrir un document.')
+    expect(lookup('welcome.openFile', 'fr-FR')).toBe('打开文件')
   })
 
   it('exposes the active locale accessors', () => {

@@ -1,32 +1,60 @@
 import zhCN from '../locales/zh-CN.json'
 
 /**
- * Minimal i18n scaffold for v0.1.0 (ADR-009, artifacts/40-ux/strings-zh-CN.md).
+ * i18n runtime for v0.1.0 (ADR-009).
  *
- * The full runtime — locale loading, the complete fallback chain and the
- * component-level API — lands with wp-16. This scaffold already fixes the
- * calling contract: `t(key, params?)` with `{param}` interpolation, flat
- * dotted keys from `src/locales/zh-CN.json`, and a "return the key, never
- * blank, never throw" fallback with a development warning.
+ * - Flat dotted keys from `src/locales/{locale}.json`; zh-CN is the baseline.
+ * - `t(key, params?)` supports `{name}` interpolation (no string
+ *   concatenation in call sites).
+ * - Fallback chain: active locale → zh-CN → return the key as-is with a
+ *   development warning. Never blank, never throws.
+ * - Future languages register their bundle via `registerLocale`; no language
+ *   gets a separate code path (single codebase rule).
  */
-export type Locale = 'zh-CN'
+
+export type Locale = string
 
 export type TranslationParams = Record<string, string | number>
 
-const resources: Record<Locale, Record<string, string>> = {
-  'zh-CN': zhCN as Record<string, string>,
+export const DEFAULT_LOCALE: Locale = 'zh-CN'
+
+type MessageBundle = Record<string, string>
+
+const bundles = new Map<Locale, MessageBundle>()
+
+let activeLocale: Locale = DEFAULT_LOCALE
+
+function isDevEnvironment(): boolean {
+  return typeof import.meta !== 'undefined' && import.meta.env?.DEV === true
 }
 
-const FALLBACK_LOCALE: Locale = 'zh-CN'
+function warn(message: string): void {
+  if (isDevEnvironment()) console.warn(`[i18n] ${message}`)
+}
 
-let activeLocale: Locale = 'zh-CN'
+/** Registers or replaces the bundle for a locale (e.g. a future `en-US.json`). */
+export function registerLocale(locale: Locale, messages: MessageBundle): void {
+  bundles.set(locale, { ...messages })
+}
+
+export function hasLocale(locale: Locale): boolean {
+  return bundles.has(locale)
+}
 
 export function setLocale(locale: Locale): void {
+  if (!bundles.has(locale) && locale !== DEFAULT_LOCALE) {
+    warn(`locale "${locale}" is not registered; text will fall back to "${DEFAULT_LOCALE}"`)
+  }
   activeLocale = locale
 }
 
 export function getLocale(): Locale {
   return activeLocale
+}
+
+/** Resolves a key through the fallback chain without warnings (for tooling). */
+export function lookup(key: string, locale: Locale = activeLocale): string | undefined {
+  return bundles.get(locale)?.[key] ?? bundles.get(DEFAULT_LOCALE)?.[key]
 }
 
 function interpolate(template: string, params?: TranslationParams): string {
@@ -38,12 +66,20 @@ function interpolate(template: string, params?: TranslationParams): string {
 }
 
 export function t(key: string, params?: TranslationParams): string {
-  const template = resources[activeLocale][key] ?? resources[FALLBACK_LOCALE][key]
-  if (template === undefined) {
-    if (import.meta.env.DEV) {
-      console.warn(`[i18n] missing key for locale "${activeLocale}": ${key}`)
+  const bundle = bundles.get(activeLocale)
+  const direct = bundle?.[key]
+  if (direct !== undefined) return interpolate(direct, params)
+
+  if (activeLocale !== DEFAULT_LOCALE) {
+    const fallback = bundles.get(DEFAULT_LOCALE)?.[key]
+    if (fallback !== undefined) {
+      warn(`key "${key}" is missing in locale "${activeLocale}"; using "${DEFAULT_LOCALE}"`)
+      return interpolate(fallback, params)
     }
-    return key
   }
-  return interpolate(template, params)
+
+  warn(`missing key "${key}" for locale "${activeLocale}"`)
+  return key
 }
+
+registerLocale(DEFAULT_LOCALE, zhCN as MessageBundle)
