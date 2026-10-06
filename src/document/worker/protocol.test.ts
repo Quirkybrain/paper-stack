@@ -293,19 +293,45 @@ describe('worker client', () => {
     )
   })
 
-  it('never reuses a startup-failed shared worker (later parses fall back in-process)', async () => {
+  it('retries a fresh worker after a fatal error instead of blacklisting it permanently', async () => {
     vi.stubGlobal('Worker', FakeWorker)
     const first = parseDocumentWithFallback(SAMPLE, token('t1'))
     await vi.waitFor(() => expect(FakeWorker.instances[0]?.posted.length).toBe(1))
     FakeWorker.instances[0].emitError()
-    const outcome = await first
-    expect(outcome.usedWorker).toBe(false)
-    expect(outcome.result.diagnostics.some((entry) => entry.code === 'PS_WORKER_FAILED')).toBe(true)
-
-    const second = await parseDocumentWithFallback(SAMPLE, token('t2'))
-    expect(second.usedWorker).toBe(false)
-    // The dead worker was terminated and no replacement is created.
-    expect(FakeWorker.instances).toHaveLength(1)
+    const firstOutcome = await first
+    expect(firstOutcome.usedWorker).toBe(false)
+    expect(firstOutcome.result.diagnostics.some((entry) => entry.code === 'PS_WORKER_FAILED')).toBe(
+      true,
+    )
+    // The dead worker was terminated and dropped.
     expect(FakeWorker.instances[0].terminated).toBe(true)
+
+    // The next parse starts a fresh worker; when it responds, it is used.
+    const second = parseDocumentWithFallback(SAMPLE, token('t2'))
+    await vi.waitFor(() => expect(FakeWorker.instances[1]?.posted.length).toBe(1))
+    const envelope = (await runPipelineTask(
+      request({ taskId: 't2', generation: 2 }),
+    )) as ParsedTaskResponse
+    FakeWorker.instances[1].emit(envelope)
+    const secondOutcome = await second
+    expect(secondOutcome.usedWorker).toBe(true)
+    expect(secondOutcome.result.diagnostics).toEqual([])
+    expect(FakeWorker.instances).toHaveLength(2)
+  })
+
+  it('keeps degrading in-process when every worker startup fails', async () => {
+    vi.stubGlobal('Worker', FakeWorker)
+    for (const [index, taskId] of ['t1', 't2'].entries()) {
+      const outcomePromise = parseDocumentWithFallback(SAMPLE, token(taskId))
+      await vi.waitFor(() => expect(FakeWorker.instances[index]?.posted.length).toBe(1))
+      FakeWorker.instances[index].emitError()
+      const outcome = await outcomePromise
+      expect(outcome.usedWorker).toBe(false)
+      expect(outcome.result.diagnostics.some((entry) => entry.code === 'PS_WORKER_FAILED')).toBe(
+        true,
+      )
+    }
+    expect(FakeWorker.instances).toHaveLength(2)
+    expect(FakeWorker.instances.every((instance) => instance.terminated)).toBe(true)
   })
 })

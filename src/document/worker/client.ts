@@ -7,7 +7,9 @@ import type { ParseTaskRequest, ParsedTaskResponse, WorkerResponse } from './pro
  * (rendering-pipeline §6). When a Worker is unavailable or the worker dies,
  * the exact same `parseDocument` runs in-process and the result carries a
  * `PS_WORKER_FAILED` diagnostic — the tree/outline/blocks/segments stay
- * identical to the worker product.
+ * identical to the worker product. A fatal error drops only that client:
+ * later parses retry a rebuilt worker instead of blacklisting it for the
+ * rest of the session.
  */
 
 export class TaskAbortedError extends Error {
@@ -111,23 +113,29 @@ export function createPipelineWorkerClient(
 }
 
 let sharedClient: PipelineWorkerClient | null = null
-let sharedClientUnavailable = false
 
+/**
+ * A failed client is dropped so that the *next* parse can start a fresh worker
+ * again (rendering-pipeline §6 allows terminating and rebuilding the worker;
+ * a session-permanent blacklist would keep the in-process fallback forever
+ * even when the worker becomes runnable). Failure stays per parse: every parse
+ * either uses a worker or degrades to the in-process pipeline with a
+ * `PS_WORKER_FAILED` diagnostic.
+ */
 function dropSharedClient(): void {
-  sharedClientUnavailable = true
   const client = sharedClient
   sharedClient = null
   client?.dispose()
 }
 
 function getSharedClient(): PipelineWorkerClient | null {
-  if (sharedClientUnavailable) return null
   if (!sharedClient || sharedClient.failed) {
     if (sharedClient?.failed) dropSharedClient()
     try {
       sharedClient = createPipelineWorkerClient({ onFatalError: dropSharedClient })
     } catch {
-      sharedClientUnavailable = true
+      // Worker construction failed for this parse only; the caller falls back
+      // and a later parse may retry (e.g. after a transient environment limit).
       return null
     }
   }
@@ -138,7 +146,6 @@ function getSharedClient(): PipelineWorkerClient | null {
 export function resetPipelineWorkerClient(): void {
   sharedClient?.dispose()
   sharedClient = null
-  sharedClientUnavailable = false
 }
 
 export interface ParseTaskToken {
