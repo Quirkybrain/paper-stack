@@ -4,7 +4,7 @@
 - **Artifact ID**: ART-60-IMPL-WP11
 - **Artifact Type**: Implementation Evidence Report（`services/storage.rs`、`services/session.rs` 的构建、测试与验证证据）
 - **Status**: VALID
-- **Revision**: 1
+- **Revision**: 2
 - **Owner**: implementation-engineer
 - **Task**: `wp-11-storage`（任务分支 `task/wp-11-storage`；父分支 `feat/v0.1.0`；基线提交 `bbc3c35d20cee6f9afd7559478f4cf6137e379a9`）
 - **Component**: C-05（Rust 存储服务）
@@ -23,7 +23,7 @@ Pinned 输入 SHA-256 于 2026-10-07 复核（`swe_guard.py begin` 冻结，本�
 | `artifacts/35-models/session-and-version-models.md` | `65c36022924f0bf662bae1442856b20346a9e929fea15ad783633ee8568e1fad` | ✓ |
 | `artifacts/50-plan/implementation-plan.md` | `ce6d7bc785771ed3c75835311bd0267d286d045c5d1804cac1f4556a8b02967f` | ✓ |
 
-基线提交 `bbc3c35` 与 handoff 一致；进入时工作树干净；`SWE snapshot` ref `refs/swe/snapshots/20261006T212642Z-wp-11-storage-2af196c0`（commit `ce678e33`）覆盖 `src-tauri/src/` 修改前字节。`fixtures/` 本任务未改。
+基线提交 `bbc3c35` 与 handoff 一致；进入时工作树干净；`SWE snapshot` ref `refs/swe/snapshots/20261006T212642Z-wp-11-storage-2af196c0`（commit `ce678e33`）覆盖 `src-tauri/src/` 修改前字节。`fixtures/` 在 Rev 2 新增 `fixtures/storage/**`（锚点样例与 README），未改动既有 fixture。
 
 ## 2. 交付物
 
@@ -36,7 +36,9 @@ Pinned 输入 SHA-256 于 2026-10-07 复核（`swe_guard.py begin` 冻结，本�
 | `src-tauri/tests/storage_records.rs` | 仓库往返、缓存 LRU、授权注册表持久化（21 测试） |
 | `src-tauri/tests/storage_gating.rs` | 门禁矩阵、分类清除、抑制与恢复、不触碰源文件（8 测试） |
 | `src-tauri/tests/storage_session.rs` | 会话映射/恢复助手集成（6 测试） |
-| `artifacts/60-implementation/wp-11-storage.md` | 本报告 |
+| `fixtures/storage/anchor-record.example.json` + `README.md` | 持久化锚点样例：`PositionRecord` 精确序列化形状（camelCase 字段、`fp1:` 指纹、半开字节区间），守护记录格式漂移 |
+| `src-tauri/tests/storage_fixtures.rs` | 样例 JSON ↔ Rust 类型语义往返 + 经 `save_position`/`load_position` 的存储往返（2 测试） |
+| `artifacts/60-implementation/wp-11-storage.md` | 本报告（Rev 2） |
 
 依赖未变：仅 `rusqlite`（bundled，既有）、`serde`/`serde_json`、`thiserror`（既有）与 `tempfile`（dev，既有）；未新增 crate。
 
@@ -45,7 +47,7 @@ Pinned 输入 SHA-256 于 2026-10-07 复核（`swe_guard.py begin` 冻结，本�
 | T | 测试（文件::测试名） |
 |---|---|
 | T-12 连接/schema/迁移框架 | `migration_faults`：空库→v1（9 表/5 索引/全 STRICT/WAL）、v1 库幂等重开且设置保留、更高修订拒绝读写并只读降级、损坏字节保留且报 `PS_DB_MIGRATION`、只读目录干净失败、只读降级拒损坏文件；`storage::tests`：固定上限与 `FrozenLimits` 一致 |
-| T-13 仓库与门禁 | `storage_records`：默认值/越界旧值/重开持久；rememberRecords 独立门禁；recents ≤100 顺序、路径刷新、未知 docId、可用性复核；positions 往返/FK 拒绝；session 往返/排序/活动标签；sidebar 往返/64KiB/非法 JSON；authorizations 往返、session 清理、wp-08 注册表注入-恢复-撤销；cache 往返/touch/LRU 淘汰（文件+元数据）/删除失败保留/逃逸路径仅删元数据/单条移除；`storage_gating`：门禁矩阵、确认要求、逐类计数（2/1/5/2/2/0）、抑制后写入 `saved:false` 且不重建、`resume_recording` 按类别/全部恢复、显式打开恢复、缓存部分失败暴露 `PS_IO_WRITE_FAILED`、清除不触碰源文件、overview 计数；`storage_session`：排序/活动/持久化/恢复/陈旧 active 丢弃/重复拒绝/抑制 |
+| T-13 仓库与门禁 | `storage_records`：默认值/越界旧值/重开持久；rememberRecords 独立门禁；recents ≤100 顺序、路径刷新、未知 docId、可用性复核；positions 往返/FK 拒绝；session 往返/排序/活动标签；sidebar 往返/64KiB/非法 JSON；authorizations 往返、session 清理、wp-08 注册表注入-恢复-撤销；cache 往返/touch/LRU 淘汰（文件+元数据）/删除失败保留/逃逸路径仅删元数据/单条移除；`storage_gating`：门禁矩阵、确认要求、逐类计数（2/1/5/2/2/0）、抑制后写入 `saved:false` 且不重建、`resume_recording` 按类别/全部恢复、显式打开恢复、缓存部分失败暴露 `PS_IO_WRITE_FAILED`、清除不触碰源文件、overview 计数；`storage_session`：排序/活动/持久化/恢复/陈旧 active 丢弃/重复拒绝/抑制；`storage_fixtures`（Rev 2）：样例形状/不变量断言、JSON 语义（顺序无关）往返、存储往返相等 |
 | T-14 故障注入 | `migration_faults`：中断迁移（v2 部分 DDL 后失败）→ 回滚且 `user_version=1`、b 表不存在；磁盘满（`max_page_count` 页预算）迁移回滚至 0 且无表；记录写入磁盘满 → `PS_DB_FAILURE` 且数据库仍可读 |
 
 ## 4. DoD 执行证据（全部在本修订上复跑；工作目录=项目根）
@@ -53,8 +55,8 @@ Pinned 输入 SHA-256 于 2026-10-07 复核（`swe_guard.py begin` 冻结，本�
 | # | 命令 | 结果 |
 |---|---|---|
 | 1 | `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` | PASS（无 diff） |
-| 2 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | PASS，0 warning（`Finished dev profile ... 4.63s`） |
-| 3 | `cargo test --manifest-path src-tauri/Cargo.toml` | PASS：159 passed / 0 failed（见下表） |
+| 2 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | PASS，0 warning |
+| 3 | `cargo test --manifest-path src-tauri/Cargo.toml` | PASS：161 passed / 0 failed（见下表） |
 
 | 测试目标 | 结果 |
 |---|---|
@@ -63,13 +65,14 @@ Pinned 输入 SHA-256 于 2026-10-07 复核（`swe_guard.py begin` 冻结，本�
 | `files_open` / `files_read` / `files_source`（既有） | 12 / 12 / 18 passed; 0 failed |
 | `migration_faults`（新） | 11 passed; 0 failed |
 | `security_paths_auth`（既有） | 24 passed; 0 failed |
+| `storage_fixtures`（新，Rev 2） | 2 passed; 0 failed |
 | `storage_gating`（新） | 8 passed; 0 failed |
 | `storage_records`（新） | 21 passed; 0 failed |
 | `storage_session`（新） | 6 passed; 0 failed |
 | `tree_listing`（既有） | 9 passed; 0 failed |
 | main / doc-tests | 0 passed; 0 failed |
 
-新增测试合计 51（5 单元 + 46 集成）。故障注入与安全相关用例（迁移中断、磁盘满×2、只读目录、损坏文件、LRU 部分失败、源文件只读）连续 3 次复跑全绿（0.02–0.07s/套）。
+新增测试合计 53（5 单元 + 48 集成；含 Rev 2 的 2 项 fixture 测试）。故障注入与安全相关用例（迁移中断、磁盘满×2、只读目录、损坏文件、LRU 部分失败、源文件只读）连续 3 次复跑全绿（0.02–0.07s/套）。
 
 ## 5. 实现决策与契约张力（明确记录）
 
@@ -94,4 +97,15 @@ Pinned 输入 SHA-256 于 2026-10-07 复核（`swe_guard.py begin` 冻结，本�
 
 ## 7. 提交
 
-任务分支 `task/wp-11-storage` 上单一提交：`feat(storage): add sqlite persistence and session services`。提交前 `cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test` 全绿；`git diff --cached --check` 干净；仅提交声明范围（`src-tauri/src/`、`src-tauri/tests/`、`artifacts/60-implementation/`；`fixtures/` 无改动）。
+任务分支 `task/wp-11-storage` 上的提交：
+
+1. `feat(storage): add sqlite persistence and session services`（`5fec019`）：服务、测试与报告初版（Rev 1）。
+2. `test(storage): add persisted anchor record fixtures`：`fixtures/storage/**` 样例与 README、`src-tauri/tests/storage_fixtures.rs`、本报告 Rev 2。
+
+提交前 `cargo fmt --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test` 全绿；`git diff --cached --check` 干净；仅提交声明范围（`src-tauri/src/`、`src-tauri/tests/`、`fixtures/`、`artifacts/60-implementation/`）。
+
+## 8. Revision 2 说明（2026-10-07）
+
+- 新增 `fixtures/storage/anchor-record.example.json` 与 `README.md`：固定持久化 `PositionRecord` 序列化形状（data-model §3.3/§3.4、contracts §3.4；INV-AR-01 仅锚点、无正文），由 `src-tauri/tests/storage_fixtures.rs` 守护（形状/不变量断言 + JSON 顺序无关语义往返 + 经 SQLite 的 `save_position`/`load_position` 往返）。
+- 全量复跑（工作目录=项目根）：`cargo fmt --check` PASS、`cargo clippy --all-targets -- -D warnings` PASS（0 warning）、`cargo test` **161 passed / 0 failed**（`storage_fixtures` 2 passed）。
+- 目的：handoff 声明的 `commit_paths` 覆盖 `fixtures/`，本修订为该范围提供真实、可复跑的交付物；未改任何契约/服务行为。
