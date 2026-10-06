@@ -889,6 +889,12 @@ impl FilesService {
         self.documents.get(doc_id)
     }
 
+    /// Registered documents in `docId` order (read accessor for the command
+    /// layer: diagnostics bundle rows, protected export sources, relink).
+    pub fn registered_documents(&self) -> impl Iterator<Item = &RegisteredDocument> {
+        self.documents.values()
+    }
+
     pub fn registered_count(&self) -> usize {
         self.documents.len()
     }

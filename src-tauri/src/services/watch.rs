@@ -50,6 +50,10 @@ use crate::models::{WatchChangedPayload, WatchKind};
 /// regression tests by fixing it in the test configuration).
 pub const QUIET_WINDOW: Duration = Duration::from_millis(300);
 
+/// `paperstack://watch-changed` event name (contracts §4); emitted by the
+/// command layer from [`WatchRuntime`] payloads.
+pub const EVENT_WATCH_CHANGED: &str = "paperstack://watch-changed";
+
 /// Suggested focus-re-check throttle (models §3.4 P-04; a to-be-validated
 /// parameter, not a frozen acceptance threshold).
 pub const FOCUS_RECHECK_THROTTLE: Duration = Duration::from_millis(300);
