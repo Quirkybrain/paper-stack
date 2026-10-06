@@ -565,6 +565,49 @@ fn settings_from_map(map: &BTreeMap<String, String>) -> GlobalSettings {
     }
 }
 
+/// Applies a settings patch to `current` with the R23 rules: present valid
+/// fields replace the value, out-of-range or non-finite values keep the
+/// previous value. Pure so the command layer can compute the effective
+/// in-memory settings even when persistence fails (`applied`/`persisted`
+/// separation, contracts §2.1 command 23).
+pub fn apply_settings_patch(
+    current: &GlobalSettings,
+    patch: &GlobalSettingsPatch,
+) -> GlobalSettings {
+    let mut next = current.clone();
+    if let Some(theme) = patch.theme {
+        next.theme = theme;
+    }
+    if let Some(value) = patch.font_size_px {
+        if (FONT_SIZE_PX_MIN..=FONT_SIZE_PX_MAX).contains(&value) {
+            next.font_size_px = value;
+        }
+    }
+    if let Some(value) = patch.line_height {
+        if value.is_finite() && (LINE_HEIGHT_MIN..=LINE_HEIGHT_MAX).contains(&value) {
+            next.line_height = value;
+        }
+    }
+    if let Some(value) = patch.max_content_width_px {
+        if (MAX_CONTENT_WIDTH_PX_MIN..=MAX_CONTENT_WIDTH_PX_MAX).contains(&value) {
+            next.max_content_width_px = value;
+        }
+    }
+    if let Some(mode) = patch.syntax_mode {
+        next.syntax_mode = mode;
+    }
+    if let Some(mode) = patch.update_mode_default {
+        next.update_mode_default = mode;
+    }
+    if let Some(value) = patch.restore_session {
+        next.restore_session = value;
+    }
+    if let Some(value) = patch.remember_records {
+        next.remember_records = value;
+    }
+    next
+}
+
 impl Storage {
     /// Typed settings with the SRS §6.1 defaults for every missing field; a
     /// corrupt or out-of-range stored value falls back to that field's default
@@ -599,47 +642,8 @@ impl Storage {
         now_ms: i64,
     ) -> Result<GlobalSettings, AppError> {
         let current = self.load_settings()?;
-        let mut next = current.clone();
-        let mut changed = false;
-        if let Some(theme) = patch.theme {
-            next.theme = theme;
-            changed = true;
-        }
-        if let Some(value) = patch.font_size_px {
-            if (FONT_SIZE_PX_MIN..=FONT_SIZE_PX_MAX).contains(&value) {
-                next.font_size_px = value;
-                changed = true;
-            }
-        }
-        if let Some(value) = patch.line_height {
-            if value.is_finite() && (LINE_HEIGHT_MIN..=LINE_HEIGHT_MAX).contains(&value) {
-                next.line_height = value;
-                changed = true;
-            }
-        }
-        if let Some(value) = patch.max_content_width_px {
-            if (MAX_CONTENT_WIDTH_PX_MIN..=MAX_CONTENT_WIDTH_PX_MAX).contains(&value) {
-                next.max_content_width_px = value;
-                changed = true;
-            }
-        }
-        if let Some(mode) = patch.syntax_mode {
-            next.syntax_mode = mode;
-            changed = true;
-        }
-        if let Some(mode) = patch.update_mode_default {
-            next.update_mode_default = mode;
-            changed = true;
-        }
-        if let Some(value) = patch.restore_session {
-            next.restore_session = value;
-            changed = true;
-        }
-        if let Some(value) = patch.remember_records {
-            next.remember_records = value;
-            changed = true;
-        }
-        if changed {
+        let next = apply_settings_patch(&current, patch);
+        if next != current {
             self.write_settings(&next, now_ms)?;
             self.inner
                 .remember_records

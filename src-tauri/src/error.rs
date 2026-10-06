@@ -411,6 +411,25 @@ impl AppError {
     pub fn from_io_write(error: std::io::Error) -> Self {
         AppError::new(ErrorCode::IoWriteFailed).with_source(error)
     }
+
+    /// Rebuilds an internal error from a wire payload. Used when a nested
+    /// `SaveResult.error` must surface as a command failure: the stable code,
+    /// details and source range survive; the developer message carries the
+    /// i18n key. Unknown codes fall back to `PS_INTERNAL`.
+    pub fn from_payload(payload: &ErrorPayload) -> Self {
+        let code = payload
+            .code
+            .parse::<ErrorCode>()
+            .unwrap_or(ErrorCode::Internal);
+        let mut error = AppError::new(code).with_message(payload.message_key.clone());
+        if let Some(details) = &payload.details {
+            error = error.with_details(details.clone());
+        }
+        if let Some(source_range) = payload.source_range {
+            error = error.with_source_range(source_range);
+        }
+        error
+    }
 }
 
 impl From<&AppError> for ErrorPayload {

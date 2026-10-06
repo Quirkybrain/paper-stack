@@ -202,31 +202,55 @@ impl AuthRegistry {
         origins: &[String],
         now_ms: i64,
     ) -> Result<GrantRecord, AppError> {
-        let mut normalized: Vec<String> = origins
-            .iter()
-            .map(|origin| origin.trim().to_owned())
-            .filter(|origin| !origin.is_empty())
-            .collect();
-        normalized.sort();
-        normalized.dedup();
+        let normalized = normalize_origins(origins);
         if normalized.is_empty() {
             return Err(AppError::new(ErrorCode::RemoteProtocol)
                 .with_message("grant_remote_session requires at least one origin"));
         }
-        let target = normalized.join(",");
-        // The grant id folds in the document session: remote grants are per
-        // document session, and grant ids are unique across documents
-        // (data-model §3.2).
-        let record = GrantRecord {
-            grant_id: grant_id_for_remote(doc_id, &target, GrantScope::Session),
-            kind: GrantKind::Remote,
-            scope: GrantScope::Session,
-            canonical_path: None,
-            origins: Some(normalized),
-            doc_id: Some(doc_id.to_owned()),
-            granted_at_ms: now_ms,
-        };
+        let record = remote_record(doc_id, &normalized, now_ms);
         self.upsert(record)
+    }
+
+    /// Session-scoped fallback for the memory-degrade path (NF08): registers a
+    /// persistent file grant in memory without touching the persistence hook.
+    /// The command layer calls this only after the persistent write failed; the
+    /// returned record honestly carries `session` scope.
+    pub fn grant_file_session(&mut self, canonical_path: &Path, now_ms: i64) -> GrantRecord {
+        let path = path_string(canonical_path);
+        self.push_memory_grant(GrantRecord {
+            grant_id: grant_id_for(GrantKind::File, &path, GrantScope::Session),
+            kind: GrantKind::File,
+            scope: GrantScope::Session,
+            canonical_path: Some(path),
+            origins: None,
+            doc_id: None,
+            granted_at_ms: now_ms,
+        })
+    }
+
+    /// Session-scoped directory fallback for the memory-degrade path (NF08).
+    pub fn grant_directory_session(&mut self, canonical_path: &Path, now_ms: i64) -> GrantRecord {
+        let path = path_string(canonical_path);
+        self.push_memory_grant(GrantRecord {
+            grant_id: grant_id_for(GrantKind::Directory, &path, GrantScope::Session),
+            kind: GrantKind::Directory,
+            scope: GrantScope::Session,
+            canonical_path: Some(path),
+            origins: None,
+            doc_id: None,
+            granted_at_ms: now_ms,
+        })
+    }
+
+    /// Session-scoped remote fallback for the memory-degrade path (NF08).
+    pub fn grant_remote_session_memory(
+        &mut self,
+        doc_id: &str,
+        origins: &[String],
+        now_ms: i64,
+    ) -> GrantRecord {
+        let normalized = normalize_origins(origins);
+        self.push_memory_grant(remote_record(doc_id, &normalized, now_ms))
     }
 
     /// Active origins for one document session, used by the remote policy
@@ -422,6 +446,21 @@ impl AuthRegistry {
         Ok(record)
     }
 
+    /// In-memory-only insert for the persistence-degraded fallbacks above
+    /// (idempotent on the grant id).
+    fn push_memory_grant(&mut self, record: GrantRecord) -> GrantRecord {
+        if let Some(existing) = self
+            .grants
+            .iter()
+            .find(|grant| grant.grant_id == record.grant_id)
+        {
+            return existing.clone();
+        }
+        self.grants.push(record.clone());
+        self.unavailable.remove(&record.grant_id);
+        record
+    }
+
     fn remove_by_id(&mut self, grant_id: &str) -> Result<(), AppError> {
         self.grants.retain(|grant| grant.grant_id != grant_id);
         self.unavailable.remove(grant_id);
@@ -453,6 +492,33 @@ fn same_binding(left: &GrantRecord, right: &GrantRecord) -> bool {
         // sets; the document session is part of the binding.
         GrantKind::Remote => left.doc_id == right.doc_id,
         GrantKind::File | GrantKind::Directory => true,
+    }
+}
+
+fn normalize_origins(origins: &[String]) -> Vec<String> {
+    let mut normalized: Vec<String> = origins
+        .iter()
+        .map(|origin| origin.trim().to_owned())
+        .filter(|origin| !origin.is_empty())
+        .collect();
+    normalized.sort();
+    normalized.dedup();
+    normalized
+}
+
+fn remote_record(doc_id: &str, normalized: &[String], now_ms: i64) -> GrantRecord {
+    // The grant id folds in the document session: remote grants are per
+    // document session, and grant ids are unique across documents
+    // (data-model §3.2).
+    let target = normalized.join(",");
+    GrantRecord {
+        grant_id: grant_id_for_remote(doc_id, &target, GrantScope::Session),
+        kind: GrantKind::Remote,
+        scope: GrantScope::Session,
+        canonical_path: None,
+        origins: Some(normalized.to_vec()),
+        doc_id: Some(doc_id.to_owned()),
+        granted_at_ms: now_ms,
     }
 }
 
