@@ -2,9 +2,11 @@
 //! `auth`), wp-10 the document/read core (`files`, `tree`), wp-11 the SQLite
 //! storage and session services, wp-12 the watch/single-instance services
 //! (`watch`, `app`) and wp-13 the remote resource policy (`resources`);
-//! wp-14 adds the diagnostics and application-info services.
+//! wp-14 adds the diagnostics and application-info services; wp-14a adds the
+//! runtime asset-protocol scope bridge (`asset_scope`).
 
 pub mod app;
+pub mod asset_scope;
 pub mod auth;
 pub mod diagnostics;
 pub mod files;

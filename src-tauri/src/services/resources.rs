@@ -19,7 +19,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt;
 use std::fs;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -739,6 +739,22 @@ impl RemoteService {
             }
         }
         report
+    }
+
+    /// Absolute cache paths currently attributed to one document session
+    /// (asset-scope cleanup on remote-session revoke, R26). Must be read
+    /// before [`Self::revoke_session`], which drops the bookkeeping.
+    pub fn session_cache_paths(&self, doc_id: &str, cache_dir: &Path) -> Vec<PathBuf> {
+        self.doc_keys
+            .get(doc_id)
+            .map(|keys| {
+                keys.iter()
+                    .filter_map(|key| {
+                        resolve_cache_path(cache_dir, &format!("remote-images/{key}"))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     /// Removes every remote-image cache entry and clears the in-process

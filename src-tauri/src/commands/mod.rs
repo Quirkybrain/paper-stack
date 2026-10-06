@@ -171,11 +171,10 @@ pub(crate) fn diagnostics_app_info(info: &InfoService) -> DiagnosticsAppInfo {
 /// Rust-generated asset URL for an authorized local file (contracts §2.1
 /// command 24; R25: the frontend never builds these itself). The `?v=`
 /// observation key (mtime + size) lets the frontend invalidate the WebView
-/// cache when the resource changes (contracts §7.6).
-///
-/// NOTE: the WebView can only serve the URL once the `tauri` `protocol-asset`
-/// feature is enabled in `Cargo.toml` (security-model §6); that manifest line
-/// is outside this work package's write scope (see the evidence report).
+/// cache when the resource changes (contracts §7.6). The `tauri`
+/// `protocol-asset` feature plus the empty static `assetProtocol.scope` let
+/// the WebView serve only paths that the authorization layer expanded at
+/// runtime (security-model §6; wp-14a).
 pub(crate) fn asset_url(app: &AppHandle, path: &std::path::Path) -> Result<String, AppError> {
     let window = app.get_webview_window("main").ok_or_else(|| {
         AppError::new(ErrorCode::Internal).with_message("main window is unavailable")

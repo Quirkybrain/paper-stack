@@ -13,6 +13,7 @@ use sha2::{Digest, Sha256};
 
 use crate::error::{AppError, ErrorCode};
 use crate::models::{GrantKind, GrantRecord, GrantScope, RevokeResult};
+use crate::services::asset_scope::AssetScopeController;
 use crate::services::paths::{self, LocalReadOutcome, PathProbe};
 
 /// Persistence hook for the future `services/storage` integration. The three
@@ -87,6 +88,9 @@ pub struct RevalidationReport {
     /// confirmation (R25).
     pub persistent_unavailable: usize,
     pub unavailable_grant_ids: Vec<String>,
+    /// Session-scope removals whose runtime asset-scope shrink failed. The
+    /// registry still removed them; the caller may log the failure.
+    pub scope_revoke_failures: usize,
 }
 
 /// In-memory authorization registry.
@@ -95,6 +99,9 @@ pub struct AuthRegistry {
     grants: Vec<GrantRecord>,
     unavailable: HashSet<String>,
     asset_scope: AssetScope,
+    /// Runtime asset-protocol scope bridge (wp-14a). `None` in unit tests and
+    /// embedded use without a Tauri app handle.
+    runtime_scope: Option<AssetScopeController>,
     persistence: Option<Box<dyn GrantPersistence>>,
 }
 
@@ -108,6 +115,14 @@ impl AuthRegistry {
             persistence: Some(persistence),
             ..Self::default()
         }
+    }
+
+    /// Attaches the runtime asset-protocol scope (wp-14a): grants and
+    /// revocations then mirror into the Tauri scope through the single
+    /// [`AssetScopeController`] mapping. Without it the registry only
+    /// maintains the in-memory [`AssetScope`] mirror.
+    pub fn set_runtime_scope(&mut self, scope: AssetScopeController) {
+        self.runtime_scope = Some(scope);
     }
 
     /// Seeds records, e.g. from storage on startup, before
@@ -171,6 +186,10 @@ impl AuthRegistry {
             let existing = existing.clone();
             if existing.scope == GrantScope::Persistent || !persist {
                 self.unavailable.remove(&existing.grant_id);
+                // Re-confirmation (or re-open) re-applies the exact scope
+                // mapping, keeping the runtime scope in sync when the grant
+                // predates this process (loaded from storage).
+                self.apply_grant_scope(&existing)?;
                 return Ok(existing);
             }
             // Upgrade session -> persistent for the same root.
@@ -214,8 +233,14 @@ impl AuthRegistry {
     /// Session-scoped fallback for the memory-degrade path (NF08): registers a
     /// persistent file grant in memory without touching the persistence hook.
     /// The command layer calls this only after the persistent write failed; the
-    /// returned record honestly carries `session` scope.
-    pub fn grant_file_session(&mut self, canonical_path: &Path, now_ms: i64) -> GrantRecord {
+    /// returned record honestly carries `session` scope. A runtime-scope
+    /// failure surfaces as an error while the grant stays registered
+    /// (fail-closed: no asset URL can serve without the scope entry).
+    pub fn grant_file_session(
+        &mut self,
+        canonical_path: &Path,
+        now_ms: i64,
+    ) -> Result<GrantRecord, AppError> {
         let path = path_string(canonical_path);
         self.push_memory_grant(GrantRecord {
             grant_id: grant_id_for(GrantKind::File, &path, GrantScope::Session),
@@ -229,7 +254,11 @@ impl AuthRegistry {
     }
 
     /// Session-scoped directory fallback for the memory-degrade path (NF08).
-    pub fn grant_directory_session(&mut self, canonical_path: &Path, now_ms: i64) -> GrantRecord {
+    pub fn grant_directory_session(
+        &mut self,
+        canonical_path: &Path,
+        now_ms: i64,
+    ) -> Result<GrantRecord, AppError> {
         let path = path_string(canonical_path);
         self.push_memory_grant(GrantRecord {
             grant_id: grant_id_for(GrantKind::Directory, &path, GrantScope::Session),
@@ -248,7 +277,7 @@ impl AuthRegistry {
         doc_id: &str,
         origins: &[String],
         now_ms: i64,
-    ) -> GrantRecord {
+    ) -> Result<GrantRecord, AppError> {
         let normalized = normalize_origins(origins);
         self.push_memory_grant(remote_record(doc_id, &normalized, now_ms))
     }
@@ -290,8 +319,20 @@ impl AuthRegistry {
             store.delete(grant_id)?;
         }
         self.unavailable.remove(grant_id);
+        let mut scope_failure = None;
         for record in &removed {
             self.drop_scope_for(record);
+            if let Some(scope) = &self.runtime_scope {
+                if let Err(error) = scope.revoke(record) {
+                    scope_failure.get_or_insert(error);
+                }
+            }
+        }
+        if let Some(error) = scope_failure {
+            // The grant is gone from the registry and storage; the runtime
+            // scope shrink failed. Fail-closed surfaces the error instead of
+            // pretending the revocation is complete.
+            return Err(error);
         }
         Ok(RevokeResult {
             revoked: true,
@@ -331,6 +372,9 @@ impl AuthRegistry {
         for record in &removed {
             self.unavailable.remove(&record.grant_id);
         }
+        // Remote grants carry no local path; their cached files are revoked
+        // through `AssetScopeController::revoke_file` by the command layer,
+        // which owns the cache keys (R26).
         RevokeResult {
             revoked: true,
             cancelled_requests: 0,
@@ -349,6 +393,15 @@ impl AuthRegistry {
             if record.scope == GrantScope::Session {
                 report.session_removed += 1;
                 self.unavailable.remove(&record.grant_id);
+                // Session-scope cleanup revokes the runtime scope for exactly
+                // the removed record. In the production startup order the
+                // scope is attached after this run (the static scope starts
+                // empty), so this only fires for a mid-process revalidation.
+                if let Some(scope) = &self.runtime_scope {
+                    if scope.revoke(&record).is_err() {
+                        report.scope_revoke_failures += 1;
+                    }
+                }
                 continue;
             }
             report.persistent_checked += 1;
@@ -397,6 +450,10 @@ impl AuthRegistry {
         let outcome = paths::authorize_local_read(probe, base_dir, raw_ref, &effective)?;
         if let LocalReadOutcome::Authorized(read) = &outcome {
             self.asset_scope.allow_file(read.canonical_path.clone());
+            if let Some(scope) = &self.runtime_scope {
+                // Step 9: the exact canonical file becomes servable only now.
+                scope.allow_file(&read.canonical_path)?;
+            }
         }
         Ok(outcome)
     }
@@ -436,32 +493,49 @@ impl AuthRegistry {
             // re-confirmation clears a stale "unavailable" mark.
             let existing = existing.clone();
             self.unavailable.remove(&existing.grant_id);
+            self.apply_grant_scope(&existing)?;
             return Ok(existing);
         }
         if let Some(store) = &self.persistence {
             store.upsert(&record)?;
         }
+        self.apply_grant_scope(&record)?;
         self.grants.push(record.clone());
         self.unavailable.remove(&record.grant_id);
         Ok(record)
     }
 
     /// In-memory-only insert for the persistence-degraded fallbacks above
-    /// (idempotent on the grant id).
-    fn push_memory_grant(&mut self, record: GrantRecord) -> GrantRecord {
+    /// (idempotent on the grant id). The record is registered first so a
+    /// runtime-scope failure cannot lose the authorization decision.
+    fn push_memory_grant(&mut self, record: GrantRecord) -> Result<GrantRecord, AppError> {
         if let Some(existing) = self
             .grants
             .iter()
             .find(|grant| grant.grant_id == record.grant_id)
         {
-            return existing.clone();
+            let existing = existing.clone();
+            self.apply_grant_scope(&existing)?;
+            return Ok(existing);
         }
         self.grants.push(record.clone());
         self.unavailable.remove(&record.grant_id);
-        record
+        self.apply_grant_scope(&record)?;
+        Ok(record)
+    }
+
+    fn apply_grant_scope(&self, record: &GrantRecord) -> Result<(), AppError> {
+        match &self.runtime_scope {
+            Some(scope) => scope.grant(record),
+            None => Ok(()),
+        }
     }
 
     fn remove_by_id(&mut self, grant_id: &str) -> Result<(), AppError> {
+        // Only used by the session -> persistent upgrade of the same root;
+        // the runtime scope is intentionally left alone because the new
+        // persistent record re-allows the same subtree, and the forbidden set
+        // has no removal API.
         self.grants.retain(|grant| grant.grant_id != grant_id);
         self.unavailable.remove(grant_id);
         if let Some(store) = &self.persistence {

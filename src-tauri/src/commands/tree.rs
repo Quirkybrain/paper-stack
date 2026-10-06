@@ -26,7 +26,9 @@ pub async fn open_directory(
         let mut auth = lock(&state.auth);
         if let Err(error) = auth.grant_directory(canonical, req.persist, now) {
             state.diagnostics.record_app_error(None, &error);
-            auth.grant_directory_session(canonical, now);
+            if let Err(error) = auth.grant_directory_session(canonical, now) {
+                state.diagnostics.record_app_error(None, &error);
+            }
         }
         Ok(root)
     })
