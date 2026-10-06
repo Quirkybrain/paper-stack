@@ -93,6 +93,48 @@ pub struct RevalidationReport {
     pub scope_revoke_failures: usize,
 }
 
+/// Per-record status of [`AuthRegistry::revoke_all_for_clear`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClearRevokeStatus {
+    /// Removed from the registry and, when attached, shrunk in the runtime
+    /// asset scope.
+    Revoked,
+    /// Removed from the registry, but the runtime asset-scope shrink failed.
+    ScopeFailed,
+}
+
+/// One record's outcome inside a clear-driven revocation (contracts §2.1).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClearRevokeItem {
+    pub grant_id: String,
+    pub kind: GrantKind,
+    pub status: ClearRevokeStatus,
+}
+
+/// Runtime-effect report of [`AuthRegistry::revoke_all_for_clear`]
+/// (contracts §2.1; R25/R27).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ClearRevocationOutcome {
+    /// One item per removed grant, in registry order.
+    pub items: Vec<ClearRevokeItem>,
+    /// Distinct document sessions whose remote grants were removed; the
+    /// command layer deletes their cache entries (R26, command 29 semantics).
+    pub remote_doc_ids: Vec<String>,
+}
+
+impl ClearRevocationOutcome {
+    pub fn removed(&self) -> usize {
+        self.items.len()
+    }
+
+    pub fn scope_failed(&self) -> usize {
+        self.items
+            .iter()
+            .filter(|item| item.status == ClearRevokeStatus::ScopeFailed)
+            .count()
+    }
+}
+
 /// In-memory authorization registry.
 #[derive(Debug, Default)]
 pub struct AuthRegistry {
@@ -380,6 +422,43 @@ impl AuthRegistry {
             cancelled_requests: 0,
             removed_cache_entries: 0,
         }
+    }
+
+    /// Runtime effect of `clear_records(["authorizations"])` (contracts §2.1;
+    /// IX12; R25/R27): removes every in-memory grant and shrinks the runtime
+    /// asset scope for each local record, mirroring [`Self::revoke`]. The
+    /// database rows are deleted by `Storage::clear_records` inside its own
+    /// transaction, so this intentionally does not touch [`GrantPersistence`].
+    /// Remote document sessions are reported so the command layer can delete
+    /// their cache entries (R26). Nothing is re-granted here: a cleared path
+    /// requires a fresh explicit user authorization (data-model §3.2).
+    pub fn revoke_all_for_clear(&mut self) -> ClearRevocationOutcome {
+        let removed: Vec<GrantRecord> = std::mem::take(&mut self.grants);
+        self.unavailable.clear();
+        let mut outcome = ClearRevocationOutcome::default();
+        for record in &removed {
+            self.drop_scope_for(record);
+            let status = match &self.runtime_scope {
+                Some(scope) => match scope.revoke(record) {
+                    Ok(()) => ClearRevokeStatus::Revoked,
+                    Err(_) => ClearRevokeStatus::ScopeFailed,
+                },
+                None => ClearRevokeStatus::Revoked,
+            };
+            if record.kind == GrantKind::Remote {
+                if let Some(doc_id) = &record.doc_id {
+                    if !outcome.remote_doc_ids.contains(doc_id) {
+                        outcome.remote_doc_ids.push(doc_id.clone());
+                    }
+                }
+            }
+            outcome.items.push(ClearRevokeItem {
+                grant_id: record.grant_id.clone(),
+                kind: record.kind,
+                status,
+            });
+        }
+        outcome
     }
 
     /// Startup revalidation (data-model §3.2): session rows are deleted;

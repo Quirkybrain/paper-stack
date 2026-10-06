@@ -9,7 +9,7 @@ use crate::models::{
 };
 use crate::services::resources::{normalize_origin, RemoteService};
 use crate::services::storage::resolve_cache_path;
-use crate::state::lock;
+use crate::state::{lock, AppState};
 
 use super::{asset_url, dispatch, now_ms};
 
@@ -62,27 +62,8 @@ pub async fn revoke_remote_session(
     doc_id: String,
 ) -> Result<RevokeResult, crate::models::ErrorPayload> {
     dispatch(app, Some(doc_id.clone()), move |_app, state| {
-        // Must be read before `revoke_session`, which drops the bookkeeping.
-        let cache_paths = {
-            let remote = lock(&state.remote);
-            remote
-                .as_ref()
-                .map(|service| service.session_cache_paths(&doc_id, &state.cache_dir))
-                .unwrap_or_default()
-        };
         let registry_result = lock(&state.auth).revoke_remote_session(&doc_id);
-        let removed_cache_entries = {
-            let mut remote = lock(&state.remote);
-            remote
-                .as_mut()
-                .map(|service: &mut RemoteService| {
-                    service.revoke_session(&doc_id).removed_cache_entries
-                })
-                .unwrap_or(0)
-        };
-        for path in cache_paths.iter().filter(|path| path.exists()) {
-            state.asset_scope.revoke_file(path)?;
-        }
+        let removed_cache_entries = revoke_remote_cache(state, &doc_id)?;
         Ok(RevokeResult {
             revoked: registry_result.revoked,
             cancelled_requests: registry_result.cancelled_requests,
@@ -90,6 +71,32 @@ pub async fn revoke_remote_session(
         })
     })
     .await
+}
+
+/// Deletes one document session's cached remote images and forbids any file
+/// that survives a failed deletion (R26). Shared by command 29 and the
+/// `clear_records(["authorizations"])` runtime effect. Returns the removed
+/// cache-entry count.
+pub(crate) fn revoke_remote_cache(state: &AppState, doc_id: &str) -> Result<u64, AppError> {
+    // Must be read before `revoke_session`, which drops the bookkeeping.
+    let cache_paths = {
+        let remote = lock(&state.remote);
+        remote
+            .as_ref()
+            .map(|service| service.session_cache_paths(doc_id, &state.cache_dir))
+            .unwrap_or_default()
+    };
+    let removed_cache_entries = {
+        let mut remote = lock(&state.remote);
+        remote
+            .as_mut()
+            .map(|service: &mut RemoteService| service.revoke_session(doc_id).removed_cache_entries)
+            .unwrap_or(0)
+    };
+    for path in cache_paths.iter().filter(|path| path.exists()) {
+        state.asset_scope.revoke_file(path)?;
+    }
+    Ok(removed_cache_entries)
 }
 
 /// Command 30: controlled fetch of one session-allowed remote image

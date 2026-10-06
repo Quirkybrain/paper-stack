@@ -149,22 +149,32 @@ enum MapAction {
 mod tests {
     use std::fs;
     use std::path::PathBuf;
+    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Mutex;
 
     use super::*;
     use crate::models::GrantScope;
-    use crate::services::auth::AuthRegistry;
+    use crate::services::auth::{AuthRegistry, ClearRevokeStatus};
     use crate::services::paths::{LocalReadOutcome, SystemPathProbe};
 
-    /// Deterministic scope double: records the exact call sequence.
+    /// Deterministic scope double: records the exact call sequence and can be
+    /// switched to fail forbid operations.
     #[derive(Debug, Default)]
     struct RecordingBackend {
         ops: Mutex<Vec<String>>,
+        fail_forbid: AtomicBool,
     }
 
     impl RecordingBackend {
         fn ops(&self) -> Vec<String> {
             self.ops.lock().unwrap().clone()
+        }
+
+        fn forbid_ops(&self) -> Vec<String> {
+            self.ops()
+                .into_iter()
+                .filter(|op| op.starts_with("forbid_"))
+                .collect()
         }
     }
 
@@ -190,6 +200,9 @@ mod tests {
                 .lock()
                 .unwrap()
                 .push(format!("forbid_file {}", path.display()));
+            if self.fail_forbid.load(Ordering::SeqCst) {
+                return Err(AppError::new(ErrorCode::Internal));
+            }
             Ok(())
         }
 
@@ -198,6 +211,9 @@ mod tests {
                 .lock()
                 .unwrap()
                 .push(format!("forbid_directory {recursive} {}", path.display()));
+            if self.fail_forbid.load(Ordering::SeqCst) {
+                return Err(AppError::new(ErrorCode::Internal));
+            }
             Ok(())
         }
     }
@@ -402,6 +418,156 @@ mod tests {
                 format!("allow_file {}", file.display()),
             ],
             "a re-confirmation must re-apply the exact allow mapping"
+        );
+    }
+
+    #[test]
+    fn clear_revokes_all_grants_forbids_each_local_path_and_denies_reads() {
+        let fixture = Fixture::new();
+        let (controller, backend) = controller();
+        let mut registry = AuthRegistry::new();
+        registry.set_runtime_scope(controller);
+        let probe = SystemPathProbe;
+
+        let persistent_dir = registry.grant_directory(&fixture.root, true, 1).unwrap();
+        let persistent_file = registry.grant_file(&fixture.file("a.md"), 2).unwrap();
+        let session_file = registry
+            .grant_file_session(&fixture.file("sub/b.md"), 3)
+            .unwrap();
+        let remote = registry
+            .grant_remote_session("d-1", &["https://images.example.com".to_owned()], 4)
+            .unwrap();
+
+        // The read is allowed before the clear...
+        let allowed = registry
+            .authorize_local_read(&probe, &fixture.root, "sub/b.md")
+            .unwrap();
+        assert!(matches!(allowed, LocalReadOutcome::Authorized(_)));
+        assert!(registry.asset_scope().contains(&fixture.file("sub/b.md")));
+
+        let outcome = registry.revoke_all_for_clear();
+        assert_eq!(outcome.removed(), 4);
+        assert_eq!(outcome.scope_failed(), 0);
+        assert_eq!(outcome.remote_doc_ids, vec!["d-1".to_owned()]);
+        assert_eq!(
+            outcome
+                .items
+                .iter()
+                .map(|item| (item.grant_id.clone(), item.kind, item.status))
+                .collect::<Vec<_>>(),
+            [
+                (
+                    persistent_dir.grant_id.clone(),
+                    GrantKind::Directory,
+                    ClearRevokeStatus::Revoked
+                ),
+                (
+                    persistent_file.grant_id.clone(),
+                    GrantKind::File,
+                    ClearRevokeStatus::Revoked
+                ),
+                (
+                    session_file.grant_id.clone(),
+                    GrantKind::File,
+                    ClearRevokeStatus::Revoked
+                ),
+                (
+                    remote.grant_id.clone(),
+                    GrantKind::Remote,
+                    ClearRevokeStatus::Revoked
+                ),
+            ]
+        );
+
+        // Asset scope shrinks for every removed local grant, session and
+        // persistent alike; remote grants map to no local path.
+        assert_eq!(
+            backend.forbid_ops(),
+            [
+                format!("forbid_directory true {}", fixture.root.display()),
+                format!("forbid_file {}", fixture.file("a.md").display()),
+                format!("forbid_file {}", fixture.file("sub/b.md").display()),
+            ]
+        );
+        assert!(registry.asset_scope().is_empty());
+        assert!(registry.list().is_empty());
+        assert!(!registry.has_local_access(&fixture.file("a.md")));
+        assert!(!registry.has_local_access(&fixture.file("sub/b.md")));
+        assert!(registry.active_origins("d-1").is_empty());
+
+        // ...and denied right after the clear (no re-grant, no stale scope).
+        let denied = registry
+            .authorize_local_read(&probe, &fixture.root, "sub/b.md")
+            .unwrap_err();
+        assert_eq!(denied.code(), ErrorCode::AuthOutsideRoot);
+    }
+
+    #[test]
+    fn clear_reports_scope_failures_per_item_without_blocking_removal() {
+        let fixture = Fixture::new();
+        let (controller, backend) = controller();
+        let mut registry = AuthRegistry::new();
+        registry.set_runtime_scope(controller);
+
+        let directory = registry.grant_directory(&fixture.root, true, 1).unwrap();
+        let file = registry.grant_file(&fixture.file("a.md"), 2).unwrap();
+        backend.fail_forbid.store(true, Ordering::SeqCst);
+
+        let outcome = registry.revoke_all_for_clear();
+        assert_eq!(outcome.removed(), 2);
+        assert_eq!(outcome.scope_failed(), 2);
+        assert!(outcome
+            .items
+            .iter()
+            .all(|item| item.status == ClearRevokeStatus::ScopeFailed));
+        assert_eq!(outcome.items[0].grant_id, directory.grant_id);
+        assert_eq!(outcome.items[1].grant_id, file.grant_id);
+        // A failed scope shrink must not keep the cleared grants active.
+        assert!(registry.list().is_empty());
+        assert!(registry.asset_scope().is_empty());
+    }
+
+    #[test]
+    fn clear_reports_remote_documents_and_does_not_re_grant() {
+        let fixture = Fixture::new();
+        let (controller, backend) = controller();
+        let mut registry = AuthRegistry::new();
+        registry.set_runtime_scope(controller);
+        let probe = SystemPathProbe;
+
+        registry.grant_file(&fixture.file("a.md"), 1).unwrap();
+        registry
+            .grant_remote_session("d-1", &["https://images.example.com".to_owned()], 2)
+            .unwrap();
+        registry
+            .grant_remote_session("d-1", &["https://static.example.com".to_owned()], 3)
+            .unwrap();
+        registry
+            .grant_remote_session("d-2", &["https://cdn.example.com".to_owned()], 4)
+            .unwrap();
+
+        let outcome = registry.revoke_all_for_clear();
+        assert_eq!(
+            outcome.remote_doc_ids,
+            vec!["d-1".to_owned(), "d-2".to_owned()]
+        );
+        assert!(registry.active_origins("d-1").is_empty());
+        assert!(registry.active_origins("d-2").is_empty());
+        assert!(registry.list().is_empty());
+
+        // No automatic re-grant from any cleared record.
+        let denied = registry
+            .authorize_local_read(&probe, &fixture.root, "a.md")
+            .unwrap_err();
+        assert_eq!(denied.code(), ErrorCode::AuthOutsideRoot);
+        assert_eq!(
+            backend
+                .ops()
+                .iter()
+                .filter(|op| op.starts_with("allow_"))
+                .count(),
+            1,
+            "only the original explicit grant may have allowed a path"
         );
     }
 }
