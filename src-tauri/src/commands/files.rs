@@ -121,7 +121,9 @@ fn open_one(state: &AppState, raw_path: &str) -> OpenOutcome {
         let mut auth = lock(&state.auth);
         if let Err(error) = auth.grant_file(Path::new(&canonical), now) {
             state.diagnostics.record_app_error(None, &error);
-            auth.grant_file_session(Path::new(&canonical), now);
+            if let Err(error) = auth.grant_file_session(Path::new(&canonical), now) {
+                state.diagnostics.record_app_error(None, &error);
+            }
         }
     }
     // Persist the document identity so recents/positions reference it
@@ -191,7 +193,9 @@ pub async fn relink_document(
             if !auth.has_local_access(&canonical) {
                 if let Err(error) = auth.grant_file(&canonical, now) {
                     state.diagnostics.record_app_error(None, &error);
-                    auth.grant_file_session(&canonical, now);
+                    if let Err(error) = auth.grant_file_session(&canonical, now) {
+                        state.diagnostics.record_app_error(None, &error);
+                    }
                 }
             }
         }

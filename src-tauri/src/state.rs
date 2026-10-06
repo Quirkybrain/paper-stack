@@ -9,13 +9,14 @@
 //! memory.
 
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::error::{AppError, ErrorCode};
 use crate::models::GlobalSettings;
 use crate::services::app::{AppService, SecondInstanceDisposition, EVENT_OPEN_REQUESTED};
+use crate::services::asset_scope::{AssetScopeController, TauriAssetScope};
 use crate::services::auth::AuthRegistry;
 use crate::services::diagnostics::{DiagnosticsService, LogCategory, LogEvent, LogField, LogLevel};
 use crate::services::files::FilesService;
@@ -63,6 +64,9 @@ pub struct AppState {
     pub remote: Mutex<Option<RemoteService>>,
     pub settings: Mutex<SettingsCache>,
     pub app: Mutex<AppService>,
+    /// Runtime asset-protocol scope bridge (wp-14a); shared with the auth
+    /// registry and used for remote-cache files.
+    pub asset_scope: AssetScopeController,
     pub diagnostics: DiagnosticsService,
     pub info: InfoService,
     pub cache_dir: PathBuf,
@@ -139,6 +143,13 @@ impl AppState {
             ],
         });
 
+        // Runtime asset-protocol scope (wp-14a; security-model §6). Attached
+        // after the startup revalidation: the static scope starts empty and
+        // session rows are purged before any in-process allow, so no runtime
+        // shrink is due at startup.
+        let asset_scope = AssetScopeController::new(Arc::new(TauriAssetScope::new(app.clone())));
+        auth.set_runtime_scope(asset_scope.clone());
+
         let remote = storage.as_ref().and_then(|storage| {
             match RemoteService::with_reqwest(RemoteConfig::default(), storage.clone(), &cache_dir)
             {
@@ -172,6 +183,7 @@ impl AppState {
                 revision: 0,
             }),
             app: Mutex::new(app_service),
+            asset_scope,
             diagnostics,
             info: InfoService::new(resource_dir),
             cache_dir,

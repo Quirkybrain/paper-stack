@@ -2,16 +2,19 @@
 
 use tauri::AppHandle;
 
+use crate::error::{AppError, ErrorCode};
 use crate::models::{
     ClearRecordsRequest, ClearResult, FrozenLimits, GlobalSettings, PositionRecord, RecentEntry,
     ResumeRecordingRequest, SavePositionRequest, SaveResult, SaveSessionRequest, SessionSnapshot,
     SettingsBundle, StorageCategory, StorageOverview, UpdateSettingsRequest, UpdateSettingsResult,
 };
+use crate::services::diagnostics::{LogCategory, LogEvent, LogField, LogLevel};
 use crate::services::paths::SystemPathProbe;
 use crate::services::session;
 use crate::services::storage::apply_settings_patch;
 use crate::state::{lock, storage_unavailable, AppState};
 
+use super::resources::revoke_remote_cache;
 use super::{dispatch, now_ms};
 
 fn require_storage(
@@ -162,10 +165,79 @@ pub async fn clear_records(
                     },
                 };
             }
+            // `authorizations` needs more than the row delete: the runtime
+            // registry must revoke every in-memory grant and shrink the asset
+            // scope (contracts §2.1; R25/R27). Applied only when the database
+            // delete succeeded, so a failed clear cannot look cleared in
+            // memory while the rows would resurrect at the next startup.
+            if let Some(index) = results
+                .iter()
+                .position(|result| result.category == StorageCategory::Authorizations)
+            {
+                if results[index].error.is_none() {
+                    let result = results[index].clone();
+                    results[index] = apply_authorization_clear(state, result);
+                }
+            }
         }
         Ok(results)
     })
     .await
+}
+
+/// Runtime effect of clearing the `authorizations` category (IX12;
+/// contracts §2.1): revokes every grant in the registry, shrinks the runtime
+/// asset scope, and deletes the removed remote sessions' cache entries (R26).
+/// Per-item scope failures are surfaced as the category error while the
+/// actual cleared count stays visible.
+fn apply_authorization_clear(state: &AppState, mut result: ClearResult) -> ClearResult {
+    let outcome = lock(&state.auth).revoke_all_for_clear();
+    let mut remote_failures = 0usize;
+    let mut removed_cache_entries = 0u64;
+    for doc_id in &outcome.remote_doc_ids {
+        match revoke_remote_cache(state, doc_id) {
+            Ok(removed) => removed_cache_entries += removed,
+            Err(error) => {
+                remote_failures += 1;
+                state
+                    .diagnostics
+                    .record_app_error(Some(doc_id.as_str()), &error);
+            }
+        }
+    }
+    state.diagnostics.log(&LogEvent {
+        level: LogLevel::Info,
+        category: LogCategory::Auth,
+        event: "authorizations_cleared",
+        fields: vec![
+            LogField::Number {
+                key: "removed",
+                value: outcome.removed() as i64,
+            },
+            LogField::Number {
+                key: "scopeFailed",
+                value: outcome.scope_failed() as i64,
+            },
+            LogField::Number {
+                key: "remoteDocuments",
+                value: outcome.remote_doc_ids.len() as i64,
+            },
+            LogField::Number {
+                key: "remoteCacheRemoved",
+                value: removed_cache_entries as i64,
+            },
+        ],
+    });
+    if outcome.scope_failed() > 0 || remote_failures > 0 {
+        result.error = Some(
+            AppError::new(ErrorCode::Internal)
+                .with_message(
+                    "authorization records were cleared but the runtime scope could not be fully shrunk",
+                )
+                .to_payload(),
+        );
+    }
+    result
 }
 
 /// Command 21: resumes record write-back; omitted categories resume all

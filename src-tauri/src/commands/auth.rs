@@ -191,7 +191,13 @@ pub async fn grant_local_root(
             Ok(record) => Ok(record),
             Err(error) => {
                 state.diagnostics.record_app_error(None, &error);
-                Ok(auth.grant_directory_session(&canonical, now))
+                match auth.grant_directory_session(&canonical, now) {
+                    Ok(record) => Ok(record),
+                    Err(error) => {
+                        state.diagnostics.record_app_error(None, &error);
+                        Err(error)
+                    }
+                }
             }
         }
     })
