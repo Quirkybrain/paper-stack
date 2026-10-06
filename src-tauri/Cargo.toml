@@ -5,6 +5,11 @@ description = "纸栈 PaperStack — Linux-first, local-first read-only technica
 authors = ["Quirkybrain"]
 license = "GPL-3.0-only"
 edition = "2021"
+# Explicit MSRV aligned with the pinned rust-toolchain.toml channel (PC-11).
+rust-version = "1.96"
+# Private, GPL-3.0-only desktop application crate: never publish to
+# crates.io by accident (mirrors package.json "private": true).
+publish = false
 
 [lib]
 name = "paperstack_lib"

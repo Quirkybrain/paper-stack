@@ -4,13 +4,13 @@
 - **Artifact ID**: ART-60-IMPL-WP14A
 - **Artifact Type**: Implementation Evidence Report（asset 协议启用、运行时 scope 扩缩、授权清除运行时效果、单元测试与开发态 CSP 冒烟证据）
 - **Status**: VALID
-- **Revision**: 3
+- **Revision**: 4
 - **Owner**: implementation-engineer
-- **Task**: `wp-14a-assetfix`（任务分支 `task/wp-14a-assetfix`；父分支 `feat/v0.1.0`；Rev 3 基线 `80bcfff61c5b26caa710382bd178f90e515f5d25`，含 Rev 1 `4ba7980`、lockfile 修复 `8415cd7`、Rev 2 `80bcfff`）
+- **Task**: `wp-14a-assetfix`（任务分支 `task/wp-14a-assetfix`；父分支 `feat/v0.1.0`；Rev 4 基线 `d5c0667969c15a3db086eb90baa873a78718e527`，含 `4ba7980`、`8415cd7`、`80bcfff`、`d5c0667`）
 - **Component**: C-03（Rust 路径与授权服务，asset scope 授予/撤回、授权清除运行时效果）、C-09（命令表面与能力/CSP）
 - **Last Verified**: 2026-10-07
-- **Revision History**: Rev 1（`4ba7980`）asset 协议启用 + 运行时 scope 映射；Rev 2（`80bcfff`）`clear_records(["authorizations"])` 运行时撤销；Rev 3（本修订）tokio 直接特性显式锁定（消除对传递 feature 统一的依赖，落实 wp-12 §5.12 记录的风险项）。
-- **Scope**: 解除 wp-14 记录的唯一跨范围阻塞（§7 决策 1），按 `security-model.md` §6、§2.2 第 9 步、§3、§4 与 `contracts.md` §2.1/§9 实现：`protocol-asset` feature + `assetProtocol.enable=true`（静态 scope 空）+ 运行时 scope 单一映射点（授予扩、撤销缩、远程缓存文件、会话清理）+ 授权类清除的运行时撤销（R25/R27/IX12）+ tokio 直接依赖特性按真实用法显式化 + 单元测试 + 开发态 CSP 冒烟。不改上游 Artifact/契约，不新增业务功能。
+- **Revision History**: Rev 1（`4ba7980`）asset 协议启用 + 运行时 scope 映射；Rev 2（`80bcfff`）`clear_records(["authorizations"])` 运行时撤销；Rev 3（`d5c0667`）tokio 直接特性显式锁定；Rev 4（本修订）发布卫生：MSRV + `publish=false`，并汇总各轮范围缺陷的恢复情况。
+- **Scope**: 解除 wp-14 记录的唯一跨范围阻塞（§7 决策 1），按 `security-model.md` §6、§2.2 第 9 步、§3、§4 与 `contracts.md` §2.1/§9 实现：`protocol-asset` feature + `assetProtocol.enable=true`（静态 scope 空）+ 运行时 scope 单一映射点（授予扩、撤销缩、远程缓存文件、会话清理）+ 授权类清除的运行时撤销（R25/R27/IX12）+ tokio 直接依赖特性按真实用法显式化 + MSRV/发布卫生 + 单元测试 + 开发态 CSP 冒烟。不改上游 Artifact/契约，不新增业务功能。
 - **Depends On**: `artifacts/30-architecture/security-model.md`（§2.2/§3/§4/§6）、`artifacts/30-architecture/contracts.md`（§2.1 命令 24/25/27/29/30、§9 asset 行）、`artifacts/30-architecture/data-model.md`（§3.2/§7）、`artifacts/60-implementation/wp-14-commands.md`（§7 决策 1、§8 限制）。
 - **Downstream**: wp-16 TS 接线后的端到端图片显示；质量审查（STRICT）；集成运行验证（`asset://` URL 真实加载）。
 
@@ -24,13 +24,13 @@ Pinned 输入 SHA-256 于 2026-10-07 `swe_guard.py check` 复核一致（本任�
 | `artifacts/30-architecture/contracts.md` | `30664dd9fcb90f745b82446fc50f98a1358ff979ff205c23ea43920f6c3ac88a` | ✓ |
 | `artifacts/60-implementation/wp-14-commands.md` | `0dccf98205e4c8b6cf8ce469f38ef6e20e8a65e0bbdbfecc5df8e68e57c31f9c` | ✓ |
 
-基线：Rev 1 的 `b76541f6`（工作树干净、快照 `refs/swe/snapshots/20261006T221316Z-wp-14a-assetfix-b1a0d257`）；Rev 2 的 `8415cd7ea0c196933931a00cc03368eb555b867c`（含 `4ba7980` 与 Cargo.lock 修复 `8415cd7`；快照 `…222424Z-…2cd84a68`）；Rev 3 的 `80bcfff61c5b26caa710382bd178f90e515f5d25`（快照 `refs/swe/snapshots/20261006T222837Z-wp-14a-assetfix-e4ab385c`）。Rev 3 只改 `src-tauri/Cargo.toml` 与 `artifacts/60-implementation/`；`Cargo.lock` 无变化（见 §3.2）。
+基线：Rev 1 的 `b76541f6`（工作树干净、快照 `refs/swe/snapshots/20261006T221316Z-wp-14a-assetfix-b1a0d257`）；Rev 2 的 `8415cd7ea0c196933931a00cc03368eb555b867c`（含 `4ba7980` 与 Cargo.lock 修复 `8415cd7`；快照 `…222424Z-…2cd84a68`）；Rev 3 的 `80bcfff`（快照 `…222837Z-…e4ab385c`）；Rev 4 的 `d5c0667969c15a3db086eb90baa873a78718e527`（快照 `refs/swe/snapshots/20261006T223148Z-wp-14a-assetfix-aab09219`）。Rev 4 只改 `src-tauri/Cargo.toml` 与 `artifacts/60-implementation/`；`Cargo.lock` 始终无变化（§3.2/§7.7）。
 
 ## 2. 交付物
 
 | 路径 | 内容 |
 |---|---|
-| `src-tauri/Cargo.toml`（改） | Rev 1：`tauri = { version = "2", features = ["protocol-asset"] }`；与 `assetProtocol.enable=true` 成对，满足 `tauri-build` 的 feature 校验（wp-14 §7 决策 1 的一行改动）。Rev 3：`tokio = { version = "1", features = ["rt"] }`（唯一直接调用的 `runtime` API；§3.2）。 |
+| `src-tauri/Cargo.toml`（改） | Rev 1：`tauri = { version = "2", features = ["protocol-asset"] }`；与 `assetProtocol.enable=true` 成对，满足 `tauri-build` 的 feature 校验（wp-14 §7 决策 1 的一行改动）。Rev 3：`tokio = { version = "1", features = ["rt"] }`（唯一直接调用的 `runtime` API；§3.2）。Rev 4：`rust-version = "1.96"` + `publish = false`（发布卫生；§3.3）。 |
 | `src-tauri/tauri.conf.json`（改） | `app.security.assetProtocol = { "enable": true, "scope": [] }`（静态 scope 为空）；生产 `csp` 与 `devCsp` 逐字保持 wp-14 版本，未放宽。 |
 | `src-tauri/src/services/asset_scope.rs`（新） | 运行时 scope 单一映射点：`AssetScopeBackend` trait（allow/forbid × file/directory(recursive)）+ `TauriAssetScope`（`AppHandle::asset_protocol_scope()` 生产实现）+ `AssetScopeController`（`grant`/`revoke` 把 `GrantRecord` 映射为精确文件或子树操作；`allow_file`/`revoke_file` 映射无 grant 记录的精确文件）。11 个确定性单元测试（记录型 backend，可注入 forbid 失败，断言调用序列）。 |
 | `src-tauri/src/services/auth.rs`（改） | Rev 1：新增 `runtime_scope: Option<AssetScopeController>` 与 `set_runtime_scope`；`grant_file`/`grant_directory`（含幂等重授与 session→persistent 升级路径）、`grant_*_session` 降级路径、`authorize_local_read` 成功路径（§2.2 第 9 步）扩 scope；`revoke` 与 `revalidate_startup` 的 session 清除缩 scope；`RevalidationReport` 新增 `scope_revoke_failures`。Rev 2：新增 `revoke_all_for_clear()` 与 `ClearRevocationOutcome`/`ClearRevokeItem`/`ClearRevokeStatus`——授权类清除的运行时撤销入口（见 §3.1）。 |
@@ -92,6 +92,13 @@ clear_records(["authorizations"], confirm=true):
 - `cargo metadata` + `git diff src-tauri/Cargo.lock` = **0 行**：Cargo.lock 不记录 features；tokio 本就作为 paperstack 的直接依赖列在 lock（`dependencies` 数组含 `"tokio"`），新增/调整特性不改变解析图，故本修订无 lock 变更（§7.7）。
 - `cargo fmt --check` PASS；`cargo test` 248/248 PASS（§5）。
 
+### 3.3 发布卫生：MSRV 与禁止发布（Rev 4）
+
+- **`rust-version = "1.96"`**：与 `rust-toolchain.toml`（`channel = "1.96.0"`）显式对齐，落实 PC-11 版本锁定意图；`cargo metadata` 与全量测试在该声明下通过（§5）。
+- **`publish = false`**：本 crate 是私有、GPL-3.0-only 的桌面应用（非库），与 `package.json` 的 `private: true` 对应，避免误发布到 crates.io。
+- **范围缺陷恢复汇总（本轮系列）**：Rev 1 的 `src-tauri/Cargo.lock` 越界变更经 `8415cd7` 机械修复提交；Rev 2/3 的 guard `commit_paths` “每个声明路径须有实际变更”阻塞均为 handoff 范围与真实变更集不匹配所致，协调方逐轮收窄范围后消除；`Cargo.lock` 自 `8415cd7` 起为当前状态（`cargo update` 零变化；特性/元数据声明不进入锁文件）。
+- **剩余 UNVERIFIED（不变）**：① `asset://localhost/...` URL 的真实字节加载（占位前端未接命令 24/30；wp-16 接线后验证）；② Tauri forbidden 集进程内不可逆（撤销后同进程重授权路径的 asset 不会恢复，架构级跟进见 §7.2）；③ 远程缓存撤销的条件性 forbid（仅删除失败的文件 forbid；命令级分支留待集成验证，§7.3）。
+
 ## 4. 新增与受影响的测试
 
 新增 11 个 lib 单元测试（`services/asset_scope.rs`，确定性：临时目录 fixture + 记录型 backend 断言精确调用序列；8 个 Rev 1 + 3 个 Rev 2）：
@@ -112,17 +119,18 @@ clear_records(["authorizations"], confirm=true):
 
 既有测试未改（`src-tauri/tests/` 不在写范围）；`AuthRegistry::new()` 无 runtime scope，全部既有集成测试行为不变。Rev 2 新增测试均为 `#[cfg(test)]` 模块内单元测试，无真实 app handle、无 sleep、无外部时钟。
 
-## 5. DoD 执行证据（工作目录=项目根，Rev 3 修订上复跑）
+## 5. DoD 执行证据（工作目录=项目根，Rev 4 修订上复跑）
 
 | # | 命令 | 结果 |
 |---|---|---|
-| 1 | `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` | PASS（无 diff） |
-| 2 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | PASS，0 warning |
-| 3 | `cargo test --manifest-path src-tauri/Cargo.toml` | PASS：**248 passed / 0 failed** |
-| 4 | `cargo metadata --manifest-path src-tauri/Cargo.toml` + `cargo tree -e features -i tokio` | PASS；解锁无变化，feature `rt` 已由本 crate 直接声明，统一特性集合不变（§3.2） |
-| 5 | `cargo build`（Rev 1 经 `pnpm tauri dev` 的 `cargo run`；Rev 2/3 无构建配置或依赖图变化） | PASS，`tauri-build` 接受 `assetProtocol.enable=true` + `protocol-asset` feature |
+| 1 | `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` | PASS（无 diff；Rev 4 无 Rust 源变更，声明保持有效） |
+| 2 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | PASS，0 warning（Rev 4 无 Rust 源变更） |
+| 3 | `cargo test --manifest-path src-tauri/Cargo.toml` | PASS：**248 passed / 0 failed**（Rev 4 复跑） |
+| 4 | `cargo metadata --manifest-path src-tauri/Cargo.toml` + `git status --porcelain` | PASS；`rust-version`/`publish` 声明被接受，工作树仅 `src-tauri/Cargo.toml`（`Cargo.lock` 零 diff） |
+| 5 | `cargo tree -e features -i tokio`（Rev 3 证据，Rev 4 无依赖声明变化） | PASS；feature `rt` 由本 crate 直接声明，统一特性集合不变（§3.2） |
+| 6 | `cargo build`（Rev 1 经 `pnpm tauri dev` 的 `cargo run`；Rev 2–4 无构建配置或依赖图变化） | PASS，`tauri-build` 接受 `assetProtocol.enable=true` + `protocol-asset` feature |
 
-测试分布（Rev 3 全绿）：lib **51**（40 既有 + 8 Rev 1 + 3 Rev 2）、`commands_surface` 19、`contract_shape` 3、`app_open_requests` 7、`files_open` 12、`files_read` 12、`files_source` 18、`migration_faults` 11、`remote_policy` 23、`security_paths_auth` 24、`storage_fixtures` 2、`storage_gating` 8、`storage_records` 21、`storage_session` 6、`tree_listing` 9、`watch_registry` 20、`watch_runtime` 2、main/doc 0。合计 **248**（Rev 3 无 `src/` 变更，计数与 Rev 2 一致）。
+测试分布（Rev 4 全绿）：lib **51**（40 既有 + 8 Rev 1 + 3 Rev 2）、`commands_surface` 19、`contract_shape` 3、`app_open_requests` 7、`files_open` 12、`files_read` 12、`files_source` 18、`migration_faults` 11、`remote_policy` 23、`security_paths_auth` 24、`storage_fixtures` 2、`storage_gating` 8、`storage_records` 21、`storage_session` 6、`tree_listing` 9、`watch_registry` 20、`watch_runtime` 2、main/doc 0。合计 **248**（Rev 3/4 无 `src/` 变更，计数与 Rev 2 一致）。
 
 ## 6. 开发态 CSP 冒烟（wp-14 §7 决策 10 / §8 风险 4）
 
@@ -157,7 +165,7 @@ kill -TERM -- -$(cat /tmp/opencode/tauri-dev.pid)   # 结束进程组；复核�
 4. **授权类清除的存储降级路径**：仅当数据库删除成功（`error=null`）才执行运行时撤销，避免“内存已清除、数据库行下次启动复活”（AT27）；存储降级时该类别返回 `PS_STORAGE_UNAVAILABLE` 且不改内存注册表。命令级 `apply_authorization_clear` 分支由注册表/共享缓存的单元测试与代码复核覆盖，WebView 级调用留待 wp-16 接线验证。
 5. 启动序列的会话清除发生在运行时 scope 挂接之前：静态 scope 为空，无对象可缩容；若未来在进程中途运行 `revalidate_startup`，映射会正确 forbid 被移除的 session 记录（有单元测试），但同样受限制 2 的不可逆性约束。
 6. `scope_revoke_failures` 仅在 `revalidate_startup` 报告；`revoke` 的 scope 失败以错误返回（命令 27 reject），此时注册表/存储已完成撤销，调用方按失败重试语义处理（实际仅 glob 编译失败才可能触发，逃逸后的 canonical 路径不会失败）。
-7. **tokio 特性显式化不产生 Cargo.lock 变更（Rev 3）**：本 handoff 的 `commit_paths` 含 `src-tauri/Cargo.lock`，但依赖特性不进入锁文件——`tokio` 自 wp-07 起就是 paperstack 的直接依赖并列入 lock 的 `dependencies`，`["sync","time"] → ["rt"]` 只改 Cargo.toml 声明，`cargo metadata` 后 lock 零 diff（实测）。因此本修订提交只改 `src-tauri/Cargo.toml` 与报告；若门禁要求 `Cargo.lock` 出现真实变更，只能是依赖图变化（版本更新或新增包），那不属于“特性锁定”任务。
+7. **tokio 特性显式化不产生 Cargo.lock 变更（Rev 3；Rev 4 的 `rust-version`/`publish` 元数据同样不进入 lock）**：Rev 3 handoff 的 `commit_paths` 曾含 `src-tauri/Cargo.lock`，但依赖特性不进入锁文件——`tokio` 自 wp-07 起就是 paperstack 的直接依赖并列入 lock 的 `dependencies`，`["sync","time"] → ["rt"]` 只改 Cargo.toml 声明，`cargo metadata` 后 lock 零 diff（实测）。当时提交只改 `src-tauri/Cargo.toml` 与报告；若门禁要求 `Cargo.lock` 出现真实变更，只能是依赖图变化（版本更新或新增包），那不属于“特性锁定”任务。
 
 ## 8. 追溯
 
@@ -180,3 +188,4 @@ kill -TERM -- -$(cat /tmp/opencode/tauri-dev.pid)   # 结束进程组；复核�
 2. `8415cd7` `build(deps): lock http-range for protocol-asset feature`：Cargo.lock 修复（协调方机械提交，非本 Agent 产出；见 §7 限制 1）。
 3. Rev 2 — `fix(auth): apply authorization clear to registry and asset scope`：`revoke_all_for_clear` + 授权清除接线 + 共享 `revoke_remote_cache` + 3 个单元测试 + 本报告 Rev 2（`src-tauri/src/`、`artifacts/60-implementation/`；`Cargo.lock` 未再改动）。
 4. Rev 3 — `build(deps): pin tokio features explicitly`：tokio 直接特性 `["sync","time"] → ["rt"]`（§3.2）；仅 `src-tauri/Cargo.toml` 与本报告 Rev 3；`Cargo.lock` 零 diff（§7.7）。
+5. Rev 4 — `chore(cargo): declare msrv and disable publishing`：`rust-version = "1.96"` + `publish = false`（§3.3）；仅 `src-tauri/Cargo.toml` 与本报告 Rev 4；`Cargo.lock` 零 diff。
