@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "PaperStack",
+  "version": "0.1.0",
+  "identifier": "com.quirkybrain.paperstack",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "纸栈 PaperStack",
+        "width": 1280,
+        "height": 800
+      }
+    ],
+    "security": {
+      "capabilities": ["default"]
+    }
+  }
+}

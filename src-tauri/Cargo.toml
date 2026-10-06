@@ -1,0 +1,39 @@
+[package]
+name = "paperstack"
+version = "0.1.0"
+description = "纸栈 PaperStack — Linux-first, local-first read-only technical document reader"
+authors = ["Quirkybrain"]
+license = "GPL-3.0-only"
+edition = "2021"
+
+[lib]
+name = "paperstack_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+notify = "8"
+rusqlite = { version = "0.40", features = ["bundled"] }
+sha2 = "0.11"
+url = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# The pinned feature name `rustls-tls` (ring provider, no native-tls) exists on
+# the reqwest 0.12 line; 0.13 renamed it to `rustls` and moved to aws-lc-rs.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+# Tauri already runs on tokio; pin the features later services need (debounce
+# timers, sync primitives) instead of relying on transitive feature unification.
+tokio = { version = "1", features = ["sync", "time"] }
+
+[dev-dependencies]
+tempfile = "3"
