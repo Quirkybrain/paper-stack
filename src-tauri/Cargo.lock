@@ -2794,6 +2794,7 @@ dependencies = [
 name = "paperstack"
 version = "0.1.0"
 dependencies = [
+ "hex",
  "notify",
  "reqwest 0.12.28",
  "rusqlite",

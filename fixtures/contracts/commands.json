@@ -1,0 +1,700 @@
+{
+  "contract": "paperstack-ipc-r1",
+  "note": "One valid request+response sample per command in contracts.md §2. Requests are null for the 10 no-argument commands. Samples are compact but real; every field required by a command's contract shape is present.",
+  "commands": [
+    {
+      "command": "pick_files",
+      "request": null,
+      "response": {
+        "cancelled": false,
+        "paths": ["/home/user/notes/paperstack-sample/markdown-guide.md"]
+      }
+    },
+    {
+      "command": "pick_directory",
+      "request": null,
+      "response": {
+        "cancelled": false,
+        "paths": ["/home/user/notes/paperstack-sample"]
+      }
+    },
+    {
+      "command": "pick_export_target",
+      "request": null,
+      "response": {
+        "cancelled": false,
+        "paths": ["/home/user/exports/paperstack-diagnostics-20261007.txt"]
+      }
+    },
+    {
+      "command": "open_documents",
+      "request": {
+        "paths": [
+          "/home/user/notes/paperstack-sample/markdown-guide.md",
+          "/home/user/notes/paperstack-sample/img/diagram.png"
+        ],
+        "entry": "dialog"
+      },
+      "response": {
+        "items": [
+          {
+            "path": "/home/user/notes/paperstack-sample/markdown-guide.md",
+            "status": "opened",
+            "docId": "d-3f79bb7b435b0532",
+            "identity": {
+              "docId": "d-3f79bb7b435b0532",
+              "canonicalPath": "/home/user/notes/paperstack-sample/markdown-guide.md",
+              "displayName": "markdown-guide.md",
+              "format": "markdown",
+              "encoding": "utf-8",
+              "contentHash": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+              "sizeBytes": 20847,
+              "lastSeenAtMs": 1770000000500
+            }
+          },
+          {
+            "path": "/home/user/notes/paperstack-sample/img/diagram.png",
+            "status": "rejected",
+            "error": {
+              "code": "PS_FMT_UNSUPPORTED",
+              "category": "encoding",
+              "messageKey": "error.encoding.formatUnsupported",
+              "retryable": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "command": "read_document",
+      "request": {
+        "docId": "d-3f79bb7b435b0532",
+        "purpose": "initial"
+      },
+      "response": {
+        "docId": "d-3f79bb7b435b0532",
+        "identity": {
+          "docId": "d-3f79bb7b435b0532",
+          "canonicalPath": "/home/user/notes/paperstack-sample/markdown-guide.md",
+          "displayName": "markdown-guide.md",
+          "format": "markdown",
+          "encoding": "utf-8",
+          "contentHash": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+          "sizeBytes": 20847,
+          "lastSeenAtMs": 1770000000500
+        },
+        "version": {
+          "contentHash": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+          "sizeBytes": 20847,
+          "modifiedAtMs": 1769999999000,
+          "observedAtMs": 1770000000500
+        },
+        "text": "# Markdown 指南\n\n正文示例。\n",
+        "lineCount": 3
+      }
+    },
+    {
+      "command": "relink_document",
+      "request": {
+        "docId": "d-3f79bb7b435b0532",
+        "newPath": "/home/user/notes/archive/markdown-guide.md"
+      },
+      "response": {
+        "status": "new-version",
+        "snapshot": {
+          "docId": "d-3f79bb7b435b0532",
+          "identity": {
+            "docId": "d-3f79bb7b435b0532",
+            "canonicalPath": "/home/user/notes/archive/markdown-guide.md",
+            "displayName": "markdown-guide.md",
+            "format": "markdown",
+            "encoding": "utf-8",
+            "contentHash": "b7d1f0e2c3a4958672d1e0f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6",
+            "sizeBytes": 21100,
+            "lastSeenAtMs": 1770000002000
+          },
+          "version": {
+            "contentHash": "b7d1f0e2c3a4958672d1e0f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6",
+            "sizeBytes": 21100,
+            "modifiedAtMs": 1770000001800,
+            "observedAtMs": 1770000002000
+          },
+          "text": "# Markdown 指南\n\n正文示例（归档副本）。\n",
+          "lineCount": 3
+        }
+      }
+    },
+    {
+      "command": "get_source_info",
+      "request": {
+        "docId": "d-3f79bb7b435b0532"
+      },
+      "response": {
+        "docId": "d-3f79bb7b435b0532",
+        "version": {
+          "contentHash": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+          "sizeBytes": 20847,
+          "modifiedAtMs": 1769999999000,
+          "observedAtMs": 1770000000500
+        },
+        "encoding": "utf-8-bom",
+        "totalLines": 3
+      }
+    },
+    {
+      "command": "read_source_window",
+      "request": {
+        "docId": "d-3f79bb7b435b0532",
+        "startLine": 1,
+        "maxLines": 2
+      },
+      "response": {
+        "docId": "d-3f79bb7b435b0532",
+        "version": {
+          "contentHash": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+          "sizeBytes": 20847,
+          "modifiedAtMs": 1769999999000,
+          "observedAtMs": 1770000000500
+        },
+        "startLine": 1,
+        "endLine": 2,
+        "text": "# Markdown 指南\n\n",
+        "eof": false
+      }
+    },
+    {
+      "command": "open_directory",
+      "request": {
+        "path": "/home/user/notes/paperstack-sample",
+        "persist": false
+      },
+      "response": {
+        "rootId": "r-abcdef0123456789",
+        "canonicalPath": "/home/user/notes/paperstack-sample",
+        "displayName": "paperstack-sample",
+        "scope": "session"
+      }
+    },
+    {
+      "command": "read_directory",
+      "request": {
+        "rootId": "r-abcdef0123456789",
+        "dirPath": "/home/user/notes/paperstack-sample"
+      },
+      "response": {
+        "dirPath": "/home/user/notes/paperstack-sample",
+        "entries": [
+          {
+            "name": "markdown-guide.md",
+            "path": "/home/user/notes/paperstack-sample/markdown-guide.md",
+            "kind": "file",
+            "status": "ok",
+            "isMarkdown": true
+          },
+          {
+            "name": "img",
+            "path": "/home/user/notes/paperstack-sample/img",
+            "kind": "directory",
+            "status": "ok",
+            "hasChildren": true
+          },
+          {
+            "name": "link-outside",
+            "path": "/home/user/notes/paperstack-sample/link-outside",
+            "kind": "symlink",
+            "status": "symlink-outside",
+            "symlinkTarget": "/tmp/shared-notes"
+          },
+          {
+            "name": "removed.md",
+            "path": "/home/user/notes/paperstack-sample/removed.md",
+            "kind": "file",
+            "status": "missing",
+            "isMarkdown": true
+          }
+        ],
+        "truncated": true
+      }
+    },
+    {
+      "command": "watch_document",
+      "request": {
+        "docId": "d-3f79bb7b435b0532",
+        "resourcePaths": ["/home/user/notes/paperstack-sample/img/diagram.png"]
+      },
+      "response": {}
+    },
+    {
+      "command": "unwatch_document",
+      "request": {
+        "docId": "d-3f79bb7b435b0532"
+      },
+      "response": {}
+    },
+    {
+      "command": "list_recents",
+      "request": null,
+      "response": [
+        {
+          "docId": "d-3f79bb7b435b0532",
+          "displayName": "markdown-guide.md",
+          "canonicalPath": "/home/user/notes/paperstack-sample/markdown-guide.md",
+          "openedAtMs": 1770000000500,
+          "available": true
+        },
+        {
+          "docId": "d-abcdef0123456789",
+          "displayName": "old-notes.md",
+          "canonicalPath": "/home/user/notes/archive/old-notes.md",
+          "openedAtMs": 1769900000000,
+          "available": false
+        }
+      ]
+    },
+    {
+      "command": "touch_recent",
+      "request": {
+        "docId": "d-3f79bb7b435b0532"
+      },
+      "response": {}
+    },
+    {
+      "command": "save_position",
+      "request": {
+        "docId": "d-3f79bb7b435b0532",
+        "anchor": {
+          "versionHash": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+          "headingPath": ["2. 方法", "2.1 数据"],
+          "blockFingerprint": "fp1:8ad4f1c39b72e065",
+          "offsetRatio": 0.42,
+          "sourceRange": {
+            "startByte": 1280,
+            "endByte": 1536
+          }
+        }
+      },
+      "response": {
+        "saved": true
+      }
+    },
+    {
+      "command": "load_position",
+      "request": {
+        "docId": "d-3f79bb7b435b0532"
+      },
+      "response": {
+        "docId": "d-3f79bb7b435b0532",
+        "anchor": {
+          "versionHash": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+          "headingPath": ["2. 方法", "2.1 数据"],
+          "blockFingerprint": "fp1:8ad4f1c39b72e065",
+          "offsetRatio": 0.42,
+          "sourceRange": {
+            "startByte": 1280,
+            "endByte": 1536
+          }
+        },
+        "updatedAtMs": 1770000003000
+      }
+    },
+    {
+      "command": "save_session",
+      "request": {
+        "tabs": [
+          {
+            "tabId": "t-1",
+            "docId": "d-3f79bb7b435b0532",
+            "orderIndex": 0,
+            "isActive": true
+          },
+          {
+            "tabId": "t-2",
+            "docId": "d-abcdef0123456789",
+            "orderIndex": 1,
+            "isActive": false
+          }
+        ]
+      },
+      "response": {
+        "saved": true
+      }
+    },
+    {
+      "command": "load_session",
+      "request": null,
+      "response": {
+        "tabs": [
+          {
+            "tabId": "t-1",
+            "docId": "d-3f79bb7b435b0532",
+            "orderIndex": 0,
+            "isActive": true
+          }
+        ],
+        "activeTabId": null,
+        "savedAtMs": 1770000004000
+      }
+    },
+    {
+      "command": "get_storage_overview",
+      "request": null,
+      "response": {
+        "categories": [
+          {
+            "category": "recents",
+            "count": 12
+          },
+          {
+            "category": "positions",
+            "count": 8
+          },
+          {
+            "category": "session",
+            "count": 2
+          },
+          {
+            "category": "cache",
+            "count": 4,
+            "bytes": 5242880
+          },
+          {
+            "category": "authorizations",
+            "count": 3
+          },
+          {
+            "category": "logs",
+            "count": 2,
+            "bytes": 204800
+          }
+        ],
+        "databasePath": "/home/user/.local/share/com.quirkybrain.paperstack/paperstack.sqlite3",
+        "cacheDir": "/home/user/.cache/com.quirkybrain.paperstack"
+      }
+    },
+    {
+      "command": "clear_records",
+      "request": {
+        "categories": ["recents", "cache"],
+        "confirm": true
+      },
+      "response": [
+        {
+          "category": "recents",
+          "cleared": 12
+        },
+        {
+          "category": "cache",
+          "cleared": 0,
+          "error": {
+            "code": "PS_IO_WRITE_FAILED",
+            "category": "io",
+            "messageKey": "error.io.writeFailed",
+            "retryable": true,
+            "details": {
+              "operation": "cache-remove",
+              "failures": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "command": "resume_recording",
+      "request": {},
+      "response": {}
+    },
+    {
+      "command": "get_settings",
+      "request": null,
+      "response": {
+        "global": {
+          "theme": "system",
+          "fontSizePx": 17,
+          "lineHeight": 1.8,
+          "maxContentWidthPx": 760,
+          "syntaxMode": "technical",
+          "updateModeDefault": "keep",
+          "restoreSession": true,
+          "rememberRecords": true
+        },
+        "defaults": {
+          "theme": "system",
+          "fontSizePx": 17,
+          "lineHeight": 1.8,
+          "maxContentWidthPx": 760,
+          "syntaxMode": "technical",
+          "updateModeDefault": "keep",
+          "restoreSession": true,
+          "rememberRecords": true
+        },
+        "limits": {
+          "recentLimit": 100,
+          "cacheMaxBytes": 268435456,
+          "logMaxBytes": 10485760
+        },
+        "revision": 3
+      }
+    },
+    {
+      "command": "update_settings",
+      "request": {
+        "patch": {
+          "theme": "dark",
+          "fontSizePx": 18
+        }
+      },
+      "response": {
+        "applied": {
+          "theme": "dark",
+          "fontSizePx": 18,
+          "lineHeight": 1.8,
+          "maxContentWidthPx": 760,
+          "syntaxMode": "technical",
+          "updateModeDefault": "keep",
+          "restoreSession": true,
+          "rememberRecords": true
+        },
+        "persisted": true,
+        "revision": 4
+      }
+    },
+    {
+      "command": "check_resource_access",
+      "request": {
+        "docId": "d-3f79bb7b435b0532",
+        "rawSrc": "./img/diagram.png"
+      },
+      "response": {
+        "status": "outside-root",
+        "kind": "local",
+        "rootCandidate": "/home/user/notes/paperstack-sample/img",
+        "reason": {
+          "code": "PS_AUTH_OUTSIDE_ROOT",
+          "category": "auth",
+          "messageKey": "error.auth.outsideRoot",
+          "retryable": false,
+          "details": {
+            "rootCandidate": "/home/user/notes/paperstack-sample/img"
+          }
+        }
+      }
+    },
+    {
+      "command": "grant_local_root",
+      "request": {
+        "docId": "d-3f79bb7b435b0532",
+        "rootPath": "/home/user/notes/paperstack-sample/img",
+        "persist": true
+      },
+      "response": {
+        "grantId": "g-1a2b3c4d5e6f7081",
+        "kind": "directory",
+        "scope": "persistent",
+        "canonicalPath": "/home/user/notes/paperstack-sample/img",
+        "grantedAtMs": 1770000001000
+      }
+    },
+    {
+      "command": "list_grants",
+      "request": null,
+      "response": [
+        {
+          "grantId": "g-1a2b3c4d5e6f7081",
+          "kind": "directory",
+          "scope": "persistent",
+          "canonicalPath": "/home/user/notes/paperstack-sample/img",
+          "grantedAtMs": 1770000001000
+        },
+        {
+          "grantId": "g-0f1e2d3c4b5a6978",
+          "kind": "remote",
+          "scope": "session",
+          "origins": ["https://images.example.com"],
+          "docId": "d-3f79bb7b435b0532",
+          "grantedAtMs": 1770000001500
+        }
+      ]
+    },
+    {
+      "command": "revoke_grant",
+      "request": {
+        "grantId": "g-1a2b3c4d5e6f7081"
+      },
+      "response": {
+        "revoked": true,
+        "cancelledRequests": 0,
+        "removedCacheEntries": 0
+      }
+    },
+    {
+      "command": "grant_remote_session",
+      "request": {
+        "docId": "d-3f79bb7b435b0532",
+        "origins": ["https://images.example.com"]
+      },
+      "response": {
+        "grantId": "g-0f1e2d3c4b5a6978",
+        "kind": "remote",
+        "scope": "session",
+        "origins": ["https://images.example.com"],
+        "docId": "d-3f79bb7b435b0532",
+        "grantedAtMs": 1770000001500
+      }
+    },
+    {
+      "command": "revoke_remote_session",
+      "request": {
+        "docId": "d-3f79bb7b435b0532"
+      },
+      "response": {
+        "revoked": true,
+        "cancelledRequests": 2,
+        "removedCacheEntries": 3
+      }
+    },
+    {
+      "command": "fetch_remote_image",
+      "request": {
+        "docId": "d-3f79bb7b435b0532",
+        "url": "https://images.example.com/diagram.png"
+      },
+      "response": {
+        "assetUrl": "http://asset.localhost/home/user/.cache/com.quirkybrain.paperstack/remote-images/c-5f4e3d2c1b0a9988.png?v=3f79bb7b435b0532",
+        "mime": "image/png",
+        "sizeBytes": 204800,
+        "finalUrl": "https://images.example.com/diagram.png",
+        "cacheKey": "c-5f4e3d2c1b0a9988",
+        "fromCache": false
+      }
+    },
+    {
+      "command": "open_external_url",
+      "request": {
+        "url": "https://example.com/docs"
+      },
+      "response": {}
+    },
+    {
+      "command": "reveal_in_folder",
+      "request": {
+        "path": "/home/user/notes/paperstack-sample/markdown-guide.md"
+      },
+      "response": {}
+    },
+    {
+      "command": "get_app_info",
+      "request": null,
+      "response": {
+        "name": "纸栈 PaperStack",
+        "version": "0.1.0",
+        "owner": "Quirkybrain",
+        "license": "GPL-3.0-only",
+        "ipcContract": "paperstack-ipc-r1",
+        "locale": "zh-CN",
+        "tauriVersion": "2.12.1",
+        "webkitVersion": "2.52.6",
+        "os": "linux",
+        "legal": {
+          "sourceEntryUrl": null,
+          "sourceEntryNote": "未配置公开发行源码入口；公开发行前必须补齐。",
+          "licenseAvailable": true,
+          "thirdPartyAvailable": false
+        }
+      }
+    },
+    {
+      "command": "read_legal_text",
+      "request": {
+        "kind": "third_party_notices"
+      },
+      "response": {
+        "text": "THIRD PARTY NOTICES\n\n- tauri 2.12.1 (MIT OR Apache-2.0)\n",
+        "resourceName": "THIRD_PARTY_NOTICES.md"
+      }
+    },
+    {
+      "command": "take_pending_open_requests",
+      "request": null,
+      "response": [
+        {
+          "paths": ["/home/user/notes/paperstack-sample/markdown-guide.md"],
+          "cwd": "/home/user/notes",
+          "source": "cli"
+        },
+        {
+          "paths": ["/home/user/notes/paperstack-sample/sub/b.md"],
+          "cwd": null,
+          "source": "second-instance"
+        }
+      ]
+    },
+    {
+      "command": "preview_diagnostics",
+      "request": {
+        "includeSourceContext": false,
+        "includeFullPaths": false
+      },
+      "response": {
+        "exportId": "e-77aa55bb33cc11dd",
+        "generatedAtMs": 1770000002000,
+        "text": "PaperStack diagnostics\napp: 纸栈 PaperStack 0.1.0\n",
+        "sections": [
+          {
+            "name": "app",
+            "bytes": 420
+          },
+          {
+            "name": "documents",
+            "bytes": 1280
+          },
+          {
+            "name": "limits",
+            "bytes": 300
+          }
+        ],
+        "redactionCount": 7,
+        "expiresAtMs": 1770000602000
+      }
+    },
+    {
+      "command": "export_diagnostics",
+      "request": {
+        "exportId": "e-77aa55bb33cc11dd",
+        "targetPath": "/home/user/exports/paperstack-diagnostics-20261007.txt",
+        "overwrite": false
+      },
+      "response": {
+        "writtenPath": "/home/user/exports/paperstack-diagnostics-20261007.txt",
+        "bytes": 2000
+      }
+    },
+    {
+      "command": "search_source",
+      "request": {
+        "docId": "d-3f79bb7b435b0532",
+        "query": "全文",
+        "caseSensitive": false,
+        "maxResults": 100
+      },
+      "response": {
+        "docId": "d-3f79bb7b435b0532",
+        "version": {
+          "contentHash": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+          "sizeBytes": 20847,
+          "modifiedAtMs": 1769999999000,
+          "observedAtMs": 1770000000500
+        },
+        "matches": [
+          {
+            "startByte": 512,
+            "endByte": 518,
+            "lineNumber": 12
+          }
+        ],
+        "scannedBytes": 1048576,
+        "totalBytes": 52428800,
+        "complete": false
+      }
+    }
+  ]
+}
