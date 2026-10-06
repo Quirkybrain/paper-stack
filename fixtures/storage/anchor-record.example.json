@@ -1,0 +1,14 @@
+{
+  "docId": "d-9f1c4a7b2e8d0563",
+  "anchor": {
+    "versionHash": "3f786850e387550fdab836ed7e6dc881de23001b6b6b34f6d8cbe7d0c1c2e9a1",
+    "headingPath": ["2. 方法", "2.1 数据"],
+    "blockFingerprint": "fp1:9c4d5e6f7a8b0c1d",
+    "offsetRatio": 0.4231,
+    "sourceRange": {
+      "startByte": 4096,
+      "endByte": 5120
+    }
+  },
+  "updatedAtMs": 1791331200000
+}
