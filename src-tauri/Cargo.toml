@@ -25,6 +25,10 @@ thiserror = "2"
 notify = "8"
 rusqlite = { version = "0.40", features = ["bundled"] }
 sha2 = "0.11"
+# Lowercase SHA-256 hex formatting for opaque `d-`/`g-` identifiers
+# (data-model §3.1/§3.2). Already present transitively; declared directly
+# because core service code depends on it.
+hex = "0.4"
 url = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

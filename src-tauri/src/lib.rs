@@ -1,7 +1,13 @@
 //! PaperStack application entry point.
 //!
-//! The skeleton (wp-07) only wires the window and the pinned plugin set from
-//! ADR-001. The IPC command surface, state and services are added by wp-08..wp-15.
+//! The skeleton (wp-07) wires the window and the pinned plugin set from
+//! ADR-001. wp-08 adds the shared contract models, the stable error taxonomy
+//! and the authorization core (`paths`/`auth`); the IPC command surface and
+//! the remaining services are added by wp-09..wp-15.
+
+pub mod error;
+pub mod models;
+pub mod services;
 
 /// Builds and runs the Tauri application.
 pub fn run() {
