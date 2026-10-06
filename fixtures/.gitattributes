@@ -1,0 +1,3 @@
+# The CRLF encoding fixture intentionally keeps its carriage returns as test
+# content (contracts §2.1; T-08); whitespace checking would flag them.
+encoding/crlf.md -whitespace
