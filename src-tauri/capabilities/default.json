@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Minimal capability for the PaperStack main window. Only the Tauri core defaults are granted in the skeleton (wp-07); plugin and feature permissions are added deliberately by wp-15.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}
