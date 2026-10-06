@@ -9,6 +9,7 @@ import { unified } from 'unified'
 
 import './plugins/register'
 import { listEngines, type EngineContext } from './engines'
+import { remarkMathPlugin } from './plugins/katex'
 import { rehypeForceTaskCheckboxDisabled, sanitizeSchema } from './sanitize'
 import { utf8ByteLength, utf16RangeToUtf8Bytes } from './source-map'
 import { runMdastTransforms } from './transforms'
@@ -56,9 +57,14 @@ export async function parseDocument(
   const diagnostics: DocumentDiagnostic[] = []
 
   try {
-    // ①–②: CommonMark base AST, GFM subset only in technical mode.
+    // ①–③: CommonMark base AST; GFM subset and math only in technical mode.
+    // `inlineMath:false` keeps `$$…$$` blocks while `$…$` stays literal
+    // (rendering-pipeline §1 mode table, §2.3).
     const mdastProcessor = unified().use(remarkParse)
-    if (resolved.mode === 'technical') mdastProcessor.use(remarkGfm)
+    if (resolved.mode === 'technical') {
+      mdastProcessor.use(remarkGfm)
+      mdastProcessor.use(remarkMathPlugin, { singleDollarTextMath: resolved.inlineMath })
+    }
     const mdast = mdastProcessor.parse(text) as MdastRoot
 
     // ④: custom mdast transforms a→b→c, all pure functions.

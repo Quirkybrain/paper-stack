@@ -15,7 +15,10 @@ import { visit } from 'unist-util-visit'
  *   with their contents (engine output is injected after sanitize);
  * - `clobberPrefix: ''` so the outline's `ps-h-*` ids survive;
  * - protocols: `href` → http/https/mailto, `src` → http/https (relative and
- *   fragment URLs are allowed by the sanitizer's protocol check).
+ *   fragment URLs are allowed by the sanitizer's protocol check);
+ * - D-3 (wp-19): `code` additionally admits the `math-inline`/`math-display`
+ *   marker classes emitted by `remark-math`; everything else about the schema
+ *   is unchanged (see `MATH_MARKER_CLASS_PATTERN`).
  *
  * Anything not listed here is not "allowed by omission": unlisted elements
  * are unwrapped by `hast-util-sanitize`, and unlisted properties are dropped.
@@ -90,6 +93,21 @@ export const FOOTNOTE_ID_PATTERN = /^ps-fn-[A-Za-z0-9-]+$/
 /** Code fence classes kept for the wp-19 Shiki/Mermaid engine slots. */
 export const LANGUAGE_CLASS_PATTERN = /^language-[A-Za-z0-9_+-]{1,32}$/
 
+/**
+ * Bounded sanitize-schema extension authorized by D-3 (wp-19):
+ * `remark-math` (③) marks math nodes as `code` elements carrying
+ * `language-math` plus `math-inline` (`$…$`) or `math-display` (`$$…$$`)
+ * (`mdast-util-math`). Only these two extra class tokens are admitted on
+ * `code`; the KaTeX output itself is injected by engine slot ⑧ *after*
+ * sanitize and is never re-sanitized. No tag, attribute, protocol or global
+ * rule changes beyond this alternation (security-model §5.2 delta recorded in
+ * `artifacts/60-implementation/wp-19-reader.md`).
+ */
+export const MATH_MARKER_CLASS_PATTERN = /^math-(inline|display)$/
+
+/** `code` className: fence languages plus the remark-math marker classes. */
+export const CODE_CLASS_PATTERN = /^(language-[A-Za-z0-9_+-]{1,32}|math-(inline|display))$/
+
 const HEADING_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const
 
 function headingAttributes(): SanitizeSchema['attributes'] {
@@ -106,7 +124,7 @@ export const sanitizeSchema: SanitizeSchema = {
     ...headingAttributes(),
     a: ['href', 'title'],
     img: ['src', 'alt', 'title'],
-    code: [['className', LANGUAGE_CLASS_PATTERN]],
+    code: [['className', CODE_CLASS_PATTERN]],
     li: [
       ['className', 'task-list-item'],
       ['id', FOOTNOTE_ID_PATTERN],
