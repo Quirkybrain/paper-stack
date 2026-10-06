@@ -35,9 +35,12 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # The pinned feature name `rustls-tls` (ring provider, no native-tls) exists on
 # the reqwest 0.12 line; 0.13 renamed it to `rustls` and moved to aws-lc-rs.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
-# Tauri already runs on tokio; pin the features later services need (debounce
-# timers, sync primitives) instead of relying on transitive feature unification.
-tokio = { version = "1", features = ["sync", "time"] }
+# Pinned from real usage at dependency freeze (wp-14a Rev 3): the only direct
+# tokio API used is `tokio::runtime::{Builder, Runtime}` in `services/resources`
+# (`ReqwestTransport`), which requires the `rt` feature. `sync`/`time` were an
+# anticipatory leftover and are supplied transitively by reqwest/tauri; declaring
+# them here would misstate our own requirements. `macros` is not used.
+tokio = { version = "1", features = ["rt"] }
 
 [dev-dependencies]
 tempfile = "3"
