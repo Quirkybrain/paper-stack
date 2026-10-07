@@ -1,0 +1,61 @@
+{
+  "contract": "paperstack-ipc-r1",
+  "note": "UTF-16 code-unit <-> UTF-8 byte offset fidelity vectors (contracts §1.2; rendering-pipeline §3 item 3; SRS §5.3). Shared: Rust asserts each byte offset is a char boundary and that the prefix's UTF-16 length equals the vector index (str::encode_utf16); the JS side asserts both conversion directions plus the total UTF-8 byte length. Invalid-text clamping (inside a surrogate pair, lone surrogate) is JS-only and lives in utf16-utf8-js-only.json, because valid Rust UTF-8 text cannot contain those.",
+  "vectors": [
+    {
+      "id": "ascii",
+      "text": "hello",
+      "points": [
+        { "utf16Index": 0, "byteOffset": 0 },
+        { "utf16Index": 5, "byteOffset": 5 }
+      ]
+    },
+    {
+      "id": "cjk-and-emoji",
+      "text": "中文abc🙂",
+      "points": [
+        { "utf16Index": 0, "byteOffset": 0 },
+        { "utf16Index": 1, "byteOffset": 3 },
+        { "utf16Index": 2, "byteOffset": 6 },
+        { "utf16Index": 3, "byteOffset": 7 },
+        { "utf16Index": 4, "byteOffset": 8 },
+        { "utf16Index": 5, "byteOffset": 9 },
+        { "utf16Index": 7, "byteOffset": 13 }
+      ]
+    },
+    {
+      "id": "combining-mark",
+      "text": "e\u0301x",
+      "points": [
+        { "utf16Index": 0, "byteOffset": 0 },
+        { "utf16Index": 1, "byteOffset": 1 },
+        { "utf16Index": 2, "byteOffset": 3 },
+        { "utf16Index": 3, "byteOffset": 4 }
+      ]
+    },
+    {
+      "id": "crlf",
+      "text": "a\r\nb",
+      "points": [
+        { "utf16Index": 0, "byteOffset": 0 },
+        { "utf16Index": 1, "byteOffset": 1 },
+        { "utf16Index": 2, "byteOffset": 2 },
+        { "utf16Index": 3, "byteOffset": 3 },
+        { "utf16Index": 4, "byteOffset": 4 }
+      ]
+    },
+    {
+      "id": "multibyte-then-newline",
+      "text": "尾\nnext",
+      "points": [
+        { "utf16Index": 0, "byteOffset": 0 },
+        { "utf16Index": 1, "byteOffset": 3 },
+        { "utf16Index": 2, "byteOffset": 4 },
+        { "utf16Index": 3, "byteOffset": 5 },
+        { "utf16Index": 4, "byteOffset": 6 },
+        { "utf16Index": 5, "byteOffset": 7 },
+        { "utf16Index": 6, "byteOffset": 8 }
+      ]
+    }
+  ]
+}

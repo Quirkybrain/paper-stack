@@ -1,0 +1,301 @@
+full run 1 PASS   Test Files  69 passed (69)       Tests  499 passed (499)
+full run 2 FAIL  ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯  Test Files  1 failed | 68 passed (69)       Tests  1 failed | 498 passed (499)
+
+> paperstack@0.1.0 test /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack
+> vitest -- --run
+
+
+ RUN  v5.0.3 /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack
+
+ ❯ src/features/settings/PrivacySection.test.tsx (6 tests | 1 failed) 4671ms
+   ❯ PrivacySection (6)
+     × suppresses cleared write-back categories and refreshes the overview 1137ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/features/settings/PrivacySection.test.tsx > PrivacySection > suppresses cleared write-back categories and refreshes the overview
+TestingLibraryElementError: Unable to find role="dialog"
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"ps-settings-section"[39m
+    [36m>[39m
+      [36m<h3>[39m
+        [0m隐私[0m
+      [36m</h3>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"ps-setting-switch"[39m
+      [36m>[39m
+        [36m<label[39m
+          [33mfor[39m=[32m"_r_h_"[39m
+        [36m>[39m
+          [36m<input[39m
+            [33maria-describedby[39m=[32m"_r_h_-hint"[39m
+            [33mchecked[39m=[32m""[39m
+            [33mid[39m=[32m"_r_h_"[39m
+            [33mtype[39m=[32m"checkbox"[39m
+          [36m/>[39m
+          [36m<span>[39m
+            [0m记住阅读记录[0m
+          [36m</span>[39m
+        [36m</label>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"ps-settings-hint"[39m
+          [33mid[39m=[32m"_r_h_-hint"[39m
+        [36m>[39m
+          [0m关闭后停止写入最近、位置与会话记录。[0m
+        [36m</span>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"ps-settings-block"[39m
+      [36m>[39m
+        [36m<p[39m
+          [33mclass[39m=[32m"ps-settings-hint"[39m
+        [36m>[39m
+          [0m清除操作不会删除原始文档。[0m
+        [36m</p>[39m
+        [36m<ul[39m
+          [33mclass[39m=[32m"ps-privacy-usage"[39m
+        [36m>[39m
+          [36m<li>[39m
+            [36m<span>[39m
+              [0m最近阅读[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"ps-settings-hint"[39m
+            [36m>[39m
+              [0m5 项 · 0 B[0m
+            [36m</span>[39m
+          [36m</li>[39m
+          [36m<li>[39m
+            [36m<span>[39m
+              [0m位置与会话[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"ps-settings-hint"[39m
+            [36m>[39m
+              [0m5 项 · 0 B[0m
+            [36m</span>[39m
+          [36m</li>[39m
+          [36m<li>[39m
+            [36m<span>[39m
+              [0m缓存[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"ps-settings-hint"[39m
+            [36m>[39m
+              [0m1 项 · 1 KiB[0m
+            [36m</span>[39m
+          [36m</li>[39m
+          [36m<li>[39m
+            [36m<span>[39m
+              [0m授权[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"ps-settings-hint"[39m
+            [36m>[39m
+              [0m1 项 · 0 B[0m
+            [36m</span>[39m
+          [36m</li>[39m
+          [36m<li>[39m
+            [36m<span>[39m
+              [0m诊断日志[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"ps-settings-hint"[39m
+            [36m>[39m
+              [0m当前用量：512 B（上限 10 MiB）[0m
+            [36m</span>[39m
+          [36m</li>[39m
+        [36m</ul>[39m
+        [36m<button[39m
+          [33mstyle[39m=[32m"min-height: var(--ps-control-h); min-width: var(--ps-hit-min); padding: 0 var(--ps-space-3); border-radius: var(--ps-radius-sm); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: var(--ps-space-1); transition: background var(--ps-transition-fast), border-color var(--ps-transition-fast); background: var(--ps-color-surface); color: var(--ps-color-text); border: 1px solid var(--ps-color-border);"[39m
+        [36m>[39m
+          [0m清除已有记录[0m
+        [36m</button>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"ps-settings-block"[39m
+      [36m>[39m
+        [36m<h4>[39m
+          [0m持久授权[0m
+        [36m</h4>[39m
+        [36m<ul[39m
+          [33mclass[39m=[32m"ps-grant-list"[39m
+        [36m>[39m
+          [36m<li[39m
+            [33mclass[39m=[32m"ps-grant-row"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"ps-grant-scope"[39m
+            [36m>[39m
+              [0m/root/assets[0m
+            [36m</span>[39m
+            [36m<button[39m
+              [33mstyle[39m=[32m"min-height: var(--ps-control-h); min-width: var(--ps-hit-min); padding: 0 var(--ps-space-3); border-radius: var(--ps-radius-sm); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: var(--ps-space-1); transition: background var(--ps-transition-fast), border-color var(--ps-transition-fast); background: var(--ps-color-surface); color: var(--ps-color-text); border: 1px solid var(--ps-color-border);"[39m
+            [36m>[39m
+              [0m撤销[0m
+            [36m</button>[39m
+          [36m</li>[39m
+        [36m</ul>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"ps-settings-section"[39m
+    [36m>[39m
+      [36m<h3>[39m
+        [0m隐私[0m
+      [36m</h3>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"ps-setting-switch"[39m
+      [36m>[39m
+        [36m<label[39m
+          [33mfor[39m=[32m"_r_h_"[39m
+        [36m>[39m
+          [36m<input[39m
+            [33maria-describedby[39m=[32m"_r_h_-hint"[39m
+            [33mchecked[39m=[32m""[39m
+            [33mid[39m=[32m"_r_h_"[39m
+            [33mtype[39m=[32m"checkbox"[39m
+          [36m/>[39m
+          [36m<span>[39m
+            [0m记住阅读记录[0m
+          [36m</span>[39m
+        [36m</label>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"ps-settings-hint"[39m
+          [33mid[39m=[32m"_r_h_-hint"[39m
+        [36m>[39m
+          [0m关闭后停止写入最近、位置与会话记录。[0m
+        [36m</span>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"ps-settings-block"[39m
+      [36m>[39m
+        [36m<p[39m
+          [33mclass[39m=[32m"ps-settings-hint"[39m
+        [36m>[39m
+          [0m清除操作不会删除原始文档。[0m
+        [36m</p>[39m
+        [36m<ul[39m
+          [33mclass[39m=[32m"ps-privacy-usage"[39m
+        [36m>[39m
+          [36m<li>[39m
+            [36m<span>[39m
+              [0m最近阅读[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"ps-settings-hint"[39m
+            [36m>[39m
+              [0m5 项 · 0 B[0m
+            [36m</span>[39m
+          [36m</li>[39m
+          [36m<li>[39m
+            [36m<span>[39m
+              [0m位置与会话[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"ps-settings-hint"[39m
+            [36m>[39m
+              [0m5 项 · 0 B[0m
+            [36m</span>[39m
+          [36m</li>[39m
+          [36m<li>[39m
+            [36m<span>[39m
+              [0m缓存[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"ps-settings-hint"[39m
+            [36m>[39m
+              [0m1 项 · 1 KiB[0m
+            [36m</span>[39m
+          [36m</li>[39m
+          [36m<li>[39m
+            [36m<span>[39m
+              [0m授权[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"ps-settings-hint"[39m
+            [36m>[39m
+              [0m1 项 · 0 B[0m
+            [36m</span>[39m
+          [36m</li>[39m
+          [36m<li>[39m
+            [36m<span>[39m
+              [0m诊断日志[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"ps-settings-hint"[39m
+            [36m>[39m
+              [0m当前用量：512 B（上限 10 MiB）[0m
+            [36m</span>[39m
+          [36m</li>[39m
+        [36m</ul>[39m
+        [36m<button[39m
+          [33mstyle[39m=[32m"min-height: var(--ps-control-h); min-width: var(--ps-hit-min); padding: 0 var(--ps-space-3); border-radius: var(--ps-radius-sm); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: var(--ps-space-1); transition: background var(--ps-transition-fast), border-color var(--ps-transition-fast); background: var(--ps-color-surface); color: var(--ps-color-text); border: 1px solid var(--ps-color-border);"[39m
+        [36m>[39m
+          [0m清除已有记录[0m
+        [36m</button>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"ps-settings-block"[39m
+      [36m>[39m
+        [36m<h4>[39m
+          [0m持久授权[0m
+        [36m</h4>[39m
+        [36m<ul[39m
+          [33mclass[39m=[32m"ps-grant-list"[39m
+        [36m>[39m
+          [36m<li[39m
+            [33mclass[39m=[32m"ps-grant-row"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"ps-grant-scope"[39m
+            [36m>[39m
+              [0m/root/assets[0m
+            [36m</span>[39m
+            [36m<button[39m
+              [33mstyle[39m=[32m"min-height: var(--ps-control-h); min-width: var(--ps-hit-min); padding: 0 var(--ps-space-3); border-radius: var(--ps-radius-sm); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: var(--ps-space-1); transition: background var(--ps-transition-fast), border-color var(--ps-transition-fast); background: var(--ps-color-surface); color: var(--ps-color-text); border: 1px solid var(--ps-color-border);"[39m
+            [36m>[39m
+              [0m撤销[0m
+            [36m</button>[39m
+          [36m</li>[39m
+        [36m</ul>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+ ❯ waitForWrapper node_modules/.pnpm/@testing-library+dom@10.4.2/node_modules/@testing-library/dom/dist/wait-for.js:163:27
+ ❯ node_modules/.pnpm/@testing-library+dom@10.4.2/node_modules/@testing-library/dom/dist/query-helpers.js:86:33
+ ❯ src/features/settings/PrivacySection.test.tsx:180:33
+    178|     renderPrivacy()
+    179|     fireEvent.click(await screen.findByRole('button', { name: t('setti…
+    180|     const dialog = await screen.findByRole('dialog')
+       |                                 ^
+    181|     fireEvent.click(within(dialog).getByRole('checkbox', { name: /最近阅读…
+    182|     fireEvent.click(within(dialog).getByRole('checkbox', { name: /位置与会…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 68 passed (69)
+      Tests  1 failed | 498 passed (499)
+   Start at  17:33:38
+   Duration  32.94s (environment 52%, tests 28%, setup 7%, import 7%, transform 6%, worker 1%)
+
+Environment  jsdom was created 69 times · 164.22s total, 52% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+
+ ELIFECYCLE  Test failed. See above for more details.
+full run 3 PASS   Test Files  69 passed (69)       Tests  499 passed (499)
+full run 4 PASS   Test Files  69 passed (69)       Tests  499 passed (499)
+full run 5 PASS   Test Files  69 passed (69)       Tests  499 passed (499)

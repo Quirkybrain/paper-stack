@@ -1,0 +1,2 @@
+# Compiled helpers and local measurement output stay local (rebuilt by scripts).
+.bin/
