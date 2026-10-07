@@ -10,7 +10,7 @@ use crate::models::{
     GrantLocalRootRequest, GrantRecord, RevokeResult,
 };
 use crate::services::paths::{self, LocalReadOutcome, ReferenceClass, SystemPathProbe};
-use crate::services::resources::{normalize_origin, origin_allowed};
+use crate::services::resources::{origin_allowed, origin_for_remote_reference};
 use crate::state::{lock, AppState};
 
 use super::{asset_url, dispatch, now_ms};
@@ -58,38 +58,13 @@ fn decide_access(
             };
             decision(status, AccessKind::Other, Some(error))
         }
-        Ok(ReferenceClass::Remote(raw)) => match normalize_origin(&raw) {
-            Err(error) => decision(
-                AccessDecisionStatus::Unsupported,
-                AccessKind::Remote,
-                Some(error),
-            ),
-            Ok(origin) => {
-                let allowed = {
-                    let auth = lock(&state.auth);
-                    auth.active_origins(&req.doc_id)
-                };
-                if origin_allowed(&origin, &allowed) {
-                    AccessDecision {
-                        status: AccessDecisionStatus::Allowed,
-                        kind: AccessKind::Remote,
-                        canonical_path: None,
-                        asset_url: None,
-                        root_candidate: None,
-                        origin: Some(origin),
-                        reason: None,
-                    }
-                } else {
-                    let mut value = decision(
-                        AccessDecisionStatus::RemoteBlocked,
-                        AccessKind::Remote,
-                        Some(AppError::new(ErrorCode::RemoteBlocked)),
-                    );
-                    value.origin = Some(origin);
-                    value
-                }
-            }
-        },
+        Ok(ReferenceClass::Remote(raw)) => {
+            let allowed = {
+                let auth = lock(&state.auth);
+                auth.active_origins(&req.doc_id)
+            };
+            remote_decision(&raw, &allowed)
+        }
         Ok(ReferenceClass::Local(_)) => {
             let outcome = {
                 let mut auth = lock(&state.auth);
@@ -140,6 +115,42 @@ fn decide_access(
                     }
                     value
                 }
+            }
+        }
+    }
+}
+
+/// Remote branch of `check_resource_access` (command 24; security-model §4;
+/// AT26/D-34-5): the resource is a full URL, so the policy classifies its
+/// *origin* — a path, query or fragment never makes the reference
+/// "unsupported" and never takes part in the allow-list match. `http`/other
+/// schemes and credential-bearing URLs stay `unsupported`.
+fn remote_decision(raw: &str, allowed: &[String]) -> AccessDecision {
+    match origin_for_remote_reference(raw) {
+        Err(error) => decision(
+            AccessDecisionStatus::Unsupported,
+            AccessKind::Remote,
+            Some(error),
+        ),
+        Ok(origin) => {
+            if origin_allowed(&origin, allowed) {
+                AccessDecision {
+                    status: AccessDecisionStatus::Allowed,
+                    kind: AccessKind::Remote,
+                    canonical_path: None,
+                    asset_url: None,
+                    root_candidate: None,
+                    origin: Some(origin),
+                    reason: None,
+                }
+            } else {
+                let mut value = decision(
+                    AccessDecisionStatus::RemoteBlocked,
+                    AccessKind::Remote,
+                    Some(AppError::new(ErrorCode::RemoteBlocked)),
+                );
+                value.origin = Some(origin);
+                value
             }
         }
     }
@@ -221,4 +232,85 @@ pub async fn revoke_grant(
         lock(&state.auth).revoke(&grant_id)
     })
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn allowed(origins: &[&str]) -> Vec<String> {
+        origins.iter().map(|origin| (*origin).to_owned()).collect()
+    }
+
+    #[test]
+    fn remote_reference_with_path_is_classified_by_origin() {
+        // AT26/D-34-5: a real image URL carries a path; the policy match must
+        // use its origin and report `remote-blocked` (not `unsupported`).
+        let decision = remote_decision("https://httpbin.org/image/png", &[]);
+        assert_eq!(decision.status, AccessDecisionStatus::RemoteBlocked);
+        assert_eq!(decision.kind, AccessKind::Remote);
+        assert_eq!(decision.origin.as_deref(), Some("https://httpbin.org"));
+        assert!(decision.reason.is_some());
+
+        let decision = remote_decision(
+            "https://httpbin.org/image/png",
+            &allowed(&["https://httpbin.org"]),
+        );
+        assert_eq!(decision.status, AccessDecisionStatus::Allowed);
+        assert_eq!(decision.origin.as_deref(), Some("https://httpbin.org"));
+    }
+
+    #[test]
+    fn remote_reference_query_and_fragment_do_not_affect_the_origin() {
+        let decision = remote_decision(
+            "https://cdn.example.com/a/b.png?token=abc#frag",
+            &allowed(&["https://cdn.example.com"]),
+        );
+        assert_eq!(decision.status, AccessDecisionStatus::Allowed);
+
+        let blocked = remote_decision("https://cdn.example.com/a/b.png?token=abc#frag", &[]);
+        assert_eq!(blocked.status, AccessDecisionStatus::RemoteBlocked);
+        assert_eq!(blocked.origin.as_deref(), Some("https://cdn.example.com"));
+    }
+
+    #[test]
+    fn remote_reference_port_must_match_the_allowed_origin_exactly() {
+        let url = "https://example.com:8443/img.png";
+        assert_eq!(
+            remote_decision(url, &allowed(&["https://example.com:8443"])).status,
+            AccessDecisionStatus::Allowed
+        );
+        let wrong_port = remote_decision(url, &allowed(&["https://example.com"]));
+        assert_eq!(wrong_port.status, AccessDecisionStatus::RemoteBlocked);
+        assert_eq!(
+            wrong_port.origin.as_deref(),
+            Some("https://example.com:8443")
+        );
+
+        // The default https port is normalized away on both sides.
+        let default_port = remote_decision(
+            "https://example.com:443/img.png",
+            &allowed(&["https://example.com"]),
+        );
+        assert_eq!(default_port.status, AccessDecisionStatus::Allowed);
+        assert_eq!(default_port.origin.as_deref(), Some("https://example.com"));
+    }
+
+    #[test]
+    fn remote_reference_with_credentials_or_plain_http_is_unsupported() {
+        for raw in [
+            "https://user:pass@example.com/img.png",
+            "https://user@example.com/img.png",
+            "http://example.com/img.png",
+            "ftp://example.com/img.png",
+        ] {
+            let decision = remote_decision(raw, &allowed(&["https://example.com"]));
+            assert_eq!(
+                decision.status,
+                AccessDecisionStatus::Unsupported,
+                "unexpected status for {raw}"
+            );
+            assert!(decision.reason.is_some());
+        }
+    }
 }

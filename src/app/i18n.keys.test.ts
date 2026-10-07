@@ -7,17 +7,24 @@ import zhCN from '../locales/zh-CN.json'
  *
  * The expected count is the number of rows of the pinned catalog
  * `artifacts/40-ux/strings-zh-CN.md` (Rev 1, producer agent:experience-designer,
- * last verified 2026-10-07) measured on 2026-10-07. The catalog is the source
- * of truth; when it changes, regenerate `src/locales/zh-CN.json` and update
- * this count in the same commit.
+ * last verified 2026-10-07) measured on 2026-10-07, plus the wp-34a fix delta
+ * (recorded as string-catalog deltas for the wp-42 documentation review):
+ * `nav.fragment.notFound` (missing-fragment explanation required by
+ * models §5.2 / AT14-AT15) and `document.unavailable.banner` (parameterized
+ * title+message composition for the source-unavailable banner per
+ * `docs/internationalization.md`; the catalog only carries the two parts).
+ * The catalog is the source of truth; when it changes, regenerate
+ * `src/locales/zh-CN.json` and update this count in the same commit.
  */
 const CATALOG_KEY_COUNT = 378
+const WP_34A_FIX_KEY_COUNT = 2
+const EXPECTED_KEY_COUNT = CATALOG_KEY_COUNT + WP_34A_FIX_KEY_COUNT
 
 const messages = zhCN as Record<string, string>
 
 describe('zh-CN locale parity with the string catalog', () => {
-  it(`contains exactly the ${CATALOG_KEY_COUNT} catalog keys`, () => {
-    expect(Object.keys(messages)).toHaveLength(CATALOG_KEY_COUNT)
+  it(`contains exactly the ${EXPECTED_KEY_COUNT} catalog keys`, () => {
+    expect(Object.keys(messages)).toHaveLength(EXPECTED_KEY_COUNT)
   })
 
   it('uses lowercase dotted namespace keys', () => {

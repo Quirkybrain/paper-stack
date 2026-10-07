@@ -20,7 +20,7 @@
 //! - Redaction helpers are pure and take the home directory as a parameter so
 //!   the tests are deterministic without touching the process environment.
 
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -460,7 +460,11 @@ pub struct ProtectedSources {
 impl ProtectedSources {
     pub fn from_paths<I: IntoIterator<Item = String>>(paths: I) -> Self {
         let mut entries = Vec::new();
+        let mut seen = BTreeSet::new();
         for raw in paths {
+            if !seen.insert(raw.clone()) {
+                continue;
+            }
             let file = PathBuf::from(raw);
             let Some(parent) = file.parent().map(Path::to_path_buf) else {
                 continue;

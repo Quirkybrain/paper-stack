@@ -63,7 +63,9 @@ export function AboutSection() {
   }
 
   const sourceUrl = info.legal.sourceEntryUrl
-  const sourceNote = info.legal.sourceEntryNote ?? t('about.sourceUnconfigured')
+  // Rust returns an i18n *key* (it never emits user-visible text); resolve it
+  // here so the raw key can never leak into the About page (AT30/D-34-1).
+  const sourceNote = t(info.legal.sourceEntryNote ?? 'about.sourceUnconfigured')
 
   return (
     <div className="ps-settings-section">

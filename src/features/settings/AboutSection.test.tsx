@@ -25,7 +25,10 @@ function appInfo(overrides: Partial<AppInfo['legal']> = {}): AppInfo {
     locale: 'zh-CN',
     tauriVersion: '2.12.1',
     legal: {
+      // Real backend payload shape (`services/info.rs`): Rust returns the
+      // i18n key, never user-visible text (AT30/D-34-1).
       sourceEntryUrl: null,
+      sourceEntryNote: 'about.sourceUnconfigured',
       licenseAvailable: false,
       thirdPartyAvailable: false,
       ...overrides,
@@ -50,7 +53,9 @@ describe('AboutSection', () => {
     expect(screen.getByText(t('about.owner'))).toBeTruthy()
     expect(screen.getByText(t('about.license'))).toBeTruthy()
     // sourceEntryUrl = null: show the release-blocking reason, not a fake URL.
+    // The backend sends an i18n key; the raw key must never render (AT30).
     expect(screen.getByText(t('about.sourceUnconfigured'))).toBeTruthy()
+    expect(screen.queryByText('about.sourceUnconfigured')).toBeNull()
     expect(invokeMock).not.toHaveBeenCalledWith('open_external_url', expect.anything())
   })
 

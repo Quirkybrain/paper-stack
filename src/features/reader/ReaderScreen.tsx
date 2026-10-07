@@ -17,6 +17,7 @@ import { Placeholder, type PlaceholderStage } from '../../components/Placeholder
 import { DOCUMENT_BODY_ID } from '../../components/SkipLink'
 import { Toast } from '../../components/Toast'
 import { HARD_LIMIT_BYTES, largeDocHonesty } from '../../document/modes/modes'
+import { slugifyHeading } from '../../document/transforms'
 import type {
   BlockRecord,
   DocumentDiagnostic,
@@ -55,7 +56,7 @@ import type { InspectTarget } from './inspect/types'
 import { LargeDocDialog } from './largeDoc/LargeDocDialog'
 import { NavPanel, type NavPanelKind } from './nav/NavPanel'
 import { useOutlineTracking } from './nav/use-outline-tracking'
-import { buildAnchorRecord } from './position/position'
+import { buildAnchorRecord, type RestoreResult } from './position/position'
 import { RootErrorBoundary } from './RootErrorBoundary'
 import { tabDisplayLabels } from './reader-state'
 import { SourceView, type SourceBackInfo } from './source/SourceView'
@@ -352,6 +353,10 @@ export default function ReaderScreen() {
   const [sourcePosition, setSourcePosition] = useState<Record<string, SourceBackInfo>>({})
   const [sourceNotice, setSourceNotice] = useState<string | null>(null)
   const [historyNotice, setHistoryNotice] = useState<string | null>(null)
+  /** Missing in-page fragment explanation (models §5.2; AT14/AT15). */
+  const [fragmentNotice, setFragmentNotice] = useState<string | null>(null)
+  /** One-shot restart position restore awaiting a mounted target (AT19). */
+  const [pendingPositionRestore, setPendingPositionRestore] = useState<RestoreResult | null>(null)
   const [revealBlockId, setRevealBlockId] = useState<string | null>(null)
   const [pendingLocate, setPendingLocate] = useState<PendingLocate | null>(null)
   /** Dismissed per tab/mode coverage notice (honesty statement stays reachable). */
@@ -494,6 +499,50 @@ export default function ReaderScreen() {
     if (element && typeof element.scrollIntoView === 'function') element.scrollIntoView()
   }, [reader.layoutCorrectionTick, activeTab, activeResult, reader])
 
+  // Restart position restore (models §6/§10; R19; AT19): consume the queued
+  // §6.2 decision-tree outcome once the restored tab is active and ready, and
+  // reveal the target block so the progressive mount always contains it.
+  const positionRestoreNonce = reader.positionRestoreNonce
+  useEffect(() => {
+    if (positionRestoreNonce === 0 || !activeTab || activeTab.phase !== 'ready' || !activeResult) {
+      return
+    }
+    const restore = reader.takePendingPositionRestore(activeTab.tabId)
+    if (restore === null) return
+    // The microtask keeps React state updates out of the effect body itself.
+    queueMicrotask(() => {
+      setPendingPositionRestore(restore)
+      if (restore.kind === 'exact' && restore.blockId !== null) setRevealBlockId(restore.blockId)
+    })
+  }, [positionRestoreNonce, activeTab, activeResult, reader])
+
+  useEffect(() => {
+    if (pendingPositionRestore === null || !activeTab || activeTab.phase !== 'ready') return
+    if (
+      pendingPositionRestore.blockId !== null &&
+      revealBlockId !== pendingPositionRestore.blockId
+    ) {
+      return // wait until the revealed block is actually mounted
+    }
+    const restore = pendingPositionRestore
+    queueMicrotask(() => {
+      if (restore.blockId !== null) {
+        const element = mainRef.current?.querySelector<HTMLElement>(
+          `[data-block-id="${restore.blockId}"]`,
+        )
+        if (element && typeof element.scrollIntoView === 'function') element.scrollIntoView()
+        else mainRef.current?.scrollIntoView?.()
+      } else {
+        mainRef.current?.scrollIntoView?.()
+      }
+      // Same-version restarts stay silent (models §6.3); cross-version
+      // outcomes are labeled exactly/approximately, never fabricated.
+      if (restore.kind === 'approx') setHistoryNotice('nav.return.approx')
+      else if (restore.reason !== 'same-version') setHistoryNotice('nav.return.exact')
+      setPendingPositionRestore(null)
+    })
+  }, [pendingPositionRestore, activeTab, activeResult, revealBlockId])
+
   /**
    * Auxiliary-area mutual exclusion (EDGE-06): at most one of files/outline/
    * inspect. Opening inspect temporarily puts the navigation panel away and
@@ -587,9 +636,31 @@ export default function ReaderScreen() {
     }
   }
 
+  /**
+   * Resolves an in-page fragment to the rendered element (models §5.2;
+   * R14/R15; AT14/AT15). Author fragments are matched through the same slug
+   * function the outline used to generate heading ids (`#more-links` →
+   * `ps-h-more-links`; CJK text hashes exactly like the outline), so the
+   * lookup stays consistent with the rendered anchors and never resolves
+   * arbitrary application DOM ids. Footnotes keep their sanitize-pattern ids.
+   */
+  const resolveFragment = (rawFragment: string): { anchorId: string; element: HTMLElement } | null => {
+    const direct = activeResult?.outline.find((entry) => entry.anchorId === rawFragment)
+    const headingId = direct?.anchorId ?? `ps-h-${slugifyHeading(rawFragment)}`
+    const heading = document.getElementById(headingId)
+    if (heading !== null) return { anchorId: headingId, element: heading }
+    if (/^ps-fn(ref)?-[A-Za-z0-9-]+$/.test(rawFragment)) {
+      const footnote = document.getElementById(rawFragment)
+      if (footnote !== null) return { anchorId: rawFragment, element: footnote }
+    }
+    return null
+  }
+
   const scrollToAnchor = (anchorId: string) => {
-    const element = document.getElementById(anchorId)
-    if (element && typeof element.scrollIntoView === 'function') element.scrollIntoView()
+    const resolved = resolveFragment(anchorId)
+    if (resolved !== null && typeof resolved.element.scrollIntoView === 'function') {
+      resolved.element.scrollIntoView()
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -735,7 +806,7 @@ export default function ReaderScreen() {
   }
 
   function anchorKind(anchorId: string): HistoryKind {
-    return /user-content-fn(ref)?-\d+/.test(anchorId) ? 'footnote' : 'fragment'
+    return /^ps-fn(ref)?-[A-Za-z0-9-]+$/.test(anchorId) ? 'footnote' : 'fragment'
   }
 
   const handleOutlineNavigate = (entry: OutlineEntry, fromAnchorId: string | null) => {
@@ -832,18 +903,24 @@ export default function ReaderScreen() {
     if (!activeTab || !activeResult) return
     if (href.startsWith('#')) {
       const anchorId = decodeURIComponent(href.slice(1))
-      const element = document.getElementById(anchorId)
-      if (!element) return // missing fragment: keep position, consume nothing
+      const resolved = resolveFragment(anchorId)
+      if (resolved === null) {
+        // Missing fragment: stay at the current position and explain
+        // (models §5.2; ui-spec §3.3); a failed navigation produces no
+        // history entry (INV-NH-02).
+        setFragmentNotice('nav.fragment.notFound')
+        return
+      }
       const from = currentNavPoint()
       const to: NavPoint = {
         docId: activeTab.docId,
         canonicalPath: activeTab.canonicalPath,
-        blockId: blockIdForAnchor(anchorId),
-        anchorId,
+        blockId: blockIdForAnchor(resolved.anchorId),
+        anchorId: resolved.anchorId,
         sourceByte: null,
       }
-      history.commit(activeTab.tabId, anchorKind(anchorId), from, to)
-      element.scrollIntoView?.()
+      history.commit(activeTab.tabId, anchorKind(resolved.anchorId), from, to)
+      resolved.element.scrollIntoView?.()
       return
     }
     const resolved = resolveDocumentLink(activeTab.canonicalPath, href)
@@ -1237,6 +1314,18 @@ export default function ReaderScreen() {
                     {t(sourceNotice)}
                   </Banner>
                 ) : null}
+                {fragmentNotice !== null ? (
+                  <Banner
+                    tone="warn"
+                    actions={
+                      <Button variant="secondary" onClick={() => setFragmentNotice(null)}>
+                        {t('common.close')}
+                      </Button>
+                    }
+                  >
+                    {t(fragmentNotice)}
+                  </Banner>
+                ) : null}
                 {historyNotice !== null ? (
                   <Banner
                     tone="info"
@@ -1272,6 +1361,38 @@ export default function ReaderScreen() {
                   </Banner>
                 ) : null}
                 <UpdateBanner variant={updateBannerState} {...updateBannerHandlers} />
+                {activeTab && activeTab.session.status === 'unavailable' ? (
+                  <Banner
+                    tone="warn"
+                    actions={
+                      <>
+                        <Button
+                          variant="secondary"
+                          onClick={() => void reader.relinkTab(activeTab.tabId)}
+                        >
+                          {t('document.unavailable.relink')}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => reader.retryTab(activeTab.tabId)}
+                        >
+                          {t('common.retry')}
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => reader.closeTab(activeTab.tabId)}
+                        >
+                          {t('document.unavailable.closeTab')}
+                        </Button>
+                      </>
+                    }
+                  >
+                    {t('document.unavailable.banner', {
+                      title: t('document.unavailable.title'),
+                      message: t('document.unavailable.message'),
+                    })}
+                  </Banner>
+                ) : null}
                 {commitNotice !== null ? (
                   <Toast
                     tone="success"

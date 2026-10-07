@@ -42,9 +42,12 @@ import type {
   DirectoryRoot,
   ErrorPayload,
   OpenEntry,
+  OpenOutcome,
   OpenRequest,
   RecentEntry,
+  RelinkResult,
   SaveResult,
+  SessionSnapshot,
   SyntaxMode,
   UpdateMode,
   VersionInfo,
@@ -78,6 +81,7 @@ import {
   restorePosition,
   LayoutStabilizer,
   type PositionController,
+  type RestoreResult,
 } from './position/position'
 import {
   effectiveUpdateMode,
@@ -182,6 +186,12 @@ export interface ReaderControls {
   ): Promise<NavigateDocumentResult | null>
   openRequest(request: OpenRequest): Promise<void>
   relinkRecent(entry: RecentEntry): Promise<void>
+  /**
+   * Unavailable-source relink for an open tab (ui-spec §3.8; R07; AT07):
+   * picker → `relink_document` → adopt, or same-tab navigation when the
+   * document is not registered yet. Cancel changes nothing.
+   */
+  relinkTab(tabId: string): Promise<void>
   activateTab(tabId: string): void
   closeTab(tabId: string): void
   closeActiveTab(): void
@@ -242,6 +252,10 @@ export interface ReaderControls {
   flushPosition(tabId: string): void
   /** Latest in-memory anchor (layout correction landing point). */
   positionAnchorFor(tabId: string): AnchorRecord | null
+  /** One-shot restart position restore from a committed record (AT19). */
+  takePendingPositionRestore(tabId: string): RestoreResult | null
+  /** Bumped when a restart position restore is queued for the view. */
+  positionRestoreNonce: number
   /** Latest position-save failure, shown with a retry action (INV-AR-07). */
   positionError: ErrorPayload | null
   clearPositionError(): void
@@ -290,6 +304,16 @@ function clearDocumentSelection(): void {
   window.getSelection()?.removeAllRanges()
 }
 
+/** Synthetic error for a restored source that cannot be resolved/opened. */
+function missingSourceError(): ErrorPayload {
+  return {
+    code: 'PS_IO_NOT_FOUND',
+    category: 'io',
+    messageKey: 'error.io.notFound',
+    retryable: true,
+  }
+}
+
 export function useReader(): ReaderControls {
   const [state, dispatch] = useReducer(readerReducer, INITIAL_READER_STATE)
   const stateRef = useRef(state)
@@ -334,6 +358,13 @@ export function useReader(): ReaderControls {
   const [commitNotices, setCommitNotices] = useState<Record<string, UpdateCommitNotice>>({})
 
   const [positionError, setPositionError] = useState<ErrorPayload | null>(null)
+  /**
+   * Restart position restores computed from committed `PositionRecord`s
+   * (models §6/§10; AT19). Entries are one-shot: the view consumes each the
+   * first time the owning tab is active and ready.
+   */
+  const [positionRestoreNonce, setPositionRestoreNonce] = useState(0)
+  const pendingPositionRestoresRef = useRef(new Map<string, RestoreResult>())
   // Created in an effect (never during render) so the controller owns timers
   // without reading refs while rendering; callbacks access it through the ref.
   const positionControllerRef = useRef<PositionController | null>(null)
@@ -431,6 +462,42 @@ export function useReader(): ReaderControls {
     [send],
   )
 
+  /**
+   * Consumes the committed `PositionRecord` of a restored tab (models §6/§10;
+   * R19/AT19). The §6.2 decision tree decides exact vs approximate against the
+   * *displayed* version's blocks; the outcome is queued for the view, which
+   * scrolls and labels it honestly. `rememberRecords=false` keeps positions
+   * in memory only, so no stored record is restored (INV-AR-08).
+   */
+  const applyStoredPosition = useCallback(
+    async (
+      tabId: string,
+      docId: string,
+      version: VersionInfo,
+      parseResult: ParseDocumentResult | undefined,
+    ) => {
+      if (!rememberRecordsRef.current) return
+      let record
+      try {
+        record = await storage.loadPosition(docId)
+      } catch {
+        return
+      }
+      if (record === null) return
+      const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+      if (!tab || tab.docId !== docId) return
+      if (tab.session.displayVersion?.contentHash !== version.contentHash) return
+      const restore = restorePosition({
+        anchor: record.anchor,
+        targetVersionHash: version.contentHash,
+        blocks: parseResult?.blocks ?? [],
+      })
+      pendingPositionRestoresRef.current.set(tabId, restore)
+      setPositionRestoreNonce((nonce) => nonce + 1)
+    },
+    [],
+  )
+
   const startParse = useCallback(
     async (
       tabId: string,
@@ -438,6 +505,7 @@ export function useReader(): ReaderControls {
       text: string,
       version: VersionInfo,
       generation: number,
+      options: { restorePosition?: boolean } = {},
     ) => {
       const taskId = nextTaskId('parse')
       const token = { docId, version: version.contentHash, generation, taskId }
@@ -451,6 +519,11 @@ export function useReader(): ReaderControls {
           tabId,
           sessionTaskSucceeded(token, version, { text, data: { parseResult: result } }),
         )
+        // Restored tabs consume their committed position only after the parse
+        // of the displayed version committed (models §10.1 T2; AT19).
+        if (options.restorePosition) {
+          void applyStoredPosition(tabId, docId, version, result)
+        }
         // Complexity budget (rendering-pipeline §5): the first parse can reveal
         // an over-budget document that the size threshold did not catch. Offer
         // the same simplified/source choice once per version; declining keeps
@@ -477,7 +550,7 @@ export function useReader(): ReaderControls {
         dispatchSession(tabId, sessionTaskFailed(token, toErrorPayload(error)))
       }
     },
-    [dispatchSession, parseOptionsFor, setPrompt],
+    [applyStoredPosition, dispatchSession, parseOptionsFor, setPrompt],
   )
 
   /**
@@ -534,21 +607,23 @@ export function useReader(): ReaderControls {
     async (
       tabId: string,
       docId: string,
-      purpose: 'initial' | 'refresh',
+      purpose: 'initial' | 'restore' | 'refresh',
       generation: number,
-      options: { skipParse?: boolean } = {},
+      options: { skipParse?: boolean; restorePosition?: boolean } = {},
     ) => {
       const token: TaskToken = { docId, version: null, generation, taskId: nextTaskId('read') }
-      if (purpose === 'initial') send(tabPhase(tabId, 'reading', null))
+      if (purpose !== 'refresh') send(tabPhase(tabId, 'reading', null))
       try {
         const snapshot = await files.readDocument({ docId, purpose })
         const current = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
         if (!current || current.session.generation !== generation) return
         dispatchSession(tabId, sessionReadSucceeded(token, snapshot.version, snapshot.text))
-        if (purpose === 'initial') {
+        if (purpose !== 'refresh') {
           void watch.watchDocument({ docId }).catch(() => undefined)
           if (!options.skipParse) {
-            void startParse(tabId, docId, snapshot.text, snapshot.version, generation)
+            void startParse(tabId, docId, snapshot.text, snapshot.version, generation, {
+              restorePosition: purpose === 'restore' || options.restorePosition === true,
+            })
           }
         } else {
           // A stable read observed a candidate (or the display hash again);
@@ -724,6 +799,17 @@ export function useReader(): ReaderControls {
     return () => document.removeEventListener('selectionchange', update)
   }, [])
 
+  /**
+   * Best-effort recents write on a successful open (R06; AT06/D-34-3). The
+   * Rust side owns the ≤100 cap, order and the read-time availability marker;
+   * a suppressed/`rememberRecords=false`/failed write stays silent (NF08;
+   * models §9).
+   */
+  const recordRecent = useCallback((docId: string) => {
+    if (isWriteBackSuppressed('recents') || !rememberRecordsRef.current) return
+    void storage.touchRecent(docId).catch(() => undefined)
+  }, [])
+
   const openPaths = useCallback(
     async (paths: readonly string[], entry: OpenEntry) => {
       if (paths.length === 0) return
@@ -737,8 +823,13 @@ export function useReader(): ReaderControls {
       // Batch oracle: request order, first accepted item gets focus, duplicates
       // reuse their canonical-path tab (R05), rejections are summarized.
       const plan = planOpenBatch(result.items)
+      // Explicit open (entry != restore) lifts the cleared-category write
+      // suppression before recents are recorded, exactly like models §9.1
+      // (`resume_recording` alternative). Restore never re-records.
+      if (plan.acceptedAny && entry !== 'restore') resumeSuppressedWrites()
       for (const item of plan.items) {
         const { outcome } = item
+        if (entry !== 'restore') recordRecent(item.docId)
         const existing = stateRef.current.tabs.find((tab) => tab.docId === item.docId)
         if (existing) {
           if (item.activate) {
@@ -777,12 +868,9 @@ export function useReader(): ReaderControls {
           void startRead(tab.tabId, item.docId, 'initial', tab.session.generation)
         }
       }
-      // Explicit open (entry != restore) lifts the cleared-category write
-      // suppression, exactly like models §9.1 (`resume_recording` alternative).
-      if (plan.acceptedAny && entry !== 'restore') resumeSuppressedWrites()
       setOpenErrors(plan.failures)
     },
-    [setPrompt, startRead, startSourceWindow, send],
+    [recordRecent, setPrompt, startRead, startSourceWindow, send],
   )
 
   /**
@@ -825,12 +913,43 @@ export function useReader(): ReaderControls {
   }, [entryHandlers])
 
   /**
+   * Adopts one `relink_document` result into the tab that owns the docId
+   * (R07; AT07): same bytes restore the identity without a version change;
+   * different bytes are explained first and adopted as a new version with an
+   * approximate position (INV-AR-04).
+   */
+  const adoptRelinkResult = useCallback(
+    (tab: ReaderTab, result: RelinkResult) => {
+      if (result.status === 'reassociated') {
+        // Same bytes: identity is restored without a version change.
+        setRelinkNotice('document.relink.reassociated')
+        dispatchSession(tab.tabId, sessionRecovered())
+        return
+      }
+      // Different bytes: explain first, then adopt as a new version of
+      // the same docId; the position can only be approximate.
+      setRelinkNotice('document.relink.newVersion')
+      dispatchSession(
+        tab.tabId,
+        sessionDisplayReplaced(result.snapshot.version, result.snapshot.text),
+      )
+      send(tabPhase(tab.tabId, 'parsing', null))
+      void startParse(
+        tab.tabId,
+        tab.docId,
+        result.snapshot.text,
+        result.snapshot.version,
+        tab.session.generation + 1,
+      )
+    },
+    [dispatchSession, send, startParse],
+  )
+
+  /**
    * Unavailable recents relink (ui-spec §3.1/§3.8; R07): re-select through the
    * system picker, attempt `relink_document` for the known docId when the tab
-   * is still open, adopt the result into that tab (same bytes → identity
-   * restored; different bytes → explained as a new version with an
-   * approximate position), and always open the chosen file afterwards.
-   * Cancel leaves every state unchanged.
+   * is still open, adopt the result into that tab, and always open the chosen
+   * file afterwards. Cancel leaves every state unchanged.
    */
   const relinkRecent = useCallback(
     async (entry: RecentEntry) => {
@@ -847,27 +966,7 @@ export function useReader(): ReaderControls {
       try {
         const result = await files.relinkDocument({ docId: entry.docId, newPath })
         if (tab) {
-          if (result.status === 'reassociated') {
-            // Same bytes: identity is restored without a version change.
-            setRelinkNotice('document.relink.reassociated')
-            dispatchSession(tab.tabId, sessionRecovered())
-          } else {
-            // Different bytes: explain first, then adopt as a new version of
-            // the same docId; the position can only be approximate.
-            setRelinkNotice('document.relink.newVersion')
-            dispatchSession(
-              tab.tabId,
-              sessionDisplayReplaced(result.snapshot.version, result.snapshot.text),
-            )
-            send(tabPhase(tab.tabId, 'parsing', null))
-            void startParse(
-              tab.tabId,
-              tab.docId,
-              result.snapshot.text,
-              result.snapshot.version,
-              tab.session.generation + 1,
-            )
-          }
+          adoptRelinkResult(tab, result)
         } else {
           setRelinkNotice(
             result.status === 'reassociated'
@@ -882,7 +981,7 @@ export function useReader(): ReaderControls {
       }
       await openPaths([newPath], 'recent')
     },
-    [dispatchSession, openPaths, send, startParse],
+    [adoptRelinkResult, openPaths],
   )
 
   const openRequest = useCallback(
@@ -951,8 +1050,129 @@ export function useReader(): ReaderControls {
     [send, startRead],
   )
 
+  /**
+   * Unavailable-source relink for an open tab (ui-spec §3.8 “源不可用”;
+   * R07; AT07): the same-bytes/different-bytes semantics as `relinkRecent`,
+   * but the chosen file belongs to this tab. When the document is not
+   * registered in Rust yet (a tab restored without its file), the selection
+   * becomes a same-tab document navigation instead.
+   */
+  const relinkTab = useCallback(
+    async (tabId: string) => {
+      const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+      if (!tab) return
+      let picked
+      try {
+        picked = await files.pickFiles()
+      } catch (error) {
+        setOpenErrors([{ path: '', error: toErrorPayload(error) }])
+        return
+      }
+      if (picked.cancelled || picked.paths.length === 0) return
+      const newPath = picked.paths[0]
+      try {
+        const result = await files.relinkDocument({ docId: tab.docId, newPath })
+        adoptRelinkResult(tab, result)
+      } catch {
+        // Not registered (restored without its file) or unreadable: treat the
+        // explicit selection as navigating this tab to the chosen document.
+        await navigateDocument(tabId, newPath, null)
+      }
+    },
+    [adoptRelinkResult, navigateDocument],
+  )
+
+  /**
+   * Startup session restore (models §10; R06; AT06/D-34-2). Runs after the
+   * explicit startup queue so a CLI/system file keeps focus (INV-SR-01) and
+   * only when `restoreSession` is on. The stored session carries only
+   * `docId`s; the canonical path comes from the recents projection, the
+   * contract's docId→path surface. Tabs are restored serially and
+   * independently (INV-SR-02): a single failure marks only that tab
+   * unavailable. Queries, selections, document-level overrides and temporary
+   * network grants are never restored (INV-SR-03/04), and a cleared session
+   * is never rebuilt (INV-SR-05).
+   */
+  const restoreStartupSession = useCallback(
+    async (isCancelled: () => boolean, explicitTookFocus: boolean) => {
+      if (isWriteBackSuppressed('session')) return
+      let snapshot: SessionSnapshot | null = null
+      try {
+        snapshot = await storage.loadSession()
+      } catch {
+        return
+      }
+      if (!snapshot || snapshot.tabs.length === 0) return
+      let recents: RecentEntry[] = []
+      try {
+        recents = await storage.listRecents()
+      } catch {
+        recents = []
+      }
+      const knownByDoc = new Map(recents.map((entry) => [entry.docId, entry]))
+      const ordered = [...snapshot.tabs].sort(
+        (left, right) =>
+          left.orderIndex - right.orderIndex || left.tabId.localeCompare(right.tabId),
+      )
+      let storedActiveTabId: string | null = null
+      for (const stored of ordered) {
+        if (isCancelled()) return
+        const alreadyOpen = stateRef.current.tabs.find((tab) => tab.docId === stored.docId)
+        if (alreadyOpen) {
+          if (stored.isActive) storedActiveTabId = alreadyOpen.tabId
+          continue
+        }
+        const known = knownByDoc.get(stored.docId)
+        if (!known) continue // no source path is known: no ghost tab
+        let outcome: OpenOutcome | undefined
+        if (known.available) {
+          try {
+            const result = await files.openDocuments({
+              paths: [known.canonicalPath],
+              entry: 'restore',
+            })
+            outcome = result.items[0]
+          } catch {
+            outcome = undefined
+          }
+          if (isCancelled()) return
+        }
+        const accepted =
+          outcome !== undefined &&
+          outcome.status !== 'rejected' &&
+          (outcome.docId ?? outcome.duplicateOfDocId) !== undefined
+        const docId = accepted ? (outcome?.docId ?? outcome?.duplicateOfDocId) : undefined
+        if (docId !== undefined && stateRef.current.tabs.some((tab) => tab.docId === docId)) {
+          continue // duplicate resolved to an already open document
+        }
+        const tab = createReaderTab({
+          tabId: nextTabId(),
+          docId: docId ?? stored.docId,
+          canonicalPath: outcome?.identity?.canonicalPath ?? known.canonicalPath,
+          displayName: outcome?.identity?.displayName ?? known.displayName,
+        })
+        send(tabOpen(tab, false))
+        if (stored.isActive) storedActiveTabId = tab.tabId
+        if (docId !== undefined) {
+          void startRead(tab.tabId, docId, 'restore', tab.session.generation)
+        } else {
+          // File missing / no longer readable: keep the tab, mark it
+          // unavailable; the banner offers 重新定位/重试/关闭 (ui-spec §3.8).
+          dispatchSession(tab.tabId, sessionUnavailable())
+          send(tabPhase(tab.tabId, 'failed', outcome?.error ?? missingSourceError()))
+        }
+      }
+      if (storedActiveTabId !== null && !explicitTookFocus && !isCancelled()) {
+        send(tabActivate(storedActiveTabId))
+      }
+    },
+    [dispatchSession, send, startRead],
+  )
+
   // Startup queue: drained exactly once and in order; later requests arrive as
   // `paperstack://open-requested` events through `openRequest` (contracts §4).
+  // The stored session is restored afterwards, never taking focus from an
+  // explicitly opened file (models §10; INV-SR-01/06).
   useEffect(() => {
     let cancelled = false
     const handlers = entryHandlers()
@@ -961,11 +1181,23 @@ export function useReader(): ReaderControls {
       setDirectory: handlers.setDirectory,
       reportError: handlers.reportError,
     }
-    void drainPendingOpenRequests(ENTRY_SERVICES, guarded)
+    void (async () => {
+      await drainPendingOpenRequests(ENTRY_SERVICES, guarded)
+      if (cancelled) return
+      const explicitTookFocus = stateRef.current.tabs.length > 0
+      let restoreSession = true
+      try {
+        restoreSession = (await settings.getSettings()).global.restoreSession
+      } catch {
+        // Keep the contract default (true) when settings are unavailable.
+      }
+      if (cancelled || !restoreSession) return
+      await restoreStartupSession(() => cancelled, explicitTookFocus)
+    })().catch(() => undefined)
     return () => {
       cancelled = true
     }
-  }, [entryHandlers])
+  }, [entryHandlers, restoreStartupSession])
 
   const activateTab = useCallback(
     (tabId: string) => {
@@ -1095,16 +1327,6 @@ export function useReader(): ReaderControls {
       send(tabPhase(tabId, 'cancelled', null))
     },
     [dispatchSession, send],
-  )
-
-  const retryTab = useCallback(
-    (tabId: string) => {
-      const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
-      if (!tab) return
-      send(tabPhase(tabId, 'reading', null))
-      void startRead(tabId, tab.docId, 'initial', tab.session.generation)
-    },
-    [startRead, send],
   )
 
   const setBannerCollapsed = useCallback(
@@ -1264,6 +1486,18 @@ export function useReader(): ReaderControls {
     [],
   )
 
+  /**
+   * One-shot consumer for a restart position restore (models §6/§10; AT19).
+   * Returns the §6.2 decision-tree outcome once; the view scrolls to it and
+   * labels exact vs approximate honestly.
+   */
+  const takePendingPositionRestore = useCallback((tabId: string): RestoreResult | null => {
+    const pending = pendingPositionRestoresRef.current.get(tabId)
+    if (pending === undefined) return null
+    pendingPositionRestoresRef.current.delete(tabId)
+    return pending
+  }, [])
+
   const clearPositionError = useCallback(() => {
     positionControllerRef.current?.clearError()
     setPositionError(null)
@@ -1300,6 +1534,60 @@ export function useReader(): ReaderControls {
       )
     },
     [startRead],
+  )
+
+  /**
+   * Retry for a failed/unavailable tab (ui-spec §3.8; models §1.2 T8). A tab
+   * whose document never registered (file missing at startup) re-runs the open
+   * validation first; a tab with loaded content retries through a stable
+   * disk re-read so only an actually readable source restores Ready (a cached
+   * initial read must not pretend recovery).
+   */
+  const retryTab = useCallback(
+    (tabId: string) => {
+      const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+      if (!tab) return
+      if (tab.session.displayVersion === null) {
+        send(tabPhase(tabId, 'reading', null))
+        const token = createTaskToken(tab.session, nextTaskId('read'), 'discovery')
+        const generation = tab.session.generation
+        void files
+          .openDocuments({ paths: [tab.canonicalPath], entry: 'restore' })
+          .then((result) => {
+            const outcome = result.items[0]
+            const current = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+            if (!current || current.session.generation !== generation) return
+            if (!outcome || outcome.status === 'rejected' || !outcome.docId) {
+              if (token !== null) {
+                dispatchSession(
+                  tabId,
+                  sessionTaskFailed(token, outcome?.error ?? missingSourceError()),
+                )
+              }
+              return
+            }
+            dispatchSession(tabId, sessionRecovered())
+            void startRead(tabId, outcome.docId, 'restore', generation)
+          })
+          .catch((error: unknown) => {
+            if (token !== null) {
+              dispatchSession(tabId, sessionTaskFailed(token, toErrorPayload(error)))
+            }
+          })
+        return
+      }
+      if (tab.session.status === 'unavailable') {
+        // Retained content stays visible during the stable re-read (INV-DS-06);
+        // the refresh read itself restores Ready on success without a parse.
+        // Forcing the `reading` phase here would strand the tab in `parsing`
+        // (no parse is scheduled for a refresh) and unmount the content.
+        refreshTab(tabId)
+        return
+      }
+      send(tabPhase(tabId, 'reading', null))
+      void startRead(tabId, tab.docId, 'initial', tab.session.generation)
+    },
+    [dispatchSession, refreshTab, startRead, send],
   )
 
   const handleWatchChanged = useCallback(
@@ -1381,6 +1669,7 @@ export function useReader(): ReaderControls {
     navigateDocument,
     openRequest,
     relinkRecent,
+    relinkTab,
     activateTab,
     closeTab,
     closeActiveTab,
@@ -1414,6 +1703,8 @@ export function useReader(): ReaderControls {
     observePosition,
     flushPosition,
     positionAnchorFor,
+    takePendingPositionRestore,
+    positionRestoreNonce,
     positionError,
     clearPositionError,
     retryPositionSave,

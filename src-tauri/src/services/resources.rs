@@ -163,6 +163,25 @@ pub fn normalize_origin(raw: &str) -> Result<String, AppError> {
     origin_from_url(&url)
 }
 
+/// Extracts the session allow-list origin of a full remote *reference*
+/// (`check_resource_access` on a document image URL; security-model §4;
+/// AT26/D-34-5).
+///
+/// Unlike [`normalize_origin`], which validates an allow-list *entry* and
+/// therefore rejects any path, query or fragment, a document reference is a
+/// full URL: only its origin takes part in the policy check, so the resource
+/// path must never make the reference "unsupported". Credentials are rejected
+/// outright (a resource reference must never carry them).
+pub fn origin_for_remote_reference(raw: &str) -> Result<String, AppError> {
+    let url = parse_remote_url(raw)?;
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err(protocol_error(
+            "remote reference must not contain credentials",
+        ));
+    }
+    origin_from_url(&url)
+}
+
 /// `scheme://host[:port]` with the default port omitted. Used after scheme
 /// validation for allow-list matching and for redirect diagnostics (where a
 /// non-https scheme must be shown as-is).

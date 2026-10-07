@@ -15,7 +15,7 @@
 //! so every contract field remains valid; the first 64KiB still drives the
 //! encoding probe and nothing is cached in memory for them.
 
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::fmt;
 use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom};
@@ -856,6 +856,11 @@ pub struct FilesService {
     snapshots: SnapshotCache,
     documents: BTreeMap<String, RegisteredDocument>,
     paths_index: HashMap<String, String>,
+    /// Canonical paths of every source document this session attempted to
+    /// open, including decode/format-rejected ones that never registered.
+    /// Diagnostics export must protect these source directories too
+    /// (R04/R28; AT28/D-34-7).
+    known_sources: BTreeSet<PathBuf>,
 }
 
 impl Default for FilesService {
@@ -881,6 +886,7 @@ impl FilesService {
             snapshots: SnapshotCache::with_capacity(capacity),
             documents: BTreeMap::new(),
             paths_index: HashMap::new(),
+            known_sources: BTreeSet::new(),
         }
     }
 
@@ -893,6 +899,15 @@ impl FilesService {
     /// layer: diagnostics bundle rows, protected export sources, relink).
     pub fn registered_documents(&self) -> impl Iterator<Item = &RegisteredDocument> {
         self.documents.values()
+    }
+
+    /// Known source locations of this session in canonical-path order:
+    /// registered documents plus every readable `.md`/`.markdown` target that
+    /// later failed validation (encoding/format), so error-state documents
+    /// still protect their source directory from diagnostics export
+    /// (AT28/D-34-7).
+    pub fn known_source_paths(&self) -> impl Iterator<Item = &PathBuf> {
+        self.known_sources.iter()
     }
 
     pub fn registered_count(&self) -> usize {
@@ -908,6 +923,9 @@ impl FilesService {
     /// caches the decoded snapshot for a following `read_document(initial)`.
     pub fn open_document(&mut self, raw_path: &str) -> Result<OpenedDocument, AppError> {
         let canonical = resolve_open_target(raw_path)?;
+        // A readable markdown target is a known source location from here on,
+        // even when decoding/validation rejects it later (AT28/D-34-7).
+        self.known_sources.insert(canonical.clone());
         let canonical_path = canonical.to_string_lossy().into_owned();
         let doc_id = doc_id_for(&canonical_path);
         let duplicate = self.documents.contains_key(&doc_id);
@@ -1032,6 +1050,7 @@ impl FilesService {
             return Err(AppError::new(ErrorCode::IoNotFound));
         }
         let canonical = resolve_open_target(new_path)?;
+        self.known_sources.insert(canonical.clone());
         let canonical_path = canonical.to_string_lossy().into_owned();
         if let Some(existing) = self.paths_index.get(&canonical_path) {
             if existing != doc_id {
