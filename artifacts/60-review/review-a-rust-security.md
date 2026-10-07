@@ -4,13 +4,13 @@
 - **Artifact ID**: ART-60-REVIEW-A
 - **Artifact Type**: Independent Review Report（T-64；Rust 服务、路径/授权/资源策略、只读保证、诊断脱敏、命令表面与能力、存储门禁、监测、错误分类、测试质量）
 - **Status**: VALID
-- **Revision**: 2
+- **Revision**: 3
 - **Owner**: quality-reviewer
 - **Task**: `wp-35-review-a`（任务分支 `task/wp-35-review-a`；父分支 `feat/v0.1.0`；基线/评审修订 `aac72e1ef676965bfa743597c1f0820e8e3efed8`；快照覆盖 `src-tauri/src/`、`src-tauri/tests/`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`、`src-tauri/capabilities/`）
 - **Last Verified**: 2026-10-07
 - **Review base**: `aac72e1`（HEAD，工作树评审前/后 `git status --porcelain` 为空；只读评审，未修改任何 `src/`、`src-tauri/`、tests 或框架文件；本报告为唯一写入）
 - **Scope**: 计划 §6.1 评审 A 清单的 Rust 侧全部（评审目标为上述快照路径）；判定仅对本修订有效。
-- **Verdict**: **FAIL**（1 blocker + 1 major + 6 minor；详见 §2、§5）。授权算法本身、只读保证、诊断脱敏、能力/CSP、存储门禁、监测与错误分类的证据总体很强；失败集中在“撤销/清除授权的运行时语义”两处。Rev 2 仅新增可执行验证附录（§9），未改变任何判定。
+- **Verdict**: **FAIL**（1 blocker + 1 major + 6 minor；详见 §2、§5）。授权算法本身、只读保证、诊断脱敏、能力/CSP、存储门禁、监测与错误分类的证据总体很强；失败集中在“撤销/清除授权的运行时语义”两处。Rev 2 新增可执行验证附录（§9），Rev 3 新增关闭与修复验证清单（§10）；均未改变任何判定。
 
 **Pinned inputs（SHA-256 于 2026-10-07 实测复核，全部一致）**
 
@@ -264,3 +264,70 @@ harness 复刻的命令序列即 `open_one` 的两步（open → grant，见上�
 - 逐区域判定不变：**1 FAIL**（路径授权与资源策略，因 A-01/A-02）、2 PASS、3 PASS、4 PASS、5 PASS（附 A-05 minor）、6 PASS、7 PASS、8 PASS（附缺口）；**overall recommendation 仍为 FAIL**（1 blocker A-01 + 1 major A-02 + 6 minor）。
 - 本附录仅新增证据与流程说明；§3 发现、§4 边界、§5 无法验证项、§6 测试质量、§7 建议均保持原样有效。
 - 证据可复跑：`cargo test --manifest-path src-tauri/Cargo.toml --offline`（261/261，§1.4）与 `/tmp/opencode/review-a-verify`（本附录 9.2/9.3；harness 位于仓库外，不作为交付物）。
+
+---
+
+## 10. Revision 3 — Closure & Fix-Verification Checklist（2026-10-07）
+
+本修订只做两件事：记录版本历史（§10.1）与给出修复任务的**复审契约**（§10.2）。§2–§9 的判定、发现、证据全部原样有效；overall recommendation 仍为 **FAIL**（1 blocker + 1 major + 6 minor）。所有发现针对修订 `aac72e1`（其后 `src-tauri/` 字节未变，见 §9.1）。
+
+### 10.1 版本历史
+
+| 修订 | 内容 | 判定变化 | 提交 |
+|---|---|---|---|
+| Rev 1 | 对 `aac72e1` 的独立评审：8 区域核对、A-01…A-08、证据与 UNVERIFIED 清单 | 建立：FAIL（1 blocker + 1 major + 6 minor） | `95e68ac` |
+| Rev 2 | 验证附录（§9）：A-01/A-02 只读 harness 可执行复现、调用链、判定重申；流程记录：首次 `finish` 因原 handoff 的 `snapshot_paths` 未覆盖已存在的 deliverable 而被 guard 阻塞（`BLOCKED: snapshot_paths does not cover required predecessor/review target: artifacts/60-review/review-a-rust-security.md`），该周期归档后以 `writes=[]` 重钉 | 无（发现与判定不变） | `2cf936b` |
+| Rev 3 | 关闭与修复验证清单（§10）；流程记录：第二次 `finish` 因 `begin` 把已提交的 Rev 1 报告记为 changed predecessor、而快照未含其原始字节而被 guard 阻塞（`BLOCKED: snapshot does not cover original bytes of changed predecessor: artifacts/60-review/review-a-rust-security.md`），该周期归档后将本报告加入 `snapshot_paths` 重钉 | 无（发现与判定不变） | 本提交 |
+
+两次阻塞均为 guard 元数据/快照配置问题（过程性），不涉及评审内容、发现或判定；已在正确配置下继续。
+
+### 10.2 Fix-Verification Checklist（A-01…A-08）
+
+使用说明：每个修复项在**新提交**上完成；修复任务对每项给出“实现位置 + 新增测试 + 复跑输出”。复审（Review A'）按第 3 列逐项确认，并复跑全量 `cargo test --manifest-path src-tauri/Cargo.toml --offline`（基准 ≥261 passed，加上新增用例）。测试文件路径均为仓库相对路径。
+
+- [ ] **A-01（blocker）restore 不得自动重新授予**
+  - **验收标准**：`entry="restore"` 的 `open_documents` 对**无有效授权**的路径不得创建 file/directory 授权（`list_grants` 不新增、`read_document` 仍返回 `PS_AUTH_REVOKED`）；有有效授权的路径恢复行为不变（AT06 不回归）。“撤销/清除后重启即恢复可读”的复现链（§9.2 四步）必须不再成立。若协调方改为把 restore 视为授权动作，则 §7 第 3 条要求的 `security-model.md`/`data-model.md`/models §10.2 统一修订 + Change Impact 记录是关闭前提，且仍需测试证明“未授权不静默授予”。
+  - **必须新增/扩展的测试**：`src-tauri/tests/security_paths_auth.rs` 新增 `restore_does_not_regrant_revoked_authorization`（给定被撤销/空的授权集合，restore 决策不调用 `grant_file`/`grant_file_session`；给定有效授权时照常通过）。若 `commands/files.rs::open_one` 的判定被提取为纯函数/服务谓词，同时在其所在文件的单测模块加边界用例（`Restore` vs `Recent/Dialog`）。
+  - **复审扫描/命令**：`grep -n "entry" src-tauri/src/commands/files.rs`（grant 块必须由 `entry != Restore` 或等价的“已有有效授权”判定保护）；`cargo test --manifest-path src-tauri/Cargo.toml --test security_paths_auth`；桌面复跑 AT06 + AT25。
+
+- [ ] **A-02（major）目录撤销/清除后 `read_directory` 必须停止扫描**
+  - **验收标准**：`revoke_grant`（目录类）或 `clear_records(["authorizations"])` 成功后，对原 `rootId` 的任意 `read_directory` 调用返回 `PS_AUTH_REVOKED`/`PS_AUTH_OUTSIDE_ROOT`（或根被逐出后 `PS_IO_NOT_FOUND`），不得返回任何条目；用户重新显式打开目录后可恢复（受 §4 forbidden 集进程内不可逆限制约束）。
+  - **必须新增/扩展的测试**：`src-tauri/tests/tree_listing.rs` 新增 `read_directory_after_directory_revoke_is_denied` 与 `read_directory_after_authorization_clear_is_denied`。若检查落在命令层，须把判定提取为可测函数（如“根 canonical path 对注册表 `has_local_access`”）并测试该函数，命令层保持薄调用。
+  - **复审扫描/命令**：`grep -n "has_local_access\|root_id\|read_directory" src-tauri/src/commands/tree.rs src-tauri/src/services/tree.rs`（读路径必须出现注册表判定；若选逐出方案，`revoke`/`revoke_all_for_clear` 路径必须出现 TreeService 清理）；`cargo test --manifest-path src-tauri/Cargo.toml --test tree_listing --test storage_gating`；桌面复跑 AT02/AT25。
+
+- [ ] **A-03（minor）revoke 不得留下“注册表已无、scope 仍允许”的半撤销态**
+  - **验收标准**：`GrantPersistence::delete` 失败时，`revoke` 的所有失败路径二选一并保持一致：**(a) 保留**（grant 仍列出、仍可读取、asset scope 仍允许）并返回错误；或 **(b) 完成**（注册表 + asset scope 均撤销、返回错误，且不得因 DB 行残留而在下次启动“复活”——需补偿删除或等效机制）。禁止出现“注册表不可见但旧 asset URL 仍可服务且重试返回 `PS_IO_NOT_FOUND`”的不可恢复态。
+  - **必须新增/扩展的测试**：`src-tauri/tests/security_paths_auth.rs` 扩展 `RecordingStore`（新增 `fail_delete`）与 `src-tauri/src/services/asset_scope.rs` 的 unit tests（复用 `RecordingBackend`，断言 delete 失败时的 forbid 调用序列或“完整保留”语义）。
+  - **复审扫描/命令**：`grep -n "store.delete" -A8 src-tauri/src/services/auth.rs`（确认顺序/补偿）；`cargo test --manifest-path src-tauri/Cargo.toml --test security_paths_auth --lib`。
+
+- [ ] **A-04（minor）`revoke_remote_session` 不 reject**
+  - **验收标准**：命令 29 在缓存删除/asset forbid 失败时仍返回 `Ok(RevokeResult)`；失败以 `removedCacheEntries` 计数、`failedRemovals` 类统计或诊断日志呈现，且对仍存在的缓存文件执行 fail-closed forbid（与现行为一致，只是不冒泡为 reject）。若保留 reject，必须先修订 contracts §2 行 29 的错误列（不推荐，需 Change Impact）。
+  - **必须新增/扩展的测试**：`src-tauri/tests/remote_policy.rs` 新增 `revoke_session_counts_failed_removals_without_failing`（cache `remove` 返回错误时报告 `failed_removals`、`revoke` 不 panic）；命令层分支由复审静态确认。
+  - **复审扫描/命令**：`grep -n "revoke_remote_cache\|revoke_file" -B2 -A6 src-tauri/src/commands/resources.rs`（不得有 `?` 冒泡为 Err）；`cargo test --manifest-path src-tauri/Cargo.toml --test remote_policy`。
+
+- [ ] **A-05（minor）NF08 降级口径闭合（只读降级接线或契约澄清）**
+  - **验收标准**：二选一并在 Artifact 中留痕：**(a)** `AppState::create` 在“数据库版本更高/不可写”时尝试 `Storage::open_read_only_path`，只读加载记录并给出降级状态（`PS_DB_MIGRATION` 如实记录）；或 **(b)** 上游（架构/需求协调方）在 Artifact 中明确 v0.1.0 采用“内存降级 + 原样保留”并修订 `data-model.md` §4.5 的“只读降级提示”，同时说明“重建本地数据库”入口的处置（补 r2 命令或显式移出范围）。
+  - **必须新增/扩展的测试**：若选 (a)：`src-tauri/tests/migration_faults.rs` 扩展 `newer_schema_revision_is_refused_read_write_and_readable_in_read_only_degrade`，并新增启动态测试断言只读加载路径可达（若命令层不可测，至少断言状态构造函数的返回值）；若选 (b)：无需代码测试，但需 Change Impact 记录。
+  - **复审扫描/命令**：`grep -n "open_read_only_path" src-tauri/src/state.rs src-tauri/src/services/storage.rs`（选 (a) 时必须在生产调用点出现）；`cargo test --manifest-path src-tauri/Cargo.toml --test migration_faults`；并检查对应 Artifact 状态/修订。
+
+- [ ] **A-06（minor）搜索折叠：契约文本与共享语义一致**
+  - **验收标准**：`contracts.md` §2.1 的折叠条款不再要求实现按整串 `toLowerCase`，而是明确“逐码点 Unicode 默认小写（双方一致）、无 Final_Sigma 上下文、无归一化”，与 `tests/contracts/vectors/search-parity.json` 的 `foldingRule` 完全一致（契约 r2 + Change Impact）；或（不推荐）双方改为字面 `toLowerCase` 并同步更新向量与两侧执行器。
+  - **必须新增/扩展的测试**：契约 r2 路线无需新增代码测试，但需复跑 `cargo test --manifest-path src-tauri/Cargo.toml --test contract_search_parity` 与 `pnpm vitest run --config tests/contracts/vitest.config.ts`，确认与向量一致。
+  - **复审扫描/命令**：`grep -n "toLowerCase\|逐码点\|per code point" artifacts/30-architecture/contracts.md tests/contracts/vectors/search-parity.json`（两处表述必须一致）；比对 `contracts.md` 版本头/Revision 行是否已提升。
+
+- [ ] **A-07（minor）受控获取拒绝携带凭据的 URL**
+  - **验收标准**：`RemoteService::fetch` 在解析 URL 后、任何 cache/allowlist/DNS/传输动作前，对含 `username`/`password` 的 URL 返回 `PS_REMOTE_PROTOCOL`（与 `origin_for_remote_reference` 一致）。
+  - **必须新增/扩展的测试**：`src-tauri/tests/remote_policy.rs` 新增 `credential_urls_are_rejected_before_any_io`，断言 `PS_REMOTE_PROTOCOL` 且 `transport_calls()==0`、`resolver_calls()==0`。
+  - **复审扫描/命令**：`grep -n "username\|password" src-tauri/src/services/resources.rs`（两条解析入口均校验）；`cargo test --manifest-path src-tauri/Cargo.toml --test remote_policy`。
+
+- [ ] **A-08（minor）`details` 白名单在唯一 payload 出口生效**
+  - **验收标准**：任何 `ErrorPayload.details` 只能含 `DETAIL_KEY_ALLOWLIST` 键——在 `AppError::to_payload()`（或等价的唯一出口）过滤/拒绝非白名单键；`sanitize_details` 不再是生产死代码（或删除并以其等价逻辑替换出口过滤）。
+  - **必须新增/扩展的测试**：`src-tauri/src/error.rs` tests 模块新增 `payload_drops_non_allowlisted_details`（构造含未知键的 `AppError`，断言 payload 中该键被移除、白名单键保留）。
+  - **复审扫描/命令**：`grep -rn "sanitize_details\|to_payload" src-tauri/src/error.rs src-tauri/src/services/diagnostics.rs`（出口必须有过滤路径）；`cargo test --manifest-path src-tauri/Cargo.toml --lib`。
+
+### 10.3 修复后复审的最低证据集
+
+1. 新修订上的完整 `cargo test --manifest-path src-tauri/Cargo.toml --offline`（含 §10.2 新增用例；基准 261+）。
+2. A-01/A-02 的修复必须重跑 `/tmp/opencode/review-a-verify` 或等价复现，证明原复现链不再成立（不是仅“新测试通过”）。
+3. 受影响桌面项复跑：AT02、AT06、AT25、AT27（按 §4 既有 UNVERIFIED 口径如实标注）。
+4. 本文件的 A-01..A-08 勾选状态与新证据引用，作为 Review A' 的输入；Review A' 由**不同评审者**执行（作者不自审）。
