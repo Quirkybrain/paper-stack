@@ -77,11 +77,18 @@ pub(crate) fn collect_documents(state: &AppState) -> Vec<DocumentDiagnosticsInpu
 
 pub(crate) fn collect_protected_sources(state: &AppState) -> ProtectedSources {
     let files = lock(&state.files);
-    ProtectedSources::from_paths(
-        files
-            .registered_documents()
-            .map(|document| document.canonical_path().to_owned()),
-    )
+    // Registered documents plus every known source location — including
+    // documents whose open failed validation (decode/encoding errors), which
+    // never register but still protect their source directory (AT28/D-34-7).
+    let paths = files
+        .registered_documents()
+        .map(|document| document.canonical_path().to_owned())
+        .chain(
+            files
+                .known_source_paths()
+                .map(|path| path.to_string_lossy().into_owned()),
+        );
+    ProtectedSources::from_paths(paths)
 }
 
 pub(crate) fn diagnostics_limits() -> DiagnosticsLimits {

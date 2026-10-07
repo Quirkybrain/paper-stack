@@ -124,6 +124,22 @@ fn open_binary_and_latin1_are_encoding_unsupported() {
 }
 
 #[test]
+fn rejected_encoding_source_is_remembered_as_a_known_source() {
+    // AT28/D-34-7: a readable markdown target that fails decoding never
+    // registers, but its canonical location must remain known so diagnostics
+    // export can protect its source directory.
+    let mut service = FilesService::new();
+    let latin1 = fixture("latin1.md");
+    let error = service.open_document(&path_str(&latin1)).unwrap_err();
+    assert_eq!(error.code(), ErrorCode::EncodingUnsupported);
+    assert_eq!(service.registered_count(), 0);
+
+    let canonical = fs::canonicalize(&latin1).unwrap();
+    let known: Vec<PathBuf> = service.known_source_paths().cloned().collect();
+    assert_eq!(known, vec![canonical]);
+}
+
+#[test]
 fn open_bom_is_detected_and_stripped_from_text_only() {
     let mut service = FilesService::new();
     let path = fixture("bom.md");

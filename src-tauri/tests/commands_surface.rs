@@ -20,6 +20,7 @@ use paperstack_lib::services::diagnostics::{
     DiagnosticsService, DocumentDiagnosticsInput, LogCategory, LogEvent, LogField, LogLevel,
     ManualDiagnosticsClock, ProtectedSources, LARGE_FILE_BYTES, LOG_MAX_BYTES, PREVIEW_TTL_MS,
 };
+use paperstack_lib::services::files::FilesService;
 use paperstack_lib::services::info::{
     InfoService, APP_LICENSE, APP_LOCALE, APP_NAME, APP_OWNER, APP_VERSION, IPC_CONTRACT,
     LEGAL_LICENSE_RESOURCE, LEGAL_THIRD_PARTY_RESOURCE, SOURCE_ENTRY_NOTE_KEY,
@@ -759,6 +760,76 @@ fn protected_sources_match_component_level() {
     assert!(protected.blocks(Path::new("/home/user/notes/sub/other.txt")));
     assert!(!protected.blocks(Path::new("/home/user/notes-other/other.txt")));
     assert!(!protected.blocks(Path::new("/home/user/elsewhere.txt")));
+}
+
+#[test]
+fn export_protects_error_state_source_directories_too() {
+    // AT28/D-34-7 regression: a document that fails validation (decode error)
+    // never registers, but its source directory must still reject diagnostics
+    // export targets. This mirrors `collect_protected_sources` (registered
+    // documents plus every known source location).
+    let (temp, service, _clock) = diagnostics_fixture(LOG_MAX_BYTES);
+    let preview = preview_once(&service);
+
+    let registered_dir = temp.path().join("registered");
+    fs::create_dir_all(&registered_dir).unwrap();
+    let good = registered_dir.join("good.md");
+    fs::write(&good, "# ok\n").unwrap();
+
+    let error_dir = temp.path().join("error-state");
+    fs::create_dir_all(&error_dir).unwrap();
+    let latin1 = error_dir.join("latin1.md");
+    fs::write(&latin1, b"\xE9t\xE9 binary-ish\n").unwrap();
+
+    let mut files = FilesService::new();
+    files.open_document(&good.to_string_lossy()).unwrap();
+    let error = files.open_document(&latin1.to_string_lossy()).unwrap_err();
+    assert_eq!(error.code(), ErrorCode::EncodingUnsupported);
+    assert_eq!(files.registered_count(), 1);
+
+    let protected = ProtectedSources::from_paths(
+        files
+            .registered_documents()
+            .map(|document| document.canonical_path().to_owned())
+            .chain(
+                files
+                    .known_source_paths()
+                    .map(|path| path.to_string_lossy().into_owned()),
+            ),
+    );
+
+    // Registered document rejection (exact file and inside its directory).
+    let registered_exact =
+        export_to(&service, &preview.export_id, &good, true, &protected).unwrap_err();
+    assert_eq!(registered_exact.code(), ErrorCode::IoExportBlocked);
+    let registered_inside = registered_dir.join("probe.txt");
+    let error = export_to(
+        &service,
+        &preview.export_id,
+        &registered_inside,
+        true,
+        &protected,
+    )
+    .unwrap_err();
+    assert_eq!(error.code(), ErrorCode::IoExportBlocked);
+
+    // Error-state document rejection: same protection without registration.
+    let error_state_inside = error_dir.join("probe-out.txt");
+    let error = export_to(
+        &service,
+        &preview.export_id,
+        &error_state_inside,
+        true,
+        &protected,
+    )
+    .unwrap_err();
+    assert_eq!(error.code(), ErrorCode::IoExportBlocked);
+
+    // Non-source target: the export still succeeds with the same preview.
+    let outside = temp.path().join("export-ok.txt");
+    let result = export_to(&service, &preview.export_id, &outside, false, &protected).unwrap();
+    assert_eq!(fs::read_to_string(&outside).unwrap(), preview.text);
+    assert_eq!(result.bytes, preview.text.len() as u64);
 }
 
 // ---------------------------------------------------------------------------

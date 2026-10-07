@@ -41,6 +41,7 @@ import ReaderScreen from './ReaderScreen'
 import { documentModelCache } from '../../app/session'
 import { AppStoreProvider } from '../../app/store'
 import { t } from '../../app/i18n'
+import { resetWriteSuppression, suppressWriteBack } from '../../app/write-suppression'
 import { resourceAuth } from './resources/resource-auth'
 import { resourceInvalidation } from './view/resource-invalidation'
 import type {
@@ -51,7 +52,9 @@ import type {
   ErrorPayload,
   GlobalSettings,
   OpenRequest,
+  PositionRecord,
   RecentEntry,
+  SessionSnapshot,
 } from '../../services/types'
 
 /**
@@ -99,6 +102,10 @@ let relinkStatus: 'reassociated' | 'new-version' = 'reassociated'
 let relinkText: string | null = null
 let rejectPath: string | null = null
 let duplicatePath: string | null = null
+let sessionSnapshot: SessionSnapshot | null = null
+let positionRecords = new Map<string, PositionRecord>()
+let touchRecentCalls: string[] = []
+let scrollCalls: Element[] = []
 
 const REJECTED_OPEN_ERROR: ErrorPayload = {
   code: 'PS_FMT_UNSUPPORTED',
@@ -106,6 +113,12 @@ const REJECTED_OPEN_ERROR: ErrorPayload = {
   messageKey: 'error.encoding.formatUnsupported',
   retryable: false,
 }
+
+/** Rendered source-unavailable banner (title + message via the template key). */
+const UNAVAILABLE_BANNER = t('document.unavailable.banner', {
+  title: t('document.unavailable.title'),
+  message: t('document.unavailable.message'),
+})
 
 function identityFor(path: string): DocIdentity {
   const name = path.split('/').pop() ?? 'doc.md'
@@ -175,6 +188,17 @@ function installRouter(): void {
         return Promise.resolve(undefined)
       case 'list_recents':
         return Promise.resolve(recentsResult)
+      case 'load_session':
+        return Promise.resolve(sessionSnapshot)
+      case 'load_position': {
+        const docId = ((args ?? {}) as { docId?: string }).docId ?? ''
+        return Promise.resolve(positionRecords.get(docId) ?? null)
+      }
+      case 'touch_recent': {
+        const docId = ((args ?? {}) as { docId?: string }).docId ?? ''
+        touchRecentCalls.push(docId)
+        return Promise.resolve(undefined)
+      }
       case 'pick_files':
         return Promise.resolve(pickFilesResult)
       case 'pick_directory':
@@ -281,6 +305,16 @@ beforeEach(() => {
   relinkText = null
   rejectPath = null
   duplicatePath = null
+  sessionSnapshot = null
+  positionRecords = new Map()
+  touchRecentCalls = []
+  scrollCalls = []
+  resetWriteSuppression()
+  // jsdom does not implement scrolling; the reader guards on the method, so a
+  // spy records exactly which element each navigation scrolled to.
+  Element.prototype.scrollIntoView = vi.fn(function (this: Element) {
+    scrollCalls.push(this)
+  })
   listeners.clear()
   windowHandlers.focus = undefined
   windowHandlers.close = undefined
@@ -1025,5 +1059,459 @@ describe('ReaderScreen (ui-spec §3.2)', () => {
     fireEvent.keyDown(window, { key: 'Escape' })
     await waitFor(() => expect(screen.queryByRole('dialog', { name: t('zoom.title') })).toBeNull())
     expect(screen.getByRole('heading', { level: 1, name: '标题' })).toBeTruthy()
+  })
+
+  // -------------------------------------------------------------------------
+  // wp-34a routed acceptance defects (AT06/07/14/15/19)
+  // -------------------------------------------------------------------------
+
+  it('restores the last session on startup with stored order and active tab (AT06)', async () => {
+    sessionSnapshot = {
+      tabs: [
+        { tabId: 'tab-old-1', docId: 'd-a.md', orderIndex: 0, isActive: false },
+        { tabId: 'tab-old-2', docId: 'd-b.md', orderIndex: 1, isActive: true },
+      ],
+      activeTabId: 'tab-old-2',
+      savedAtMs: 1,
+    }
+    recentsResult = [
+      {
+        docId: 'd-a.md',
+        displayName: 'a.md',
+        canonicalPath: '/docs/a.md',
+        openedAtMs: 1,
+        available: true,
+      },
+      {
+        docId: 'd-b.md',
+        displayName: 'b.md',
+        canonicalPath: '/docs/b.md',
+        openedAtMs: 2,
+        available: true,
+      },
+    ]
+    renderReader()
+
+    await screen.findByRole('heading', { level: 1, name: 'b.md' })
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs).toHaveLength(2)
+    expect(tabs[1].getAttribute('aria-selected')).toBe('true')
+    expect(invokeMock).toHaveBeenCalledWith('open_documents', {
+      req: { paths: ['/docs/a.md'], entry: 'restore' },
+    })
+    expect(invokeMock).toHaveBeenCalledWith('read_document', {
+      req: { docId: 'd-a.md', purpose: 'restore' },
+    })
+    // Restoring is not an explicit open: no recent is (re-)recorded.
+    expect(touchRecentCalls).toEqual([])
+  })
+
+  it('does not restore the session when the preference is off (AT06)', async () => {
+    settingsResult = { ...DEFAULTS, restoreSession: false }
+    sessionSnapshot = {
+      tabs: [{ tabId: 'tab-old-1', docId: 'd-a.md', orderIndex: 0, isActive: true }],
+      activeTabId: 'tab-old-1',
+      savedAtMs: 1,
+    }
+    recentsResult = [
+      {
+        docId: 'd-a.md',
+        displayName: 'a.md',
+        canonicalPath: '/docs/a.md',
+        openedAtMs: 1,
+        available: true,
+      },
+    ]
+    renderReader()
+    await screen.findByRole('heading', { level: 1, name: t('welcome.title') })
+    // The stored session is not even read when the preference is off.
+    expect(invokeMock.mock.calls.some(([command]) => command === 'load_session')).toBe(false)
+    expect(
+      invokeMock.mock.calls.some(
+        ([command, args]) =>
+          command === 'read_document' &&
+          (args as { req?: { purpose?: string } } | undefined)?.req?.purpose === 'restore',
+      ),
+    ).toBe(false)
+  })
+
+  it('never lets a session restore steal focus from an explicit startup file (INV-SR-01)', async () => {
+    sessionSnapshot = {
+      tabs: [{ tabId: 'tab-old-1', docId: 'd-b.md', orderIndex: 0, isActive: true }],
+      activeTabId: 'tab-old-1',
+      savedAtMs: 1,
+    }
+    recentsResult = [
+      {
+        docId: 'd-b.md',
+        displayName: 'b.md',
+        canonicalPath: '/docs/b.md',
+        openedAtMs: 1,
+        available: true,
+      },
+    ]
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    renderReader()
+
+    await screen.findByRole('heading', { level: 1, name: 'a.md' })
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith('read_document', {
+        req: { docId: 'd-b.md', purpose: 'restore' },
+      }),
+    )
+    const tabs = screen.getAllByRole('tab')
+    expect(tabs).toHaveLength(2)
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true')
+  })
+
+  it('records successful explicit opens in recents but never silently drops them (AT06/D-34-3)', async () => {
+    pendingRequests = [{ paths: ['/docs/a.md', '/docs/b.md'], cwd: null, source: 'cli' }]
+    renderReader()
+    await screen.findByRole('heading', { level: 1, name: 'a.md' })
+    await waitFor(() => expect(touchRecentCalls).toEqual(['d-a.md', 'd-b.md']))
+  })
+
+  it('records the first explicit open after a cleared recents category (AT27 interplay)', async () => {
+    suppressWriteBack(['recents'])
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    renderReader()
+    await screen.findByRole('heading', { level: 1, name: 'a.md' })
+    // The explicit open lifts the suppression before the recent is recorded
+    // (models §9.1), so the freshly opened document is not lost.
+    await waitFor(() => expect(touchRecentCalls).toEqual(['d-a.md']))
+  })
+
+  it('scrolls to the heading when an outline item is activated (AT14)', async () => {
+    pendingRequests = [{ paths: ['/docs/links.md'], cwd: null, source: 'cli' }]
+    texts.set('d-links.md', '# Links\n\n## More links\n\nBody\n')
+    renderReader()
+    await screen.findByText('Body')
+
+    fireEvent.keyDown(window, { key: 'b', ctrlKey: true })
+    const panel = await screen.findByRole('complementary', { name: t('nav.aria') })
+    const heading = document.getElementById('ps-h-more-links')
+    expect(heading).not.toBeNull()
+    fireEvent.click(within(panel).getByRole('treeitem', { name: /More links/ }))
+    await waitFor(() => expect(scrollCalls).toContain(heading))
+    // Outline navigation records history too (models §5.2; INV-NH-02).
+    const back = screen.getByRole('button', { name: t('toolbar.back') }) as HTMLButtonElement
+    await waitFor(() => expect(back.disabled).toBe(false))
+  })
+
+  it('keeps the loaded content and offers relink/retry/close when the source disappears (AT07)', async () => {
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md', '# 标题\n\n仍然可见\n')
+    renderReader()
+    await screen.findByText('仍然可见')
+
+    await act(async () => {
+      listeners.get('paperstack://watch-changed')?.({
+        payload: { docId: 'd-a.md', kind: 'removed', observedAtMs: 7 },
+      })
+    })
+    await screen.findByText(
+      UNAVAILABLE_BANNER,
+    )
+    // INV-DS-06: the loaded content is kept.
+    expect(screen.getByText('仍然可见')).toBeTruthy()
+    const relink = screen.getByRole('button', { name: t('document.unavailable.relink') })
+    expect(screen.getByRole('button', { name: t('common.retry') })).toBeTruthy()
+    expect(screen.getByRole('button', { name: t('document.unavailable.closeTab') })).toBeTruthy()
+
+    // 重新定位 adopts the reselected file and clears the unavailable state.
+    pickFilesResult = { cancelled: false, paths: ['/docs/a.md'] }
+    fireEvent.click(relink)
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith('relink_document', {
+        req: { docId: 'd-a.md', newPath: '/docs/a.md' },
+      }),
+    )
+    await screen.findByText(t('document.relink.reassociated'))
+    await waitFor(() =>
+      expect(
+        screen.queryByText(UNAVAILABLE_BANNER),
+      ).toBeNull(),
+    )
+  })
+
+  it('retries an unavailable source with retained content and returns to the readable state (AT07)', async () => {
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md', '# 标题\n\n仍然可见\n')
+    renderReader()
+    await screen.findByText('仍然可见')
+
+    await act(async () => {
+      listeners.get('paperstack://watch-changed')?.({
+        payload: { docId: 'd-a.md', kind: 'removed', observedAtMs: 7 },
+      })
+    })
+    await screen.findByText(
+      UNAVAILABLE_BANNER,
+    )
+
+    // 重试 re-reads the same path through the stable refresh read.
+    fireEvent.click(screen.getByRole('button', { name: t('common.retry') }))
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith('read_document', {
+        req: { docId: 'd-a.md', purpose: 'refresh' },
+      }),
+    )
+    // Same bytes readable again → Ready: the banner clears, the retained
+    // content stays mounted and the tab must not be left in a loading phase
+    // (T8 "源恢复可读"; INV-DS-06).
+    await waitFor(() =>
+      expect(
+        screen.queryByText(UNAVAILABLE_BANNER),
+      ).toBeNull(),
+    )
+    expect(screen.getByText('仍然可见')).toBeTruthy()
+  })
+
+  it('keeps the retained content when the unavailable retry still fails (AT07)', async () => {
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md', '# 标题\n\n仍然可见\n')
+    renderReader()
+    await screen.findByText('仍然可见')
+
+    await act(async () => {
+      listeners.get('paperstack://watch-changed')?.({
+        payload: { docId: 'd-a.md', kind: 'removed', observedAtMs: 7 },
+      })
+    })
+    await screen.findByText(
+      UNAVAILABLE_BANNER,
+    )
+
+    readError = {
+      code: 'PS_IO_NOT_FOUND',
+      category: 'io',
+      messageKey: 'error.io.notFound',
+      retryable: true,
+    }
+    fireEvent.click(screen.getByRole('button', { name: t('common.retry') }))
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith('read_document', {
+        req: { docId: 'd-a.md', purpose: 'refresh' },
+      }),
+    )
+    // INV-DS-06: a failed retry keeps the last displayed content and the
+    // unavailable banner (the source is still missing).
+    await waitFor(() =>
+      expect(
+        screen.getByText(UNAVAILABLE_BANNER),
+      ).toBeTruthy(),
+    )
+    expect(screen.getByText('仍然可见')).toBeTruthy()
+  })
+
+  it('navigates in-app heading fragments through the outline anchors and records history (AT14/AT15)', async () => {
+    pendingRequests = [{ paths: ['/docs/links.md'], cwd: null, source: 'cli' }]
+    texts.set(
+      'd-links.md',
+      '# Links\n\n## More links\n\n[Jump](#more-links)\n\n## Duplicate 标题\n\nA\n\n## Duplicate 标题\n\nB\n',
+    )
+    renderReader()
+    await screen.findByText('Jump')
+
+    const heading = document.getElementById('ps-h-more-links')
+    expect(heading).not.toBeNull()
+    const back = screen.getByRole('button', { name: t('toolbar.back') }) as HTMLButtonElement
+    expect(back.disabled).toBe(true)
+
+    fireEvent.click(screen.getByRole('link', { name: 'Jump' }))
+    await waitFor(() => expect(scrollCalls).toContain(heading))
+    // The navigation produced exactly one history entry (INV-NH-02).
+    await waitFor(() => expect(back.disabled).toBe(false))
+  })
+
+  it('resolves duplicate-title fragments to the unique outline ids (AT14)', async () => {
+    pendingRequests = [{ paths: ['/docs/links.md'], cwd: null, source: 'cli' }]
+    texts.set(
+      'd-links.md',
+      '# Links\n\n## Duplicate 标题\n\nFirst\n\n## Duplicate 标题\n\nSecond\n\n[两种](#duplicate-标题)\n',
+    )
+    renderReader()
+    await screen.findByText('两种')
+
+    fireEvent.click(screen.getByRole('link', { name: '两种' }))
+    await waitFor(() => expect(scrollCalls.length).toBeGreaterThan(0))
+    // The author fragment resolves through the same slug as the first
+    // duplicate's unique outline anchor (`ps-h-duplicate`).
+    expect(scrollCalls[0]?.id).toBe('ps-h-duplicate')
+  })
+
+  it('explains a missing fragment and keeps the position instead of navigating silently (AT15)', async () => {
+    pendingRequests = [{ paths: ['/docs/links.md'], cwd: null, source: 'cli' }]
+    texts.set('d-links.md', '# Links\n\n[Missing](#does-not-exist)\n')
+    renderReader()
+    await screen.findByText('Missing')
+
+    fireEvent.click(screen.getByRole('link', { name: 'Missing' }))
+    await screen.findByText(t('nav.fragment.notFound'))
+    expect(scrollCalls).toHaveLength(0)
+    // A failed navigation records no history (INV-NH-02).
+    const back = screen.getByRole('button', { name: t('toolbar.back') }) as HTMLButtonElement
+    expect(back.disabled).toBe(true)
+  })
+
+  it('restores the committed position on startup, exactly and silently for the same version (AT19)', async () => {
+    sessionSnapshot = {
+      tabs: [{ tabId: 'tab-old-1', docId: 'd-a.md', orderIndex: 0, isActive: true }],
+      activeTabId: 'tab-old-1',
+      savedAtMs: 1,
+    }
+    recentsResult = [
+      {
+        docId: 'd-a.md',
+        displayName: 'a.md',
+        canonicalPath: '/docs/a.md',
+        openedAtMs: 1,
+        available: true,
+      },
+    ]
+    texts.set('d-a.md', '# 标题\n\n第一段\n\n第二段\n')
+    positionRecords.set('d-a.md', {
+      docId: 'd-a.md',
+      anchor: {
+        versionHash: 'v1',
+        headingPath: [],
+        blockFingerprint: 'fp1:unchanged',
+        offsetRatio: 0,
+        sourceRange: { startByte: 0, endByte: 1 },
+      },
+      updatedAtMs: 3,
+    })
+    renderReader()
+
+    await screen.findByRole('heading', { level: 1, name: '标题' })
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith('load_position', { docId: 'd-a.md' }))
+    await waitFor(() =>
+      expect(scrollCalls.some((element) => element.getAttribute('data-block-id') === 'b1')).toBe(
+        true,
+      ),
+    )
+    // Same-version restarts are silent (models §6.3): no fabricated label.
+    expect(screen.queryByText(t('nav.return.approx'))).toBeNull()
+    expect(screen.queryByText(t('nav.return.exact'))).toBeNull()
+  })
+
+  it('labels a cross-version position restore honestly as approximate (AT19)', async () => {
+    sessionSnapshot = {
+      tabs: [{ tabId: 'tab-old-1', docId: 'd-a.md', orderIndex: 0, isActive: true }],
+      activeTabId: 'tab-old-1',
+      savedAtMs: 1,
+    }
+    recentsResult = [
+      {
+        docId: 'd-a.md',
+        displayName: 'a.md',
+        canonicalPath: '/docs/a.md',
+        openedAtMs: 1,
+        available: true,
+      },
+    ]
+    texts.set('d-a.md', '# 标题\n\n第一段\n')
+    positionRecords.set('d-a.md', {
+      docId: 'd-a.md',
+      anchor: {
+        versionHash: 'v-old',
+        headingPath: ['已删除的章节'],
+        blockFingerprint: 'fp1:deleted-section',
+        offsetRatio: 0.5,
+        sourceRange: { startByte: 40, endByte: 60 },
+      },
+      updatedAtMs: 3,
+    })
+    renderReader()
+
+    await screen.findByRole('heading', { level: 1, name: '标题' })
+    await screen.findByText(t('nav.return.approx'))
+  })
+
+  it('applies a restored position when its background tab is activated (AT19)', async () => {
+    sessionSnapshot = {
+      tabs: [
+        { tabId: 'tab-old-1', docId: 'd-a.md', orderIndex: 0, isActive: true },
+        { tabId: 'tab-old-2', docId: 'd-b.md', orderIndex: 1, isActive: false },
+      ],
+      activeTabId: 'tab-old-1',
+      savedAtMs: 1,
+    }
+    recentsResult = [
+      {
+        docId: 'd-a.md',
+        displayName: 'a.md',
+        canonicalPath: '/docs/a.md',
+        openedAtMs: 1,
+        available: true,
+      },
+      {
+        docId: 'd-b.md',
+        displayName: 'b.md',
+        canonicalPath: '/docs/b.md',
+        openedAtMs: 2,
+        available: true,
+      },
+    ]
+    positionRecords.set('d-b.md', {
+      docId: 'd-b.md',
+      anchor: {
+        versionHash: 'v-old',
+        headingPath: ['Gone'],
+        blockFingerprint: 'fp1:gone',
+        offsetRatio: 0,
+        sourceRange: { startByte: 9, endByte: 20 },
+      },
+      updatedAtMs: 3,
+    })
+    renderReader()
+
+    await screen.findByRole('heading', { level: 1, name: 'a.md' })
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith('load_position', { docId: 'd-b.md' }),
+    )
+    // Background tabs are never scrolled or labeled before activation.
+    expect(screen.queryByText(t('nav.return.approx'))).toBeNull()
+
+    fireEvent.click(screen.getByRole('tab', { name: /b\.md/ }))
+    await screen.findByText(t('nav.return.approx'))
+  })
+
+  it('marks a startup-unavailable restored source and retries its open (AT06/AT07)', async () => {
+    sessionSnapshot = {
+      tabs: [{ tabId: 'tab-old-1', docId: 'd-gone.md', orderIndex: 0, isActive: true }],
+      activeTabId: 'tab-old-1',
+      savedAtMs: 1,
+    }
+    recentsResult = [
+      {
+        docId: 'd-gone.md',
+        displayName: 'gone.md',
+        canonicalPath: '/docs/gone.md',
+        openedAtMs: 1,
+        available: false,
+      },
+    ]
+    renderReader()
+
+    // The tab is restored as unavailable without a read; retry re-runs the
+    // open validation against the known path (models §10).
+    await screen.findByText(
+      UNAVAILABLE_BANNER,
+    )
+    expect(
+      invokeMock.mock.calls.some(
+        ([command, args]) =>
+          command === 'read_document' &&
+          (args as { req?: { docId?: string } } | undefined)?.req?.docId === 'd-gone.md',
+      ),
+    ).toBe(false)
+
+    fireEvent.click(screen.getAllByRole('button', { name: t('common.retry') })[0] as HTMLElement)
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith('open_documents', {
+        req: { paths: ['/docs/gone.md'], entry: 'restore' },
+      }),
+    )
   })
 })

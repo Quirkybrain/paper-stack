@@ -13,9 +13,10 @@ use std::time::Duration;
 use paperstack_lib::error::{AppError, ErrorCode};
 use paperstack_lib::models::DetailValue;
 use paperstack_lib::services::resources::{
-    cache_key_for, is_blocked_address, normalize_origin, origin_allowed, CachePut, CachedImage,
-    ManualRemoteClock, RemoteCacheStore, RemoteConfig, RemoteFetch, RemoteHttpOutcome,
-    RemoteHttpRequest, RemoteResolver, RemoteService, RemoteTransport, ReqwestTransport,
+    cache_key_for, is_blocked_address, normalize_origin, origin_allowed,
+    origin_for_remote_reference, CachePut, CachedImage, ManualRemoteClock, RemoteCacheStore,
+    RemoteConfig, RemoteFetch, RemoteHttpOutcome, RemoteHttpRequest, RemoteResolver, RemoteService,
+    RemoteTransport, ReqwestTransport,
 };
 
 // ---------------------------------------------------------------------------
@@ -331,6 +332,46 @@ fn origin_normalization_canonicalizes_default_port_and_case() {
     assert!(origin_allowed("https://example.com", &allowed));
     assert!(!origin_allowed("https://example.com:8443", &allowed));
     assert!(!origin_allowed("https://example.com", &[]));
+}
+
+#[test]
+fn remote_reference_origin_ignores_path_query_fragment_and_default_port() {
+    // AT26/D-34-5 regression: a real image URL carries a path; the policy
+    // check must classify its origin instead of rejecting it as malformed.
+    assert_eq!(
+        origin_for_remote_reference("https://httpbin.org/image/png").unwrap(),
+        "https://httpbin.org"
+    );
+    assert_eq!(
+        origin_for_remote_reference("https://cdn.example.com/a/b.png?token=abc#frag").unwrap(),
+        "https://cdn.example.com"
+    );
+    assert_eq!(
+        origin_for_remote_reference("https://Example.com:443/img.png").unwrap(),
+        "https://example.com"
+    );
+    assert_eq!(
+        origin_for_remote_reference("https://example.com:8443/img.png").unwrap(),
+        "https://example.com:8443"
+    );
+    // A path reference matches the same allow-list entry as the bare origin.
+    let allowed = vec!["https://example.com".to_owned()];
+    let origin = origin_for_remote_reference("https://example.com/img.png").unwrap();
+    assert!(origin_allowed(&origin, &allowed));
+
+    // Non-https schemes and credential-bearing references stay unsupported.
+    for raw in [
+        "http://example.com/img.png",
+        "ftp://example.com/img.png",
+        "https://user:pass@example.com/img.png",
+        "https://user@example.com/img.png",
+        "not a url",
+    ] {
+        assert!(
+            origin_for_remote_reference(raw).is_err(),
+            "expected {raw} to be rejected"
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
