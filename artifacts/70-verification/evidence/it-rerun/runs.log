@@ -1,0 +1,552 @@
+[2026-10-08T03:14:11+08:00] [run-itrerun.sh] == fixed conditions: light theme ==
+[2026-10-08T03:14:11+08:00] [run-itrerun.sh] original color-scheme='prefer-dark'; text-scaling='1.25'
+
+$ gsettings set org.gnome.desktop.interface color-scheme prefer-light
+[exit=0] gsettings set org.gnome.desktop.interface color-scheme prefer-light
+[2026-10-08T03:14:11+08:00] [run-itrerun.sh] IT-rerun binary: /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack sha256=ee21ad20ff190ef6c4fceb6d0e2314394009e2c75a127f4697e016d282c404a7 size=28104136
+[2026-10-08T03:14:11+08:00] [it07r2] ======== it07r2: IT07 11MiB simplified reading re-run (D-IT-3) ========
+[2026-10-08T03:14:11+08:00] [it07r2] git HEAD: cb79a827e3b6dd2736b490d6eb9b0e0a99cba77b branch: task/wp-46-itrerun
+[2026-10-08T03:14:11+08:00] [it07r2] binary: /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack sha256=ee21ad20ff190ef6c4fceb6d0e2314394009e2c75a127f4697e016d282c404a7
+[2026-10-08T03:14:11+08:00] [it07r2] display: :1 screen: 2520x1680
+b84af6728fad8a616e28e56b7489946397822bdd26f571b4fdf35e947bd78767  /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/inputs/it07/corpus-11MiB.md
+[2026-10-08T03:14:11+08:00] [it07r2] IT07 rerun tail probe token: '段落 132144'
+[2026-10-08T03:14:11+08:00] [it07r2] isolated app data reset: /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/data
+
+$ GTK_THEME=Adwaita:light XDG_DATA_HOME=/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/data XDG_CACHE_HOME=/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/cache-it07 /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/inputs/it07/corpus-11MiB.md &
+[2026-10-08T03:14:11+08:00] [it07r2] app pid=3240153 args='/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/inputs/it07/corpus-11MiB.md'
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper wait
+0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper wait
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper focus
+focused 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper focus
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-a-large-dialog.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-a-large-dialog.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-a-large-dialog.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Return
+sent keyseq 'Return' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Return
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-choice-try1.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-choice-try1.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-choice-try1.png 纸栈 PaperStack
+[2026-10-08T03:14:18+08:00] [it07r2] IT07 rerun simplified choice made at try=1 (choice_ms=1791400457375)
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-b-parse-t1.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-b-parse-t1.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-b-parse-t1.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-c-parse-t2.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-c-parse-t2.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-c-parse-t2.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-d-parse-t3.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-d-parse-t3.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-d-parse-t3.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-e-parse-t5.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-e-parse-t5.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-e-parse-t5.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-f-parse-t8.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-f-parse-t8.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-f-parse-t8.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-g-simplified-view.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-g-simplified-view.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-g-simplified-view.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+f
+sent keyseq 'ctrl+f' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+f
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 500 101 1 1
+clicked 0x3e00003 at (500,101) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 500 101 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+v
+sent keyseq 'ctrl+v' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+v
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-h-tail-search.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-h-tail-search.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-h-tail-search.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 1179 101 1 1
+clicked 0x3e00003 at (1179,101) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 1179 101 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-i-tail-next.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-i-tail-next.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-i-tail-next.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Return
+sent keyseq 'Return' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Return
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-i2-tail-return.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-i2-tail-return.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-i2-tail-return.png 纸栈 PaperStack
+[2026-10-08T03:14:37+08:00] [it07r2] IT07 rerun tail search+hit-attempts elapsed_ms=10147
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Escape
+sent keyseq 'Escape' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Escape
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 400 5 3
+clicked 0x3e00003 at (640,400) button 5 count 3
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 400 5 3
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-j-code-scroll.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-j-code-scroll.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-j-code-scroll.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 500 1 1
+clicked 0x3e00003 at (640,500) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 500 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-k-code-hover.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-k-code-hover.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-k-code-hover.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 866 435 1 1
+clicked 0x3e00003 at (866,435) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 866 435 1 1
+[2026-10-08T03:14:42+08:00] [it07r2] IT07 rerun code clipboard-a bytes=22
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 1080 435 1 1
+clicked 0x3e00003 at (1080,435) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 1080 435 1 1
+[2026-10-08T03:14:44+08:00] [it07r2] IT07 rerun code clipboard bytes=23
+[2026-10-08T03:14:44+08:00] [it07r2] IT07 rerun code payload MISMATCH (see cmp in runs.log)
+[2026-10-08T03:15:33+08:00] [it07r2] IT07 WebKit CPU watch timeout at 75057ms
+[2026-10-08T03:15:33+08:00] [it07r2] IT07 rerun CPU watch settled_ms=none (choice_ms=1791400457375)
+[2026-10-08T03:15:33+08:00] [it07r2] clean termination: WM_DELETE_WINDOW
+WM_DELETE_WINDOW sent to 0x3e00003
+[2026-10-08T03:15:42+08:00] [it07r2] app alive after first close request; second WM_DELETE_WINDOW
+WM_DELETE_WINDOW sent to 0x3e00003
+[2026-10-08T03:15:47+08:00] [it07r2] NON-CLEAN: falling back to SIGTERM
+[2026-10-08T03:15:48+08:00] [it07r2] ======== it07r2 done: app pid state 'none' ========
+[2026-10-08T03:15:48+08:00] [it07r2] restored color-scheme=prefer-dark
+[2026-10-08T03:15:48+08:00] [it07r2] restored text-scaling-factor=1.25
+[2026-10-08T03:15:48+08:00] [it07r2] pgrep: no paperstack process remains
+[2026-10-08T03:16:43+08:00] [run-itrerun.sh] == fixed conditions: light theme ==
+[2026-10-08T03:16:43+08:00] [run-itrerun.sh] original color-scheme='prefer-dark'; text-scaling='1.25'
+
+$ gsettings set org.gnome.desktop.interface color-scheme prefer-light
+[exit=0] gsettings set org.gnome.desktop.interface color-scheme prefer-light
+[2026-10-08T03:16:43+08:00] [run-itrerun.sh] IT-rerun binary: /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack sha256=ee21ad20ff190ef6c4fceb6d0e2314394009e2c75a127f4697e016d282c404a7 size=28104136
+[2026-10-08T03:16:43+08:00] [it07r2] ======== it07r2: IT07 11MiB simplified reading re-run (D-IT-3) ========
+[2026-10-08T03:16:43+08:00] [it07r2] git HEAD: cb79a827e3b6dd2736b490d6eb9b0e0a99cba77b branch: task/wp-46-itrerun
+[2026-10-08T03:16:43+08:00] [it07r2] binary: /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack sha256=ee21ad20ff190ef6c4fceb6d0e2314394009e2c75a127f4697e016d282c404a7
+[2026-10-08T03:16:43+08:00] [it07r2] display: :1 screen: 2520x1680
+b84af6728fad8a616e28e56b7489946397822bdd26f571b4fdf35e947bd78767  /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/inputs/it07/corpus-11MiB.md
+[2026-10-08T03:16:43+08:00] [it07r2] IT07 rerun tail probe token: '段落 132144'
+[2026-10-08T03:16:43+08:00] [it07r2] isolated app data reset: /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/data
+
+$ GTK_THEME=Adwaita:light XDG_DATA_HOME=/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/data XDG_CACHE_HOME=/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/cache-it07 /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/inputs/it07/corpus-11MiB.md &
+[2026-10-08T03:16:43+08:00] [it07r2] app pid=3245226 args='/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/inputs/it07/corpus-11MiB.md'
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper wait
+0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper wait
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper focus
+focused 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper focus
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-a-large-dialog.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-a-large-dialog.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-a-large-dialog.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Return
+sent keyseq 'Return' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Return
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-choice-try1.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-choice-try1.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-choice-try1.png 纸栈 PaperStack
+[2026-10-08T03:16:50+08:00] [it07r2] IT07 rerun simplified choice made at try=1 (choice_ms=1791400609259)
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-b-parse-t1.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-b-parse-t1.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-b-parse-t1.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-c-parse-t2.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-c-parse-t2.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-c-parse-t2.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-d-parse-t3.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-d-parse-t3.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-d-parse-t3.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-e-parse-t5.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-e-parse-t5.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-e-parse-t5.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-f-parse-t8.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-f-parse-t8.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-f-parse-t8.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-g-simplified-view.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-g-simplified-view.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-g-simplified-view.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 770 1 1
+clicked 0x3e00003 at (640,770) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 770 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-j-code-hover.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-j-code-hover.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-j-code-hover.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 850 710 1 1
+clicked 0x3e00003 at (850,710) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 850 710 1 1
+[2026-10-08T03:17:02+08:00] [it07r2] IT07 rerun code clipboard bytes=49
+[2026-10-08T03:17:02+08:00] [it07r2] IT07 rerun code payload EXACT match
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+f
+sent keyseq 'ctrl+f' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+f
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 500 101 1 1
+clicked 0x3e00003 at (500,101) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 500 101 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+v
+sent keyseq 'ctrl+v' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+v
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-k-tail-search.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-k-tail-search.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-k-tail-search.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 1179 101 1 1
+clicked 0x3e00003 at (1179,101) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 1179 101 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-l-tail-next.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-l-tail-next.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-l-tail-next.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Return
+sent keyseq 'Return' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Return
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-m-tail-return.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-m-tail-return.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it07-r2-m-tail-return.png 纸栈 PaperStack
+[2026-10-08T03:17:12+08:00] [it07r2] IT07 rerun tail search+hit-attempts elapsed_ms=10136
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Escape
+sent keyseq 'Escape' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Escape
+[2026-10-08T03:18:06+08:00] [it07r2] IT07 WebKit CPU watch timeout at 75360ms
+[2026-10-08T03:18:06+08:00] [it07r2] IT07 rerun CPU watch settled_ms=none (choice_ms=1791400609259)
+[2026-10-08T03:18:06+08:00] [it07r2] clean termination: WM_DELETE_WINDOW
+WM_DELETE_WINDOW sent to 0x3e00003
+[2026-10-08T03:18:14+08:00] [it07r2] app alive after first close request; second WM_DELETE_WINDOW
+WM_DELETE_WINDOW sent to 0x3e00003
+[2026-10-08T03:18:19+08:00] [it07r2] NON-CLEAN: falling back to SIGTERM
+[2026-10-08T03:18:20+08:00] [it07r2] ======== it07r2 done: app pid state 'none' ========
+[2026-10-08T03:18:20+08:00] [it07r2] restored color-scheme=prefer-dark
+[2026-10-08T03:18:20+08:00] [it07r2] restored text-scaling-factor=1.25
+[2026-10-08T03:18:20+08:00] [it07r2] pgrep: no paperstack process remains
+[2026-10-08T03:18:28+08:00] [run-itrerun.sh] == fixed conditions: light theme ==
+[2026-10-08T03:18:28+08:00] [run-itrerun.sh] original color-scheme='prefer-dark'; text-scaling='1.25'
+
+$ gsettings set org.gnome.desktop.interface color-scheme prefer-light
+[exit=0] gsettings set org.gnome.desktop.interface color-scheme prefer-light
+[2026-10-08T03:18:28+08:00] [run-itrerun.sh] IT-rerun binary: /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack sha256=ee21ad20ff190ef6c4fceb6d0e2314394009e2c75a127f4697e016d282c404a7 size=28104136
+[2026-10-08T03:18:28+08:00] [it02r2] ======== it02r2: IT02 cross-file navigation re-run on current-tree binary (D-IT-1) ========
+[2026-10-08T03:18:28+08:00] [it02r2] git HEAD: cb79a827e3b6dd2736b490d6eb9b0e0a99cba77b branch: task/wp-46-itrerun
+[2026-10-08T03:18:28+08:00] [it02r2] binary: /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack sha256=ee21ad20ff190ef6c4fceb6d0e2314394009e2c75a127f4697e016d282c404a7
+[2026-10-08T03:18:28+08:00] [it02r2] display: :1 screen: 2520x1680
+[2026-10-08T03:18:28+08:00] [it02r2] isolated app data reset: /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/data
+
+$ GTK_THEME=Adwaita:light XDG_DATA_HOME=/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/data XDG_CACHE_HOME=/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/cache-it02 /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/inputs/it02/导航样例.md &
+[2026-10-08T03:18:28+08:00] [it02r2] app pid=3249313 args='/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/inputs/it02/导航样例.md'
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper wait
+0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper wait
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper focus
+focused 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper focus
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it02-r2-a-opened.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it02-r2-a-opened.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it02-r2-a-opened.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 463 276 1 1
+clicked 0x3e00003 at (463,276) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 463 276 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it02-r2-b-second-doc.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it02-r2-b-second-doc.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it02-r2-b-second-doc.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 400 1 1
+clicked 0x3e00003 at (640,400) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 400 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+a
+sent keyseq 'ctrl+a' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+a
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+c
+sent keyseq 'ctrl+c' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+c
+[2026-10-08T03:18:40+08:00] [it02r2] clipboard capture it02-r2-second-doc-clip.txt: bytes=206
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key alt+Left
+sent keyseq 'alt+Left' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key alt+Left
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it02-r2-c-back.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it02-r2-c-back.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it02-r2-c-back.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 607 257 1 1
+clicked 0x3e00003 at (607,257) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 607 257 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it02-r2-d-cjk-doc-try1.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it02-r2-d-cjk-doc-try1.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it02-r2-d-cjk-doc-try1.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 400 1 1
+clicked 0x3e00003 at (640,400) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 400 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+a
+sent keyseq 'ctrl+a' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+a
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+c
+sent keyseq 'ctrl+c' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+c
+[2026-10-08T03:18:48+08:00] [it02r2] clipboard capture it02-r2-cjk-doc-clip-try1.txt: bytes=218
+[2026-10-08T03:18:48+08:00] [it02r2] IT02 rerun CJK non-ASCII link opened: yes (try=1)
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key alt+Left
+sent keyseq 'alt+Left' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key alt+Left
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it02-r2-e-back-after-cjk.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it02-r2-e-back-after-cjk.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it02-r2-e-back-after-cjk.png 纸栈 PaperStack
+[2026-10-08T03:18:50+08:00] [it02r2] clean termination: WM_DELETE_WINDOW
+WM_DELETE_WINDOW sent to 0x3e00003
+[2026-10-08T03:18:50+08:00] [it02r2] ======== it02r2 done: app pid state 'none' ========
+[2026-10-08T03:18:50+08:00] [it02r2] restored color-scheme=prefer-dark
+[2026-10-08T03:18:50+08:00] [it02r2] restored text-scaling-factor=1.25
+[2026-10-08T03:18:50+08:00] [it02r2] pgrep: no paperstack process remains
+[2026-10-08T03:18:52+08:00] [run-itrerun.sh] == fixed conditions: light theme ==
+[2026-10-08T03:18:52+08:00] [run-itrerun.sh] original color-scheme='prefer-dark'; text-scaling='1.25'
+
+$ gsettings set org.gnome.desktop.interface color-scheme prefer-light
+[exit=0] gsettings set org.gnome.desktop.interface color-scheme prefer-light
+[2026-10-08T03:18:52+08:00] [run-itrerun.sh] IT-rerun binary: /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack sha256=ee21ad20ff190ef6c4fceb6d0e2314394009e2c75a127f4697e016d282c404a7 size=28104136
+[2026-10-08T03:18:52+08:00] [it03r2] ======== it03r2: IT03 external update re-run incl. replacement-save (D-IT-2) ========
+[2026-10-08T03:18:52+08:00] [it03r2] git HEAD: cb79a827e3b6dd2736b490d6eb9b0e0a99cba77b branch: task/wp-46-itrerun
+[2026-10-08T03:18:52+08:00] [it03r2] binary: /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack sha256=ee21ad20ff190ef6c4fceb6d0e2314394009e2c75a127f4697e016d282c404a7
+[2026-10-08T03:18:52+08:00] [it03r2] display: :1 screen: 2520x1680
+[2026-10-08T03:18:52+08:00] [it03r2] isolated app data reset: /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/data
+
+$ GTK_THEME=Adwaita:light XDG_DATA_HOME=/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/data XDG_CACHE_HOME=/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/cache-it03 /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/inputs/it03/doc.md &
+[2026-10-08T03:18:52+08:00] [it03r2] app pid=3250122 args='/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/inputs/it03/doc.md'
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper wait
+X Error of failed request:  BadWindow (invalid Window parameter)
+  Major opcode of failed request:  3 (X_GetWindowAttributes)
+  Resource id in failed request:  0x3e00016
+  Serial number of failed request:  503
+  Current serial number in output stream:  504
+[exit=1] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper wait
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper focus
+focused 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper focus
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-a-v1.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-a-v1.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-a-v1.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 400 300 1 1
+clicked 0x3e00003 at (400,300) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 400 300 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+a
+sent keyseq 'ctrl+a' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+a
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-b-selection.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-b-selection.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-b-selection.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-c-replace-t1.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-c-replace-t1.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-c-replace-t1.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-d-replace-banner.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-d-replace-banner.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-d-replace-banner.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 1210 107 1 1
+clicked 0x3e00003 at (1210,107) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 1210 107 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-e-later-collapsed.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-e-later-collapsed.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-e-later-collapsed.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-f-source-v1.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-f-source-v1.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-f-source-v1.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 400 1 1
+clicked 0x3e00003 at (640,400) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 400 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+a
+sent keyseq 'ctrl+a' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+a
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+c
+sent keyseq 'ctrl+c' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+c
+[2026-10-08T03:19:08+08:00] [it03r2] clipboard capture it03-r2-source-v1-clip.txt: bytes=341
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 94 1 1
+clicked 0x3e00003 at (640,94) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 94 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-g-marker-reopened.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-g-marker-reopened.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-g-marker-reopened.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 1103 107 1 1
+clicked 0x3e00003 at (1103,107) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 1103 107 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-h-update-fast.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-h-update-fast.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-h-update-fast.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-i-update-settled.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-i-update-settled.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-i-update-settled.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-j-update-late.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-j-update-late.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-j-update-late.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 400 1 1
+clicked 0x3e00003 at (640,400) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 400 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+a
+sent keyseq 'ctrl+a' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+a
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+c
+sent keyseq 'ctrl+c' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+c
+[2026-10-08T03:19:19+08:00] [it03r2] clipboard capture it03-r2-source-v2-clip.txt: bytes=407
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-k-back-to-reading-v2.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-k-back-to-reading-v2.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-k-back-to-reading-v2.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 400 1 1
+clicked 0x3e00003 at (640,400) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 400 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+a
+sent keyseq 'ctrl+a' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+a
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+c
+sent keyseq 'ctrl+c' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+c
+[2026-10-08T03:19:22+08:00] [it03r2] clipboard capture it03-r2-reading-v2-clip.txt: bytes=407
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-l-inplace-banner.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-l-inplace-banner.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-l-inplace-banner.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 1103 107 1 1
+clicked 0x3e00003 at (1103,107) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 1103 107 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-m-inplace-fast.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-m-inplace-fast.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-m-inplace-fast.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-n-inplace-updated.png 纸栈 PaperStack
+screenshot: window 0x3e00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-n-inplace-updated.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it-rerun/it03-r2-n-inplace-updated.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 400 1 1
+clicked 0x3e00003 at (640,400) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 400 1 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+a
+sent keyseq 'ctrl+a' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+a
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+c
+sent keyseq 'ctrl+c' to 0x3e00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+c
+[2026-10-08T03:19:32+08:00] [it03r2] clipboard capture it03-r2-reading-v3-clip.txt: bytes=448
+[2026-10-08T03:19:32+08:00] [it03r2] clean termination: WM_DELETE_WINDOW
+WM_DELETE_WINDOW sent to 0x3e00003
+IT03 rerun final source tail:
+.
+
+- item alpha
+- item beta
+- item gamma (added in v2)
+
+Code block:
+
+```text
+v2 line
+```
+
+结尾段落：用于 UTF-8 字节范围的确定性换算。
+
+New tail paragraph so the content hash and length differ from v1.
+
+控制段落：原地追加写入 v3。
+
+[2026-10-08T03:19:32+08:00] [it03r2] ======== it03r2 done: app pid state 'none' ========
+[2026-10-08T03:19:32+08:00] [it03r2] restored color-scheme=prefer-dark
+[2026-10-08T03:19:32+08:00] [it03r2] restored text-scaling-factor=1.25
+[2026-10-08T03:19:32+08:00] [it03r2] pgrep: no paperstack process remains
+[2026-10-08T03:26:00+08:00] [run-itrerun.sh] == fixed conditions: light theme ==
+[2026-10-08T03:26:00+08:00] [run-itrerun.sh] original color-scheme='prefer-dark'; text-scaling='1.25'
+
+$ gsettings set org.gnome.desktop.interface color-scheme prefer-light
+[exit=0] gsettings set org.gnome.desktop.interface color-scheme prefer-light
+[2026-10-08T03:26:00+08:00] [run-itrerun.sh] IT-rerun binary: /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack sha256=ee21ad20ff190ef6c4fceb6d0e2314394009e2c75a127f4697e016d282c404a7 size=28104136
+[2026-10-08T03:26:00+08:00] [suite] ======== suite: frontend suite on the wp-46 revision (expect 568) ========
+[2026-10-08T03:26:00+08:00] [suite] git HEAD: cb79a827e3b6dd2736b490d6eb9b0e0a99cba77b branch: task/wp-46-itrerun
+[2026-10-08T03:26:00+08:00] [suite] binary: /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack sha256=ee21ad20ff190ef6c4fceb6d0e2314394009e2c75a127f4697e016d282c404a7
+[2026-10-08T03:26:00+08:00] [suite] display: :1 screen: 2520x1680
+
+$ pnpm test -- --run >> unit-suite-itrerun.log
+[exit=0] pnpm test -- --run (output: unit-suite-itrerun.log)
+ Test Files  72 passed (72)
+      Tests  568 passed (568)
+[2026-10-08T03:26:18+08:00] [suite] ======== suite done: app pid state 'none' ========
+[2026-10-08T03:26:18+08:00] [suite] restored color-scheme=prefer-dark
+[2026-10-08T03:26:18+08:00] [suite] restored text-scaling-factor=1.25
+[2026-10-08T03:26:18+08:00] [suite] pgrep: no paperstack process remains

@@ -1,0 +1,54 @@
+[2026-10-07T23:28:46+08:00] == wp-40 desktop integration smoke (no rebuild) ==
+[2026-10-07T23:28:46+08:00] display=:1 data=/tmp/opencode/wp40/desktop-data
+054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e  /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack
+[2026-10-07T23:28:46+08:00] app binary stat: size=32318216 bytes mtime=2026-10-07 22:34:52.773546864 +0800
+[2026-10-07T23:28:46+08:00] git HEAD: f2f2a3d403bc7631871c7caf89dc070b4f643825 branch: task/wp-40-integrate
+[2026-10-07T23:28:46+08:00] product tree diff vs acceptance build base 5d977ea: 0 lines
+[dimensions] 2520x1680
+[2026-10-07T23:28:46+08:00] == flow 1: CLI open -> parse -> render (mixed-cn-en.md) ==
+[2026-10-07T23:28:46+08:00] app pid=2818582
+0x5c00003
+[2026-10-07T23:28:46+08:00] window id: 0x5c00003
++ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper geometry
+id=0x5c00003 x=96 y=126 w=1280 h=800 viewable=1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper geometry
++ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/wp-40/wp40-01-render-top.png 纸栈 PaperStack
+screenshot: window 0x5c00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/wp-40/wp40-01-render-top.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/wp-40/wp40-01-render-top.png 纸栈 PaperStack
++ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 500 5 8
+clicked 0x5c00003 at (640,500) button 5 count 8
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 640 500 5 8
++ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/wp-40/wp40-02-render-scrolled.png 纸栈 PaperStack
+screenshot: window 0x5c00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/wp-40/wp40-02-render-scrolled.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/wp-40/wp40-02-render-scrolled.png 纸栈 PaperStack
+[2026-10-07T23:28:52+08:00] == flow 2: second-instance handoff (code.md) ==
++ timeout 30 /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/fixtures/rendering/code.md
+[exit=0] timeout 30 /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/fixtures/rendering/code.md
++ pgrep -c -f /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack
+1
+[exit=0] pgrep -c -f /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack
++ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/wp-40/wp40-03-second-instance.png 纸栈 PaperStack
+screenshot: window 0x5c00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/wp-40/wp40-03-second-instance.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/wp-40/wp40-03-second-instance.png 纸栈 PaperStack
+[2026-10-07T23:28:55+08:00] == flow 3: close second tab (Ctrl+W) ==
++ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+w
+sent keyseq 'ctrl+w' to 0x5c00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key ctrl+w
++ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/wp-40/wp40-04-after-ctrl-w.png 纸栈 PaperStack
+screenshot: window 0x5c00003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/wp-40/wp40-04-after-ctrl-w.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/wp-40/wp40-04-after-ctrl-w.png 纸栈 PaperStack
+[2026-10-07T23:28:57+08:00] == flow 4: clean termination ==
++ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper close
+WM_DELETE_WINDOW sent to 0x5c00003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper close
+[2026-10-07T23:28:57+08:00] app exited after close
+[2026-10-07T23:28:57+08:00] == post checks ==
++ pgrep -x paperstack
+[exit=1] pgrep -x paperstack
+[2026-10-07T23:28:57+08:00] app.log lines: 0
+[2026-10-07T23:28:57+08:00] app.log empty (no runtime errors reported)
+[png] wp40-01-render-top.png 1280x800 87660 bytes
+[png] wp40-02-render-scrolled.png 1280x800 87660 bytes
+[png] wp40-03-second-instance.png 1280x800 69898 bytes
+[png] wp40-04-after-ctrl-w.png 1280x800 87660 bytes
+[2026-10-07T23:28:57+08:00] == smoke finished ==

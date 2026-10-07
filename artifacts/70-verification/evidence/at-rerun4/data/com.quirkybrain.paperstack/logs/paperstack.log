@@ -1,0 +1,4 @@
+ts=1791401103916 level=info category=app event=startup version="0.1.0"
+ts=1791401103923 level=info category=auth event=startup_revalidation sessionRemoved=0 persistentChecked=0 persistentUnavailable=0
+ts=1791401140560 level=info category=app event=startup version="0.1.0"
+ts=1791401140561 level=info category=auth event=startup_revalidation sessionRemoved=0 persistentChecked=1 persistentUnavailable=0

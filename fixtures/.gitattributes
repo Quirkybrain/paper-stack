@@ -1,0 +1,6 @@
+# The CRLF encoding fixture intentionally keeps its carriage returns as test
+# content (contracts §2.1; T-08); whitespace checking would flag them.
+encoding/crlf.md -whitespace
+# The edge-case fixture intentionally ends a line with two trailing spaces to
+# pin the Markdown hard-break sample (rendering-pipeline §7).
+rendering/edge-cases.md -whitespace

@@ -1,0 +1,11 @@
+=== contract vitest final (2026-10-07T18:02:51+08:00) ===
+
+ RUN  v5.0.3 /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack
+
+
+ Test Files  4 passed (4)
+      Tests  43 passed (43)
+   Start at  18:02:51
+   Duration  3.17s (environment 47%, tests 44%, import 5%, transform 3%)
+
+CONTRACT_VITEST_EXIT=0

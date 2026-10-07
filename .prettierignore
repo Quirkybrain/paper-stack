@@ -1,0 +1,26 @@
+# Framework-managed files (not owned by the product codebase)
+.claude/
+.opencode/
+artifacts/
+config/
+docs/
+input/
+scripts/
+state/
+AGENTS.md
+CLAUDE.md
+ADOPT_EXISTING_PROJECT.md
+CONTINUE_PROJECT.md
+EXECUTE_TASK.md
+FRAMEWORK_ARCHITECTURE.md
+START_PROJECT.md
+design.md
+opencode.json
+tests/test_*.mjs
+
+# Dependencies, generated files and build outputs
+node_modules/
+dist/
+pnpm-lock.yaml
+src-tauri/target/
+src-tauri/gen/

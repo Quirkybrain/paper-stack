@@ -1,0 +1,60 @@
+{
+  "contract": "paperstack-ipc-r1",
+  "note": "Round-trip samples for contract models that are not carried by any command request/response (events, task tokens, diagnostics bundle).",
+  "models": {
+    "task_token": {
+      "docId": "d-3f79bb7b435b0532",
+      "version": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+      "generation": 7,
+      "taskId": "task-42"
+    },
+    "watch_changed": {
+      "docId": "d-3f79bb7b435b0532",
+      "kind": "resource",
+      "resourcePath": "/home/user/notes/paperstack-sample/img/diagram.png",
+      "observedAtMs": 1770000002100
+    },
+    "diagnostics_bundle": {
+      "bundleVersion": 1,
+      "generatedAtMs": 1770000002200,
+      "app": {
+        "name": "纸栈 PaperStack",
+        "version": "0.1.0",
+        "ipcContract": "paperstack-ipc-r1",
+        "tauriVersion": "2.12.1",
+        "webkitVersion": "2.52.6",
+        "os": "linux"
+      },
+      "documents": [
+        {
+          "docIdShort": "d-3f79bb7b435b0532",
+          "displayNameRedacted": "markdown-guide.md",
+          "versionHash": "3f79bb7b435b05321651daefd374cdc681dc06faa65e374e38337b88ca046dea",
+          "status": "ok",
+          "issues": [
+            {
+              "code": "PS_RESOURCE_MISSING",
+              "category": "resource",
+              "messageKey": "error.resource.missing",
+              "sourceRange": {
+                "startByte": 300,
+                "endByte": 320
+              },
+              "count": 1,
+              "firstSeenAtMs": 1770000001800
+            }
+          ]
+        }
+      ],
+      "limits": {
+        "recentLimit": 100,
+        "cacheMaxBytes": 268435456,
+        "logMaxBytes": 10485760,
+        "largeFileBytes": 10485760,
+        "hardLimitBytes": 52428800,
+        "imageBytes": 20971520
+      },
+      "redactions": ["home-directory", "url-query", "absolute-paths-last-two"]
+    }
+  }
+}

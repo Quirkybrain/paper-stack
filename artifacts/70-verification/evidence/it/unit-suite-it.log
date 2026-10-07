@@ -1,0 +1,16 @@
+
+> paperstack@0.1.0 test /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack
+> vitest -- --run
+
+
+ RUN  v5.0.3 /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack
+
+
+ Test Files  71 passed (71)
+      Tests  547 passed (547)
+   Start at  02:06:01
+   Duration  16.29s (environment 53%, tests 27%, setup 7%, transform 7%, import 6%, worker 1%)
+
+Environment  jsdom was created 71 times · 83.44s total, 53% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments

@@ -1,0 +1,634 @@
+{
+  "contract": "paperstack-ipc-r1",
+  "note": "Shared literal-search parity vectors (ADR-007; contracts §2.1 command 38; NF11). Both the front-end search-core and the Rust search_source service execute these cases; expected offsets are computed from the normative rule, never from implementation output.",
+  "foldingRule": "caseSensitive=false folds both sides per Unicode code point with Unicode default lowercase conversion (front-end `foldLower` helper in src/features/search/search-core.ts / Rust char::to_lowercase). The front-end must NOT use whole-string String.prototype.toLowerCase: it applies the context-sensitive Final_Sigma rule (Σ at a word end -> ς) and diverged from Rust (F-32-1, fixed in wp-32a). No normalization, no regex, no tokenizing. Matches are leftmost non-overlapping, in document order. Offsets address the original text as UTF-8 bytes; lineNumber is 1-based and counts LF. The only remaining per-side divergence is the accepted length-changing İ fold, pinned in boundaryCases.",
+  "cases": [
+    {
+      "id": "ascii-case-and-lines",
+      "note": "ASCII fold, every occurrence, 1-based LF lines, no trailing newline.",
+      "corpus": "Alpha beta ALPHA\nbeta Alpha\n",
+      "queries": [
+        {
+          "query": "alpha",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 0,
+              "endByte": 5,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 11,
+              "endByte": 16,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 22,
+              "endByte": 27,
+              "lineNumber": 2
+            }
+          ]
+        },
+        {
+          "query": "Alpha",
+          "caseSensitive": true,
+          "expected": [
+            {
+              "startByte": 0,
+              "endByte": 5,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 22,
+              "endByte": 27,
+              "lineNumber": 2
+            }
+          ]
+        },
+        {
+          "query": "ALPHA",
+          "caseSensitive": true,
+          "expected": [
+            {
+              "startByte": 11,
+              "endByte": 16,
+              "lineNumber": 1
+            }
+          ]
+        },
+        {
+          "query": "missing",
+          "caseSensitive": false,
+          "expected": []
+        }
+      ]
+    },
+    {
+      "id": "literal-not-regex",
+      "note": "Metacharacters are literal; a regex engine would match more.",
+      "corpus": "a.b a-b a*b a.b\n",
+      "queries": [
+        {
+          "query": "a.b",
+          "caseSensitive": true,
+          "expected": [
+            {
+              "startByte": 0,
+              "endByte": 3,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 12,
+              "endByte": 15,
+              "lineNumber": 1
+            }
+          ]
+        },
+        {
+          "query": "a*b",
+          "caseSensitive": true,
+          "expected": [
+            {
+              "startByte": 8,
+              "endByte": 11,
+              "lineNumber": 1
+            }
+          ]
+        },
+        {
+          "query": "a?b",
+          "caseSensitive": true,
+          "expected": []
+        }
+      ]
+    },
+    {
+      "id": "cjk-emoji-combining",
+      "note": "CJK has no case; emoji are astral; the decomposed mark is not normalized to é (U+00E9).",
+      "corpus": "前缀🚀中文中文\nemoji🎉e\u0301结尾\n",
+      "queries": [
+        {
+          "query": "中文",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 10,
+              "endByte": 16,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 16,
+              "endByte": 22,
+              "lineNumber": 1
+            }
+          ]
+        },
+        {
+          "query": "🚀",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 6,
+              "endByte": 10,
+              "lineNumber": 1
+            }
+          ]
+        },
+        {
+          "query": "🎉",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 28,
+              "endByte": 32,
+              "lineNumber": 2
+            }
+          ]
+        },
+        {
+          "query": "e\u0301",
+          "caseSensitive": true,
+          "expected": [
+            {
+              "startByte": 32,
+              "endByte": 35,
+              "lineNumber": 2
+            }
+          ]
+        },
+        {
+          "query": "E\u0301",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 32,
+              "endByte": 35,
+              "lineNumber": 2
+            }
+          ]
+        },
+        {
+          "query": "é",
+          "caseSensitive": false,
+          "expected": []
+        }
+      ]
+    },
+    {
+      "id": "kelvin-sign",
+      "note": "U+212A folds to ASCII k; UTF-16 length is preserved but the original is 3 UTF-8 bytes.",
+      "corpus": "K k\n",
+      "queries": [
+        {
+          "query": "k",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 0,
+              "endByte": 3,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 4,
+              "endByte": 5,
+              "lineNumber": 1
+            }
+          ]
+        },
+        {
+          "query": "k",
+          "caseSensitive": true,
+          "expected": [
+            {
+              "startByte": 4,
+              "endByte": 5,
+              "lineNumber": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "angstrom-sign",
+      "note": "U+212B folds to å (U+00E5); 3-byte original, 2-byte folded char.",
+      "corpus": "Å å\n",
+      "queries": [
+        {
+          "query": "å",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 0,
+              "endByte": 3,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 4,
+              "endByte": 6,
+              "lineNumber": 1
+            }
+          ]
+        },
+        {
+          "query": "å",
+          "caseSensitive": true,
+          "expected": [
+            {
+              "startByte": 4,
+              "endByte": 6,
+              "lineNumber": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sharp-s",
+      "note": "U+1E9E and U+00DF fold to ß; uppercase STRASSE folds to strasse and must not match straße.",
+      "corpus": "Straße STRASSE straße ẞ\n",
+      "queries": [
+        {
+          "query": "straße",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 0,
+              "endByte": 7,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 16,
+              "endByte": 23,
+              "lineNumber": 1
+            }
+          ]
+        },
+        {
+          "query": "Straße",
+          "caseSensitive": true,
+          "expected": [
+            {
+              "startByte": 0,
+              "endByte": 7,
+              "lineNumber": 1
+            }
+          ]
+        },
+        {
+          "query": "STRASSE",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 8,
+              "endByte": 15,
+              "lineNumber": 1
+            }
+          ]
+        },
+        {
+          "query": "ß",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 4,
+              "endByte": 6,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 20,
+              "endByte": 22,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 24,
+              "endByte": 27,
+              "lineNumber": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nonoverlapping-repeat",
+      "note": "Leftmost non-overlapping matches, exactly like a single-buffer scan.",
+      "corpus": "aaaa aa\n",
+      "queries": [
+        {
+          "query": "aa",
+          "caseSensitive": true,
+          "expected": [
+            {
+              "startByte": 0,
+              "endByte": 2,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 2,
+              "endByte": 4,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 5,
+              "endByte": 7,
+              "lineNumber": 1
+            }
+          ]
+        },
+        {
+          "query": "a",
+          "caseSensitive": true,
+          "expected": [
+            {
+              "startByte": 0,
+              "endByte": 1,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 1,
+              "endByte": 2,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 2,
+              "endByte": 3,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 3,
+              "endByte": 4,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 5,
+              "endByte": 6,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 6,
+              "endByte": 7,
+              "lineNumber": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "crlf-lines",
+      "note": "CRLF is content; LF alone drives line numbers.",
+      "corpus": "alpha\r\nbeta\r\ngamma needle",
+      "queries": [
+        {
+          "query": "beta",
+          "caseSensitive": true,
+          "expected": [
+            {
+              "startByte": 7,
+              "endByte": 11,
+              "lineNumber": 2
+            }
+          ]
+        },
+        {
+          "query": "needle",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 19,
+              "endByte": 25,
+              "lineNumber": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multibyte-lines",
+      "note": "Line numbers with CJK/emoji before the match.",
+      "corpus": "第一行 needle\n🚀 emoji line\nneedle 结尾无换行",
+      "queries": [
+        {
+          "query": "needle",
+          "caseSensitive": true,
+          "expected": [
+            {
+              "startByte": 10,
+              "endByte": 16,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 33,
+              "endByte": 39,
+              "lineNumber": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "greek-final-sigma-per-code-point",
+      "note": "F-32-1 (wp-32a): both sides fold per code point, so U+03A3 folds to U+03C3 without Final_Sigma context. 'ΟΔΟΣ' folds to 'οδοσ' and no longer matches the final-sigma query 'οδος' (only the already-final 'οδος' word matches); symmetrically, 'οδοσ' matches only the folded 'ΟΔΟΣ'. Asserted identically by the front-end suite and the Rust contract_search_parity suite.",
+      "corpus": "ΟΔΟΣ οδος\n",
+      "queries": [
+        {
+          "query": "οδος",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 9,
+              "endByte": 17,
+              "lineNumber": 1
+            }
+          ]
+        },
+        {
+          "query": "οδοσ",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 0,
+              "endByte": 8,
+              "lineNumber": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "empty-inputs",
+      "note": "An empty query or empty corpus never matches.",
+      "corpus": "anything\n",
+      "queries": [
+        {
+          "query": "",
+          "caseSensitive": false,
+          "expected": []
+        }
+      ]
+    },
+    {
+      "id": "empty-corpus",
+      "note": "Empty corpus edge.",
+      "corpus": "",
+      "queries": [
+        {
+          "query": "a",
+          "caseSensitive": false,
+          "expected": []
+        }
+      ]
+    }
+  ],
+  "boundaryCases": [
+    {
+      "id": "dotted-capital-i-length-changing-fold",
+      "kind": "accepted-length-changing-fold",
+      "note": "U+0130 folds to 'i' + U+0307 (1 UTF-16 unit -> 2). Rust maps folded bytes back to the enclosing original character; the front-end uses the folded index as an index into the original UTF-16 string. KNOWN, DOCUMENTED divergence accepted by ADR-007 (length-changing folds on exotic code points); per-side expectations pin both behaviors so drift is visible.",
+      "corpus": "İstanbul İzmir\n",
+      "queries": [
+        {
+          "query": "i",
+          "caseSensitive": false,
+          "frontend": [
+            {
+              "startByte": 0,
+              "endByte": 2,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 12,
+              "endByte": 13,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 16,
+              "endByte": 17,
+              "lineNumber": 1
+            }
+          ],
+          "rust": [
+            {
+              "startByte": 0,
+              "endByte": 2,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 10,
+              "endByte": 12,
+              "lineNumber": 1
+            },
+            {
+              "startByte": 14,
+              "endByte": 15,
+              "lineNumber": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "fileCases": [
+    {
+      "id": "search-samples-fixture",
+      "note": "The fixed fixture executes through both implementations: Rust opens the file and calls search_source; the front-end reads the same bytes and scans them. Expected offsets were computed from the normative rule.",
+      "corpusFile": "fixtures/search/search-samples.md",
+      "queries": [
+        {
+          "query": "needle",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 177,
+              "endByte": 183,
+              "lineNumber": 7
+            },
+            {
+              "startByte": 220,
+              "endByte": 226,
+              "lineNumber": 10
+            },
+            {
+              "startByte": 261,
+              "endByte": 267,
+              "lineNumber": 13
+            },
+            {
+              "startByte": 438,
+              "endByte": 444,
+              "lineNumber": 19
+            }
+          ]
+        },
+        {
+          "query": "SECRET",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 446,
+              "endByte": 452,
+              "lineNumber": 19
+            },
+            {
+              "startByte": 453,
+              "endByte": 459,
+              "lineNumber": 19
+            },
+            {
+              "startByte": 460,
+              "endByte": 466,
+              "lineNumber": 19
+            }
+          ]
+        },
+        {
+          "query": "中文",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 307,
+              "endByte": 313,
+              "lineNumber": 15
+            }
+          ]
+        },
+        {
+          "query": "🎉",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 383,
+              "endByte": 387,
+              "lineNumber": 17
+            }
+          ]
+        },
+        {
+          "query": "unfindable-zzz",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 489,
+              "endByte": 503,
+              "lineNumber": 21
+            }
+          ]
+        },
+        {
+          "query": "alpha x",
+          "caseSensitive": true,
+          "expected": [
+            {
+              "startByte": 99,
+              "endByte": 106,
+              "lineNumber": 5
+            }
+          ]
+        },
+        {
+          "query": "quux-absent-token",
+          "caseSensitive": false,
+          "expected": []
+        }
+      ]
+    }
+  ]
+}

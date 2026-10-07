@@ -1,0 +1,51 @@
+[package]
+name = "paperstack"
+version = "0.1.0"
+description = "纸栈 PaperStack — Linux-first, local-first read-only technical document reader"
+authors = ["Quirkybrain"]
+license = "GPL-3.0-only"
+edition = "2021"
+# Explicit MSRV aligned with the pinned rust-toolchain.toml channel (PC-11).
+rust-version = "1.96"
+# Private, GPL-3.0-only desktop application crate: never publish to
+# crates.io by accident (mirrors package.json "private": true).
+publish = false
+
+[lib]
+name = "paperstack_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+notify = "8"
+rusqlite = { version = "0.40", features = ["bundled"] }
+sha2 = "0.11"
+# Lowercase SHA-256 hex formatting for opaque `d-`/`g-` identifiers
+# (data-model §3.1/§3.2). Already present transitively; declared directly
+# because core service code depends on it.
+hex = "0.4"
+url = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# The pinned feature name `rustls-tls` (ring provider, no native-tls) exists on
+# the reqwest 0.12 line; 0.13 renamed it to `rustls` and moved to aws-lc-rs.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+# Pinned from real usage at dependency freeze (wp-14a Rev 3): the only direct
+# tokio API used is `tokio::runtime::{Builder, Runtime}` in `services/resources`
+# (`ReqwestTransport`), which requires the `rt` feature. `sync`/`time` were an
+# anticipatory leftover and are supplied transitively by reqwest/tauri; declaring
+# them here would misstate our own requirements. `macros` is not used.
+tokio = { version = "1", features = ["rt"] }
+
+[dev-dependencies]
+tempfile = "3"

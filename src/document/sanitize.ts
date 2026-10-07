@@ -1,0 +1,159 @@
+import type { Root } from 'hast'
+import { defaultSchema, type Options as SanitizeSchema } from 'rehype-sanitize'
+import { visit } from 'unist-util-visit'
+
+/**
+ * Application sanitize schema — the single authority for rendered document
+ * text (security-model §5.2; rendering-pipeline §2.7). Build on
+ * `defaultSchema` but replace the allow lists with the documented v0.1.0
+ * subset:
+ *
+ * - no global attributes (all `on*`, `style`, `srcset`, `ping`, `target`,
+ *   `class` stripped unless a per-element rule allows them);
+ * - `script`/`style`/`iframe`/`object`/`embed`/`form`/`button`/raw `svg`/
+ *   raw `math`/media/`link`/`meta`/`base`/`template`/form controls stripped
+ *   with their contents (engine output is injected after sanitize);
+ * - `clobberPrefix: ''` so the outline's `ps-h-*` ids survive;
+ * - protocols: `href` → http/https/mailto, `src` → http/https (relative and
+ *   fragment URLs are allowed by the sanitizer's protocol check);
+ * - `code` `className` is exactly the §5.2 pattern `^language-…$`: the
+ *   `math-inline`/`math-display` markers are stripped, and the engines
+ *   recognize `language-math` alone (B-10 fix: the earlier D-3 alternation
+ *   was unnecessary — see wp-36a evidence).
+ *
+ * Anything not listed here is not "allowed by omission": unlisted elements
+ * are unwrapped by `hast-util-sanitize`, and unlisted properties are dropped.
+ */
+
+/** Raw tags stripped together with their contents (security-model §5.2). */
+export const STRIPPED_RAW_TAGS = [
+  'script',
+  'style',
+  'iframe',
+  'object',
+  'embed',
+  'form',
+  'button',
+  'svg',
+  'math',
+  'video',
+  'audio',
+  'source',
+  'link',
+  'meta',
+  'base',
+  'template',
+  'textarea',
+  'select',
+  'option',
+] as const
+
+export const ALLOWED_TAGS = [
+  'p',
+  'br',
+  'hr',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'ul',
+  'ol',
+  'li',
+  'blockquote',
+  'pre',
+  'code',
+  'em',
+  'strong',
+  'del',
+  'a',
+  'img',
+  'table',
+  'thead',
+  'tbody',
+  'tfoot',
+  'tr',
+  'th',
+  'td',
+  'details',
+  'summary',
+  'span',
+  'sup',
+  'sub',
+  'section',
+  'input',
+] as const
+
+/** Generated heading anchors (rendering-pipeline §2.4a). */
+export const HEADING_ID_PATTERN = /^ps-h-[a-z0-9-]{1,128}$/
+
+/** GFM footnote note ids after `clobberPrefix: 'ps-'` (security-model §5.2). */
+export const FOOTNOTE_ID_PATTERN = /^ps-fn-[A-Za-z0-9-]+$/
+
+/**
+ * GFM footnote *reference* anchors: the `id` carried by the `<a>` inside
+ * `<sup>` that links to a note (and that the note's back-reference `href`
+ * targets). Same shape as the §5.2 `ps-fn(ref)?-…` rule (B-02 fix: the id
+ * must survive sanitize or every `↩` back-reference dead-links).
+ */
+export const FOOTNOTE_REF_ID_PATTERN = /^ps-fn(ref)?-[A-Za-z0-9-]+$/
+
+/** Code fence classes kept for the wp-19 Shiki/Mermaid engine slots. */
+export const LANGUAGE_CLASS_PATTERN = /^language-[A-Za-z0-9_+-]{1,32}$/
+
+const HEADING_TAGS = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const
+
+function headingAttributes(): SanitizeSchema['attributes'] {
+  const result: NonNullable<SanitizeSchema['attributes']> = {}
+  for (const tag of HEADING_TAGS) {
+    result[tag] = [['id', HEADING_ID_PATTERN]]
+  }
+  return result
+}
+
+export const sanitizeSchema: SanitizeSchema = {
+  ...defaultSchema,
+  attributes: {
+    ...headingAttributes(),
+    a: ['href', 'title', ['id', FOOTNOTE_REF_ID_PATTERN]],
+    img: ['src', 'alt', 'title'],
+    code: [['className', LANGUAGE_CLASS_PATTERN]],
+    li: [
+      ['className', 'task-list-item'],
+      ['id', FOOTNOTE_ID_PATTERN],
+    ],
+    input: [['type', 'checkbox'], 'checked', 'disabled'],
+    details: ['open'],
+    td: [['align', /^(left|center|right)$/]],
+    th: [['align', /^(left|center|right)$/]],
+    section: [['className', 'footnotes'], 'dataFootnotes'],
+  },
+  clobberPrefix: '',
+  protocols: {
+    href: ['http', 'https', 'mailto'],
+    src: ['http', 'https'],
+  },
+  required: {
+    input: { disabled: true, type: 'checkbox' },
+  },
+  strip: [...STRIPPED_RAW_TAGS],
+  tagNames: [...ALLOWED_TAGS],
+}
+
+/**
+ * Post-sanitize patch: force task-list checkboxes read-only (security-model
+ * §5.2 post patch; R04). Sanitize already enforces this through `required`;
+ * this pass keeps the invariant explicit even for engine-produced input and
+ * documents the read-only boundary in one visible place.
+ */
+export function rehypeForceTaskCheckboxDisabled() {
+  return (tree: Root): Root => {
+    visit(tree, 'element', (node) => {
+      if (node.tagName !== 'input') return
+      if (node.properties.type !== 'checkbox') return
+      node.properties.disabled = true
+    })
+    return tree
+  }
+}

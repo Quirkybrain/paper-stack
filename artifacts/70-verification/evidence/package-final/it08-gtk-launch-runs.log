@@ -1,0 +1,25 @@
+[2026-10-08T05:09:43+08:00] == IT08 system-open via gtk-launch on final package (isolated absolute XDG dirs) ==
+
+$ dpkg-deb -x /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb /tmp/opencode/ps-deb-final
+[exit=0] dpkg-deb -x /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb /tmp/opencode/ps-deb-final
+0x3400003
+
+$ tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/package-final/06-gtk-launch-system-open.png 纸栈 PaperStack
+screenshot: window 0x3400003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/package-final/06-gtk-launch-system-open.png
+[exit=0] tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/package-final/06-gtk-launch-system-open.png 纸栈 PaperStack
+
+$ tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/package-final/06b-gtk-launch-confirmed.png 纸栈 PaperStack
+screenshot: window 0x3400003 -> /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/package-final/06b-gtk-launch-confirmed.png
+[exit=0] tests/desktop/screenshot.sh /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/package-final/06b-gtk-launch-confirmed.png 纸栈 PaperStack
+[2026-10-08T05:09:51+08:00] gtk-launch pid=3436401; app process:
+3436407 /tmp/opencode/ps-deb-final/usr/bin/paperstack /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/package-final/inputs/it08/系统打开样例.md
+[2026-10-08T05:09:51+08:00] tab count check (xwininfo title):
+     0x603267 "纸栈 PaperStack": ("mutter-x11-frames" "mutter-x11-frames")  1308x866+168+128  +168+128
+        0x3400003 "纸栈 PaperStack": ("paperstack" "Paperstack")  1280x800+14+49  +182+177
+[2026-10-08T05:09:51+08:00] == clean close (WM_DELETE_WINDOW) ==
+
+$ tests/desktop/xdo-helper close
+WM_DELETE_WINDOW sent to 0x3400003
+[exit=0] tests/desktop/xdo-helper close
+[2026-10-08T05:09:53+08:00] no app process remains
+[2026-10-08T05:09:53+08:00] == IT08 gtk-launch check finished ==
