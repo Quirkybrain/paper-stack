@@ -102,20 +102,35 @@ impl AppState {
             }],
         });
 
-        let (storage, grants, settings) = match Storage::open(&data_dir) {
-            Ok(storage) => {
+        let (storage, read_write_error) = Storage::open_with_degrade(&data_dir);
+        let mut grants = Vec::new();
+        let mut settings = GlobalSettings::default();
+        if let Some(storage) = &storage {
+            if !storage.is_read_only() {
                 // Contract startup step (data-model §3.2): session grants die
                 // with the process; persistent rows are revalidated below.
                 let _ = storage.purge_session_grants();
-                let grants = storage.load_grants().unwrap_or_default();
-                let settings = storage.load_settings().unwrap_or_default();
-                (Some(storage), grants, settings)
             }
-            Err(error) => {
-                diagnostics.record_app_error(None, &error);
-                (None, Vec::new(), GlobalSettings::default())
+            grants = storage.load_grants().unwrap_or_default();
+            settings = storage.load_settings().unwrap_or_default();
+        }
+        if let Some(error) = &read_write_error {
+            // The read-write failure is recorded honestly even when the
+            // read-only degrade keeps records readable (NF08; data-model
+            // §4.5).
+            diagnostics.record_app_error(None, error);
+            if storage.as_ref().is_some_and(Storage::is_read_only) {
+                diagnostics.log(&LogEvent {
+                    level: LogLevel::Warn,
+                    category: LogCategory::Storage,
+                    event: "storage_read_only_degrade",
+                    fields: vec![LogField::Text {
+                        key: "reason",
+                        value: error.code().as_str(),
+                    }],
+                });
             }
-        };
+        }
 
         let mut auth = match &storage {
             Some(storage) => AuthRegistry::with_persistence(Box::new(storage.clone())),

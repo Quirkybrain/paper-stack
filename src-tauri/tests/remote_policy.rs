@@ -77,6 +77,7 @@ impl RemoteTransport for MockTransport {
 struct CacheState {
     entries: BTreeMap<String, Vec<u8>>,
     fail_store: bool,
+    fail_remove: bool,
     purge_calls: usize,
 }
 
@@ -109,13 +110,11 @@ impl RemoteCacheStore for MemoryCache {
     }
 
     fn remove(&mut self, cache_key: &str) -> Result<bool, AppError> {
-        Ok(self
-            .state
-            .lock()
-            .unwrap()
-            .entries
-            .remove(cache_key)
-            .is_some())
+        let mut state = self.state.lock().unwrap();
+        if state.fail_remove {
+            return Err(AppError::new(ErrorCode::IoWriteFailed));
+        }
+        Ok(state.entries.remove(cache_key).is_some())
     }
 
     fn purge(&mut self) -> Result<u64, AppError> {
@@ -256,6 +255,23 @@ fn only_https_urls_pass_the_protocol_check() {
         assert_eq!(error.code(), ErrorCode::RemoteProtocol, "url {url}");
     }
     assert_eq!(harness.transport_calls(), 0);
+}
+
+#[test]
+fn credential_urls_are_rejected_before_any_io() {
+    let mut harness = harness_with(RemoteConfig::default(), vec![public_v4()]);
+    for url in [
+        "https://user:pass@example.com/a.png",
+        "https://user@example.com/a.png",
+    ] {
+        // The origin of these URLs matches the allow-list, so a missing
+        // credential check would reach the cache/DNS/transport seams.
+        let error = fetch_example(&mut harness, url).unwrap_err();
+        assert_eq!(error.code(), ErrorCode::RemoteProtocol, "url {url}");
+    }
+    assert_eq!(harness.resolver_calls(), 0);
+    assert_eq!(harness.transport_calls(), 0);
+    assert!(harness.cache_state.lock().unwrap().entries.is_empty());
 }
 
 #[test]
@@ -680,6 +696,36 @@ fn revoke_only_deletes_that_document_sessions_entries() {
     let report = harness.service.revoke_session("d-unknown");
     assert_eq!(report.removed_cache_entries, 0);
     assert!(harness.cached(&cache_key_for(url_b)).is_some());
+}
+
+#[test]
+fn revoke_session_counts_failed_removals_without_failing() {
+    let url_a = "https://example.com/a.png";
+    let url_b = "https://example.com/b.png";
+    let mut harness = harness_with(RemoteConfig::default(), vec![public_v4()]);
+    harness
+        .service
+        .fetch("d-1", url_a, &allowed_example())
+        .unwrap();
+    harness
+        .service
+        .fetch("d-1", url_b, &allowed_example())
+        .unwrap();
+    harness.cache_state.lock().unwrap().fail_remove = true;
+
+    // A-04: cache deletion failures are counted, never panicked/rejected.
+    let report = harness.service.revoke_session("d-1");
+    assert_eq!(report.removed_cache_entries, 0);
+    assert_eq!(report.failed_removals, 2);
+    // The entries are left intact for a later purge/LRU pass.
+    assert!(harness.cached(&cache_key_for(url_a)).is_some());
+    assert!(harness.cached(&cache_key_for(url_b)).is_some());
+
+    // The session bookkeeping was dropped nevertheless: a later fetch
+    // re-fetches instead of serving the still-cached bytes.
+    let again = fetch_example(&mut harness, url_a).unwrap();
+    assert!(!again.from_cache);
+    assert_eq!(harness.transport_calls(), 3);
 }
 
 #[test]

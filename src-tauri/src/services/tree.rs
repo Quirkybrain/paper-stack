@@ -110,6 +110,9 @@ impl TreeService {
     /// component-checked against the authorized root; entries outside the
     /// root (symlink targets) are reported as `symlink-outside`, never
     /// followed.
+    ///
+    /// This primitive performs no authorization check; callers that read on
+    /// behalf of a user action must use [`Self::read_directory_checked`].
     pub fn read_directory(
         &self,
         root_id: &str,
@@ -145,6 +148,27 @@ impl TreeService {
             entries,
             truncated,
         })
+    }
+
+    /// Authorization-gated variant of [`Self::read_directory`] for command 10
+    /// (INV-AZ-06; security-model §2.1): the caller's decision is evaluated
+    /// against the registered root's canonical path before the listing starts,
+    /// so a revoked or cleared directory grant stops new scans with
+    /// `PS_AUTH_REVOKED`. The command layer passes the `AuthRegistry`-backed
+    /// decision; a user-explicit `open_directory` re-establishes it (R25).
+    pub fn read_directory_checked(
+        &self,
+        root_id: &str,
+        dir_path: &str,
+        authorized: impl FnOnce(&Path) -> bool,
+    ) -> Result<DirectoryListing, AppError> {
+        let root = self
+            .root(root_id)
+            .ok_or_else(|| AppError::new(ErrorCode::IoNotFound))?;
+        if !authorized(Path::new(&root.canonical_path)) {
+            return Err(AppError::new(ErrorCode::AuthRevoked));
+        }
+        self.read_directory(root_id, dir_path)
     }
 }
 
@@ -290,5 +314,39 @@ mod tests {
         let hex = first.strip_prefix("r-").expect("r- prefix");
         assert_eq!(hex.len(), 16);
         assert!(hex.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn read_directory_checked_gates_on_the_root_canonical_path() {
+        let temp = tempfile::tempdir().unwrap();
+        fs::write(temp.path().join("a.md"), "# a\n").unwrap();
+        let mut service = TreeService::new();
+        let opened = service
+            .open_directory(&temp.path().to_string_lossy(), false)
+            .unwrap();
+
+        // The decision receives the registered root's canonical path.
+        let seen = std::cell::RefCell::new(None);
+        let listing = service
+            .read_directory_checked(&opened.root_id, &opened.canonical_path, |root| {
+                *seen.borrow_mut() = Some(root.to_path_buf());
+                true
+            })
+            .unwrap();
+        assert_eq!(listing.entries.len(), 1);
+        assert_eq!(seen.into_inner().as_deref(), Some(temp.path()));
+
+        // A denied decision stops the listing before any readdir
+        // (INV-AZ-06: revoke/clear stops new scans).
+        let denied = service
+            .read_directory_checked(&opened.root_id, &opened.canonical_path, |_| false)
+            .unwrap_err();
+        assert_eq!(denied.code(), ErrorCode::AuthRevoked);
+
+        // Unknown roots stay IO_NOT_FOUND.
+        let unknown = service
+            .read_directory_checked("r-0000000000000000", &opened.canonical_path, |_| true)
+            .unwrap_err();
+        assert_eq!(unknown.code(), ErrorCode::IoNotFound);
     }
 }

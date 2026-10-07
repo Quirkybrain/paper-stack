@@ -11,6 +11,7 @@ use crate::models::{
     OpenStatus, PickResult, ReadDocumentRequest, ReadSourceWindowRequest, RelinkRequest,
     RelinkResult, SearchSourceRequest, SourceInfo, SourceSearchResult, SourceWindow,
 };
+use crate::services::auth::OpenAuthorizationOutcome;
 use crate::services::storage::DocumentRecord;
 use crate::state::{lock, AppState};
 
@@ -72,7 +73,8 @@ fn pick_result(picked: Vec<tauri_plugin_dialog::FilePath>) -> PickResult {
 /// Command 4: per-item validation, decoding and single-file read
 /// authorization (contracts §2.1; R01/R05/R25). Failures are per item; the
 /// batch keeps input order. `entry != "restore"` resumes record write-back
-/// (data-model §6).
+/// (data-model §6) and carries the user's authorization decision; a
+/// `restore` item is never an authorization source (INV-AZ-10; models §10.2).
 #[tauri::command]
 pub async fn open_documents(
     app: AppHandle,
@@ -81,7 +83,7 @@ pub async fn open_documents(
     dispatch(app, None, move |_app, state| {
         let mut items = Vec::with_capacity(req.paths.len());
         for path in &req.paths {
-            items.push(open_one(state, path));
+            items.push(open_one(state, path, req.entry));
         }
         if req.entry != OpenEntry::Restore {
             if let Some(storage) = &state.storage {
@@ -93,7 +95,37 @@ pub async fn open_documents(
     .await
 }
 
-fn open_one(state: &AppState, raw_path: &str) -> OpenOutcome {
+fn open_one(state: &AppState, raw_path: &str, entry: OpenEntry) -> OpenOutcome {
+    // Restore is a lifecycle event, not an authorization decision (INV-AZ-10;
+    // models §10.2; data-model §3.2): without a valid grant the item is
+    // rejected before any read, so a revoked/cleared authorization cannot be
+    // resurrected by a restart. Missing paths still fall through to
+    // `open_document` for the honest IO error.
+    if entry == OpenEntry::Restore {
+        let needs_confirmation = std::fs::canonicalize(raw_path)
+            .ok()
+            .is_some_and(|canonical| {
+                let mut auth = lock(&state.auth);
+                matches!(
+                    auth.authorize_open_entry(entry, &canonical, now_ms()),
+                    Ok(OpenAuthorizationOutcome::NeedsConfirmation)
+                )
+            });
+        if needs_confirmation {
+            let error = AppError::new(ErrorCode::AuthRevoked)
+                .with_message("restore requires an existing valid authorization");
+            state.diagnostics.record_app_error(None, &error);
+            return OpenOutcome {
+                path: raw_path.to_owned(),
+                status: OpenStatus::Rejected,
+                doc_id: None,
+                identity: None,
+                duplicate_of_doc_id: None,
+                error: Some(error.to_payload()),
+            };
+        }
+    }
+
     let opened = {
         let mut files = lock(&state.files);
         match files.open_document(raw_path) {
@@ -114,12 +146,13 @@ fn open_one(state: &AppState, raw_path: &str) -> OpenOutcome {
 
     let canonical = opened.identity.canonical_path.clone();
     let now = now_ms();
-    // A user-selected open is the authorization decision (security-model
-    // §2.1): register the persistent single-file grant, falling back to a
-    // session grant when persistence is degraded (NF08).
-    {
+    // An explicit user open is the authorization decision (security-model
+    // §2.1; R25): register the persistent single-file grant, falling back to a
+    // session grant when persistence is degraded (NF08). A `restore` item
+    // never reaches this block: it only proceeds on an existing valid grant.
+    if entry != OpenEntry::Restore {
         let mut auth = lock(&state.auth);
-        if let Err(error) = auth.grant_file(Path::new(&canonical), now) {
+        if let Err(error) = auth.authorize_open_entry(entry, Path::new(&canonical), now) {
             state.diagnostics.record_app_error(None, &error);
             if let Err(error) = auth.grant_file_session(Path::new(&canonical), now) {
                 state.diagnostics.record_app_error(None, &error);
@@ -265,4 +298,57 @@ pub(crate) fn authorize_registered(state: &AppState, doc_id: &str) -> Result<Str
         return Err(AppError::new(ErrorCode::AuthRevoked));
     }
     Ok(canonical)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::services::auth::AuthRegistry;
+    use std::path::PathBuf;
+
+    #[test]
+    fn restore_without_a_valid_grant_needs_confirmation_and_creates_nothing() {
+        let mut auth = AuthRegistry::new();
+        let path = PathBuf::from("/tmp/paperstack-unit-restore-none.md");
+        let outcome = auth
+            .authorize_open_entry(OpenEntry::Restore, &path, 1)
+            .unwrap();
+        assert_eq!(outcome, OpenAuthorizationOutcome::NeedsConfirmation);
+        assert!(auth.list().is_empty());
+        assert!(!auth.has_local_access(&path));
+    }
+
+    #[test]
+    fn restore_with_an_existing_grant_proceeds_without_a_new_record() {
+        let mut auth = AuthRegistry::new();
+        let path = PathBuf::from("/tmp/paperstack-unit-restore-existing.md");
+        let existing = auth.grant_file(&path, 1).unwrap();
+        let outcome = auth
+            .authorize_open_entry(OpenEntry::Restore, &path, 2)
+            .unwrap();
+        assert_eq!(outcome, OpenAuthorizationOutcome::Restored);
+        assert_eq!(auth.list(), vec![existing]);
+    }
+
+    #[test]
+    fn explicit_entries_keep_the_grant_on_open_decision() {
+        for entry in [
+            OpenEntry::Dialog,
+            OpenEntry::Drop,
+            OpenEntry::Cli,
+            OpenEntry::System,
+            OpenEntry::Tree,
+            OpenEntry::Recent,
+        ] {
+            let mut auth = AuthRegistry::new();
+            let path = PathBuf::from(format!("/tmp/paperstack-unit-open-{entry:?}.md"));
+            let outcome = auth.authorize_open_entry(entry, &path, 1).unwrap();
+            assert!(
+                matches!(outcome, OpenAuthorizationOutcome::Granted(_)),
+                "{entry:?} must keep the grant-on-open semantics"
+            );
+            assert_eq!(auth.list().len(), 1, "{entry:?}");
+            assert!(auth.has_local_access(&path), "{entry:?}");
+        }
+    }
 }

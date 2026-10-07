@@ -5,8 +5,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use paperstack_lib::commands::tree::read_directory_checked;
 use paperstack_lib::error::ErrorCode;
 use paperstack_lib::models::{DirectoryNodeKind, DirectoryNodeStatus, GrantScope};
+use paperstack_lib::services::auth::AuthRegistry;
 use paperstack_lib::services::tree::{TreeService, MAX_DIRECTORY_ENTRIES};
 use tempfile::TempDir;
 
@@ -271,6 +273,57 @@ fn read_directory_reports_denied_child_and_denied_root_when_not_root() {
     }
 
     fs::set_permissions(&denied, fs::Permissions::from_mode(0o755)).unwrap();
+}
+
+#[test]
+fn read_directory_after_directory_revoke_is_denied() {
+    let root = tree_root();
+    let mut tree = TreeService::new();
+    let opened = tree.open_directory(&path_str(&root), false).unwrap();
+    let mut auth = AuthRegistry::new();
+    let grant = auth
+        .grant_directory(Path::new(&opened.canonical_path), false, 1)
+        .unwrap();
+
+    // Before the revoke the command path lists normally.
+    let listing = read_directory_checked(&tree, &auth, &opened.root_id, &path_str(&root)).unwrap();
+    assert!(!listing.entries.is_empty());
+
+    // A-02: revoking the directory grant stops further scans immediately
+    // (INV-AZ-06; security-model §2.1: no listing until re-confirmation).
+    auth.revoke(&grant.grant_id).unwrap();
+    let denied =
+        read_directory_checked(&tree, &auth, &opened.root_id, &path_str(&root)).unwrap_err();
+    assert_eq!(denied.code(), ErrorCode::AuthRevoked);
+    let sub_denied =
+        read_directory_checked(&tree, &auth, &opened.root_id, &path_str(&root.join("sub")))
+            .unwrap_err();
+    assert_eq!(sub_denied.code(), ErrorCode::AuthRevoked);
+
+    // An explicit user re-open (command 9) re-establishes the authorization.
+    auth.grant_directory(Path::new(&opened.canonical_path), false, 2)
+        .unwrap();
+    assert!(read_directory_checked(&tree, &auth, &opened.root_id, &path_str(&root)).is_ok());
+}
+
+#[test]
+fn read_directory_after_authorization_clear_is_denied() {
+    let root = tree_root();
+    let mut tree = TreeService::new();
+    let opened = tree.open_directory(&path_str(&root), false).unwrap();
+    let mut auth = AuthRegistry::new();
+    auth.grant_directory(Path::new(&opened.canonical_path), false, 1)
+        .unwrap();
+    assert!(read_directory_checked(&tree, &auth, &opened.root_id, &path_str(&root)).is_ok());
+
+    // clear_records(["authorizations"]) empties the registry; the retained
+    // rootId must not keep listing (data-model §3.2: no automatic re-grant).
+    let outcome = auth.revoke_all_for_clear();
+    assert_eq!(outcome.removed(), 1);
+    let denied =
+        read_directory_checked(&tree, &auth, &opened.root_id, &path_str(&root)).unwrap_err();
+    assert_eq!(denied.code(), ErrorCode::AuthRevoked);
+    assert!(auth.list().is_empty());
 }
 
 #[test]
