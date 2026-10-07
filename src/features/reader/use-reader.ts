@@ -30,6 +30,7 @@ import {
   PaperStackError,
   app,
   files,
+  remote,
   settings,
   storage,
   toErrorPayload,
@@ -41,7 +42,6 @@ import type {
   DirectoryRoot,
   ErrorPayload,
   OpenEntry,
-  OpenOutcome,
   OpenRequest,
   RecentEntry,
   SaveResult,
@@ -85,6 +85,17 @@ import {
   resolveUpdateDecision,
   updatePositionForRestore,
 } from './update/update-model'
+import {
+  drainPendingOpenRequests,
+  openFromDirectoryDialog,
+  openFromDrop,
+  openFromFileDialog,
+  openFromRequest,
+  planOpenBatch,
+  type OpenEntryHandlers,
+  type OpenEntryServices,
+} from './open/entry'
+import { resourceAuth } from './resources/resource-auth'
 import { resourceInvalidation } from './view/resource-invalidation'
 
 /**
@@ -144,6 +155,8 @@ export interface ReaderControls {
   state: ReaderState
   openErrors: OpenFailure[]
   clearOpenErrors(): void
+  /** Records a surface-level command failure (e.g. authorization dialogs). */
+  reportOpenError(error: ErrorPayload): void
   /** True when the quit-time session save failed and the window was kept open. */
   closeSaveFailed: boolean
   /** Currently opened directory root for the file tree (one at a time). */
@@ -154,6 +167,8 @@ export interface ReaderControls {
   pickAndOpen(): Promise<void>
   pickDirectory(): Promise<void>
   openPaths(paths: readonly string[], entry: OpenEntry): Promise<void>
+  /** Drag-and-drop entry (`tauri://drag-drop`): validated per item, never a command on its own. */
+  openDrop(paths: readonly string[]): Promise<void>
   /**
    * Cross-file link navigation in the current tab (models §5.2; R15/R16): the
    * target replaces this tab's document, never opening a new tab. Returns null
@@ -251,6 +266,19 @@ function nextTaskId(prefix: string): string {
 
 /** Default syntax options until settings are loaded (contract §3.5 defaults). */
 const DEFAULT_SYNTAX_MODE: SyntaxMode = 'technical'
+
+/**
+ * Injected command surface for the entry adapters (contracts commands 1, 2, 4,
+ * 9, 35). Module-level so the adapters and the startup drain keep stable
+ * identities across renders.
+ */
+const ENTRY_SERVICES: OpenEntryServices = {
+  pickFiles: () => files.pickFiles(),
+  pickDirectory: () => files.pickDirectory(),
+  openDocuments: (request) => files.openDocuments(request),
+  openDirectory: (request) => tree.openDirectory(request),
+  takePendingOpenRequests: () => app.takePendingOpenRequests(),
+}
 
 function documentSelectionPresent(): boolean {
   if (typeof window === 'undefined') return false
@@ -706,74 +734,86 @@ export function useReader(): ReaderControls {
         setOpenErrors([{ path: '', error: toErrorPayload(error) }])
         return
       }
-      const failures: OpenFailure[] = []
-      let activationUsed = false
-      let acceptedAny = false
-      for (const outcome of result.items) {
-        const docId = outcomeDocId(outcome)
-        if (outcome.status === 'rejected') {
-          if (outcome.error) failures.push({ path: outcome.path, error: outcome.error })
-          continue
-        }
-        if (!docId) continue
-        acceptedAny = true
-        const existing = stateRef.current.tabs.find((tab) => tab.docId === docId)
+      // Batch oracle: request order, first accepted item gets focus, duplicates
+      // reuse their canonical-path tab (R05), rejections are summarized.
+      const plan = planOpenBatch(result.items)
+      for (const item of plan.items) {
+        const { outcome } = item
+        const existing = stateRef.current.tabs.find((tab) => tab.docId === item.docId)
         if (existing) {
-          if (!activationUsed) {
-            activationUsed = true
+          if (item.activate) {
             send(tabActivate(existing.tabId))
             maybeAutoCommitRef.current(existing.tabId)
           }
           continue
         }
-        if (!outcome.identity) continue
+        const identity = outcome.identity
+        if (!identity) continue
         const tab = createReaderTab({
           tabId: nextTabId(),
-          docId,
-          canonicalPath: outcome.identity.canonicalPath,
-          displayName: outcome.identity.displayName,
+          docId: item.docId,
+          canonicalPath: identity.canonicalPath,
+          displayName: identity.displayName,
         })
-        const activate = !activationUsed
-        if (activate) activationUsed = true
-        send(tabOpen(tab, activate))
+        send(tabOpen(tab, item.activate))
 
         // Large-document classification (rendering-pipeline §5). The hard
         // limit wins: the tab goes straight to the source-window mode with an
         // explicit label; >10MiB asks before reading anything (cancel closes
         // the freshly created tab without starting background work).
-        const classification = classifyLargeDocument({ sizeBytes: outcome.identity.sizeBytes })
+        const classification = classifyLargeDocument({ sizeBytes: identity.sizeBytes })
         if (classification.kind === 'sourceOnly') {
           send(tabLargeDoc(tab.tabId, 'sourceWindow'))
           send(tabView(tab.tabId, 'source'))
-          void startSourceWindow(tab.tabId, docId, tab.session.generation)
+          void startSourceWindow(tab.tabId, item.docId, tab.session.generation)
         } else if (classification.kind === 'prompt') {
           send(tabPhase(tab.tabId, 'largeDoc', null))
           setPrompt(tab.tabId, {
-            sizeBytes: outcome.identity.sizeBytes,
+            sizeBytes: identity.sizeBytes,
             reason: classification.reason,
             origin: 'open',
           })
         } else {
-          void startRead(tab.tabId, docId, 'initial', tab.session.generation)
+          void startRead(tab.tabId, item.docId, 'initial', tab.session.generation)
         }
       }
       // Explicit open (entry != restore) lifts the cleared-category write
       // suppression, exactly like models §9.1 (`resume_recording` alternative).
-      if (acceptedAny && entry !== 'restore') resumeSuppressedWrites()
-      setOpenErrors(failures)
+      if (plan.acceptedAny && entry !== 'restore') resumeSuppressedWrites()
+      setOpenErrors(plan.failures)
     },
     [setPrompt, startRead, startSourceWindow, send],
   )
 
+  /**
+   * Records a surface-level command failure without clearing the current open
+   * summary (used by the authorization dialog host).
+   */
+  const reportOpenError = useCallback((error: ErrorPayload) => {
+    setOpenErrors((previous) => [...previous, { path: '', error }])
+  }, [])
+
+  /** Shared handler surface for the four entry adapters (`open/entry.ts`). */
+  const entryHandlers = useCallback(
+    (): OpenEntryHandlers => ({
+      openPaths,
+      setDirectory,
+      reportError: reportOpenError,
+    }),
+    [openPaths, reportOpenError],
+  )
+
   const pickAndOpen = useCallback(async () => {
-    try {
-      const picked = await files.pickFiles()
-      if (picked.cancelled) return
-      await openPaths(picked.paths, 'dialog')
-    } catch (error) {
-      setOpenErrors([{ path: '', error: toErrorPayload(error) }])
-    }
-  }, [openPaths])
+    await openFromFileDialog(ENTRY_SERVICES, entryHandlers())
+  }, [entryHandlers])
+
+  /** Drag-and-drop entry: empty payloads are ignored, paths validate per item. */
+  const openDrop = useCallback(
+    async (paths: readonly string[]) => {
+      await openFromDrop(entryHandlers(), paths)
+    },
+    [entryHandlers],
+  )
 
   /**
    * “打开目录” (Ctrl+Shift+O): the picker result never authorizes by itself;
@@ -781,15 +821,8 @@ export function useReader(): ReaderControls {
    * tree service (contracts §8/§9, R25). Cancel changes nothing.
    */
   const pickDirectory = useCallback(async () => {
-    try {
-      const picked = await files.pickDirectory()
-      if (picked.cancelled || picked.paths.length === 0) return
-      const root = await tree.openDirectory({ path: picked.paths[0], persist: false })
-      setDirectory(root)
-    } catch (error) {
-      setOpenErrors([{ path: '', error: toErrorPayload(error) }])
-    }
-  }, [])
+    await openFromDirectoryDialog(ENTRY_SERVICES, entryHandlers())
+  }, [entryHandlers])
 
   /**
    * Unavailable recents relink (ui-spec §3.1/§3.8; R07): re-select through the
@@ -854,9 +887,9 @@ export function useReader(): ReaderControls {
 
   const openRequest = useCallback(
     async (request: OpenRequest) => {
-      await openPaths(request.paths, request.source === 'cli' ? 'cli' : 'system')
+      await openFromRequest(entryHandlers(), request)
     },
-    [openPaths],
+    [entryHandlers],
   )
 
   /**
@@ -899,6 +932,7 @@ export function useReader(): ReaderControls {
       if (!identity) return null
 
       const generation = tab.session.generation + 1 // session/opened advances §6.1
+      const previousDocId = tab.docId
       send(
         tabDocReplace(tabId, {
           docId,
@@ -906,28 +940,32 @@ export function useReader(): ReaderControls {
           displayName: identity.displayName,
         }),
       )
+      // The old document session ends here: its remote allowances die with it
+      // (INV-AZ-07/09) — the new document starts blocked again.
+      resourceAuth.revokeRemote(previousDocId)
+      resourceAuth.clearPromptsFor(previousDocId)
+      void remote.revokeRemoteSession(previousDocId).catch(() => undefined)
       void startRead(tabId, docId, 'initial', generation)
       return { docId, anchorId }
     },
     [send, startRead],
   )
 
-  // Startup queue: drained exactly once; later requests arrive as events.
+  // Startup queue: drained exactly once and in order; later requests arrive as
+  // `paperstack://open-requested` events through `openRequest` (contracts §4).
   useEffect(() => {
     let cancelled = false
-    void (async () => {
-      try {
-        const pending = await app.takePendingOpenRequests()
-        if (cancelled) return
-        for (const request of pending) await openRequest(request)
-      } catch (error) {
-        if (!cancelled) setOpenErrors([{ path: '', error: toErrorPayload(error) }])
-      }
-    })()
+    const handlers = entryHandlers()
+    const guarded: OpenEntryHandlers = {
+      openPaths: (paths, entry) => (cancelled ? Promise.resolve() : handlers.openPaths(paths, entry)),
+      setDirectory: handlers.setDirectory,
+      reportError: handlers.reportError,
+    }
+    void drainPendingOpenRequests(ENTRY_SERVICES, guarded)
     return () => {
       cancelled = true
     }
-  }, [openRequest])
+  }, [entryHandlers])
 
   const activateTab = useCallback(
     (tabId: string) => {
@@ -971,7 +1009,14 @@ export function useReader(): ReaderControls {
         delete next[tabId]
         return next
       })
-      if (tab) void watch.unwatchDocument(tab.docId).catch(() => undefined)
+      if (tab) {
+        // Leaving the document session revokes its remote allowances and
+        // cancels in-flight fetches (INV-AZ-07/09): reopening is blocked again.
+        resourceAuth.revokeRemote(tab.docId)
+        resourceAuth.clearPromptsFor(tab.docId)
+        void remote.revokeRemoteSession(tab.docId).catch(() => undefined)
+        void watch.unwatchDocument(tab.docId).catch(() => undefined)
+      }
     },
     [removePrompt, send, setCommitNotices, setInlineMathByTab, setUpdateModeByTab],
   )
@@ -1324,6 +1369,7 @@ export function useReader(): ReaderControls {
     state,
     openErrors,
     clearOpenErrors,
+    reportOpenError,
     closeSaveFailed,
     directory,
     relinkNotice,
@@ -1331,6 +1377,7 @@ export function useReader(): ReaderControls {
     pickAndOpen,
     pickDirectory,
     openPaths,
+    openDrop,
     navigateDocument,
     openRequest,
     relinkRecent,
@@ -1373,10 +1420,6 @@ export function useReader(): ReaderControls {
     layoutCorrectionTick,
     notifyLayoutChange,
   }
-}
-
-function outcomeDocId(outcome: OpenOutcome): string | undefined {
-  return outcome.docId ?? outcome.duplicateOfDocId
 }
 
 /** Cache lookup used by the view layer (heavy artifacts out of React state). */

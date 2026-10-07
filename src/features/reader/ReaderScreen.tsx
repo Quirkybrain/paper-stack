@@ -70,6 +70,7 @@ import { ReaderToolbar } from './toolbar/ReaderToolbar'
 import { ReaderUiContext, type ReaderUi } from './ui-context'
 import { UpdateBanner } from './update/UpdateBanner'
 import { selectUpdateBanner } from './update/update-model'
+import { ResourceAuthDialogs } from './resources/ResourceAuthDialogs'
 import {
   displayDocumentModel,
   useReader,
@@ -1026,7 +1027,7 @@ export default function ReaderScreen() {
         focusTimer.current = setTimeout(() => controlsRef.current.recheckActive(), 300)
       },
       onCloseRequested: (event) => controlsRef.current.handleCloseRequested(event),
-      onDragDrop: (paths) => void controlsRef.current.openPaths(paths, 'drop'),
+      onDragDrop: (paths) => void controlsRef.current.openDrop(paths),
     })
     void bridge.start()
     return () => {
@@ -1359,6 +1360,8 @@ export default function ReaderScreen() {
                 onChoose={(choice) => reader.chooseLargeDoc(activeTab.tabId, choice)}
               />
             ) : null}
+            {/* Local/remote authorization dialogs (ui-spec §3.8; models §8). */}
+            <ResourceAuthDialogs onError={reader.reportOpenError} />
           </ReaderUiContext.Provider>
         </RootErrorBoundary>
       </DiagnosticsProvider>
