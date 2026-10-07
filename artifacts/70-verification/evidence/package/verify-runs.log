@@ -1,0 +1,146 @@
+[2026-10-08T00:49:36+08:00] == PaperStack .deb verification (wp-43 C2) ==
+[2026-10-08T00:49:36+08:00] deb=src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb
+[2026-10-08T00:49:36+08:00] git HEAD: 1e9321ca4e4a644f4b337b2ebbdedd206426d1df branch: task/wp-43-package
+[2026-10-08T00:49:36+08:00] display=:1 window='纸栈 PaperStack'
+
+$ stat -c deb path=%n size=%s bytes mtime=%y src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb
+deb path=src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb size=11519100 bytes mtime=2026-10-08 00:49:22.354425767 +0800
+[exit=0] stat -c deb path=%n size=%s bytes mtime=%y src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb
+b0f44fdba83b1bfa5bbca80293ee14c8dd1b25e32a602bd74bf098fa754b4968  src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb
+
+$ dpkg-deb -I src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb >> dpkg-deb-I.txt
+[exit=0] dpkg-deb -I src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb (output: dpkg-deb-I.txt)
+
+$ dpkg-deb -f src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb Package Version Maintainer Architecture Depends Description
+Package: paperstack
+Version: 0.1.0
+Maintainer: Quirkybrain
+Architecture: amd64
+Depends: libwebkit2gtk-4.1-0, libgtk-3-0
+Description: PaperStack - local-first, read-only Markdown and math reader
+ PaperStack is a Linux-first, local-first read-only reader for technical documents.
+ Version 0.1.0 renders Markdown with math (KaTeX), Mermaid diagrams and Shiki-highlighted code, fully offline from local files.
+[exit=0] dpkg-deb -f src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb Package Version Maintainer Architecture Depends Description
+
+$ dpkg-deb -c src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb >> dpkg-deb-c.txt
+[exit=0] dpkg-deb -c src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb (output: dpkg-deb-c.txt)
+
+$ dpkg-deb -x src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb /tmp/opencode/paperstack-deb-vfuFTC >> dpkg-deb-x.log
+[exit=0] dpkg-deb -x src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb /tmp/opencode/paperstack-deb-vfuFTC (output: dpkg-deb-x.log)
+== extracted tree under usr/ ==
+/tmp/opencode/paperstack-deb-vfuFTC/usr
+/tmp/opencode/paperstack-deb-vfuFTC/usr/bin
+/tmp/opencode/paperstack-deb-vfuFTC/usr/bin/paperstack
+/tmp/opencode/paperstack-deb-vfuFTC/usr/lib
+/tmp/opencode/paperstack-deb-vfuFTC/usr/lib/paperstack
+/tmp/opencode/paperstack-deb-vfuFTC/usr/lib/paperstack/LICENSE
+/tmp/opencode/paperstack-deb-vfuFTC/usr/lib/paperstack/THIRD_PARTY_NOTICES.md
+/tmp/opencode/paperstack-deb-vfuFTC/usr/share
+/tmp/opencode/paperstack-deb-vfuFTC/usr/share/applications
+/tmp/opencode/paperstack-deb-vfuFTC/usr/share/applications/paperstack.desktop
+/tmp/opencode/paperstack-deb-vfuFTC/usr/share/icons
+/tmp/opencode/paperstack-deb-vfuFTC/usr/share/icons/hicolor
+/tmp/opencode/paperstack-deb-vfuFTC/usr/share/icons/hicolor/1024x1024
+/tmp/opencode/paperstack-deb-vfuFTC/usr/share/icons/hicolor/128x128
+/tmp/opencode/paperstack-deb-vfuFTC/usr/share/icons/hicolor/256x256@2
+/tmp/opencode/paperstack-deb-vfuFTC/usr/share/icons/hicolor/32x32
+== extracted legal files vs repository root ==
+3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986  /tmp/opencode/paperstack-deb-vfuFTC/usr/lib/paperstack/LICENSE
+3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986  /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/LICENSE
+LICENSE: byte-identical
+894703df263964da468aeebc669641f774e58f701bab9aefa150676563091f78  /tmp/opencode/paperstack-deb-vfuFTC/usr/lib/paperstack/THIRD_PARTY_NOTICES.md
+894703df263964da468aeebc669641f774e58f701bab9aefa150676563091f78  /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/THIRD_PARTY_NOTICES.md
+THIRD_PARTY_NOTICES.md: byte-identical
+== desktop entry ==
+[Desktop Entry]
+Categories=Utility;
+Comment=PaperStack - local-first, read-only Markdown and math reader
+Exec=paperstack
+StartupWMClass=paperstack
+Icon=paperstack
+Name=纸栈 PaperStack
+Terminal=false
+Type=Application
+[2026-10-08T00:49:36+08:00] == extract-run smoke: /tmp/opencode/paperstack-deb-vfuFTC/usr/bin/paperstack /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/fixtures/reader-min/reader-min.md ==
+[2026-10-08T00:49:36+08:00] app pid=2986314 (extracted package binary)
+0x4200003
+[wait] window found on attempt 1
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh artifacts/70-verification/evidence/package/01-launch.png 纸栈 PaperStack
+screenshot: window 0x4200003 -> artifacts/70-verification/evidence/package/01-launch.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh artifacts/70-verification/evidence/package/01-launch.png 纸栈 PaperStack
+[2026-10-08T00:49:40+08:00] local-resource prompt detected -> 保持阻止 (279,548)
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 279 548
+clicked 0x4200003 at (279,548) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 279 548
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh artifacts/70-verification/evidence/package/01b-prompt-blocked.png 纸栈 PaperStack
+screenshot: window 0x4200003 -> artifacts/70-verification/evidence/package/01b-prompt-blocked.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh artifacts/70-verification/evidence/package/01b-prompt-blocked.png 纸栈 PaperStack
+[2026-10-08T00:49:41+08:00] == About page: more menu -> End (last item 关于) -> Return ==
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 1245 26
+clicked 0x4200003 at (1245,26) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 1245 26
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key End
+sent keyseq 'End' to 0x4200003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key End
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Return
+sent keyseq 'Return' to 0x4200003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Return
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh artifacts/70-verification/evidence/package/02-about.png 纸栈 PaperStack
+screenshot: window 0x4200003 -> artifacts/70-verification/evidence/package/02-about.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh artifacts/70-verification/evidence/package/02-about.png 纸栈 PaperStack
+[2026-10-08T00:49:45+08:00] == license viewer (查看许可证) ==
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 499 579
+clicked 0x4200003 at (499,579) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 499 579
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh artifacts/70-verification/evidence/package/03-license-viewer.png 纸栈 PaperStack
+screenshot: window 0x4200003 -> artifacts/70-verification/evidence/package/03-license-viewer.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh artifacts/70-verification/evidence/package/03-license-viewer.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Escape
+sent keyseq 'Escape' to 0x4200003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Escape
+[2026-10-08T00:49:48+08:00] == third-party notices viewer (第三方声明) ==
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 649 579
+clicked 0x4200003 at (649,579) button 1 count 1
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper click 649 579
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh artifacts/70-verification/evidence/package/04-third-party-viewer.png 纸栈 PaperStack
+screenshot: window 0x4200003 -> artifacts/70-verification/evidence/package/04-third-party-viewer.png
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh artifacts/70-verification/evidence/package/04-third-party-viewer.png 纸栈 PaperStack
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Escape
+sent keyseq 'Escape' to 0x4200003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Escape
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Escape
+sent keyseq 'Escape' to 0x4200003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper key Escape
+[2026-10-08T00:49:53+08:00] == clean termination (WM_DELETE_WINDOW) ==
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper close
+WM_DELETE_WINDOW sent to 0x4200003
+[exit=0] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/xdo-helper close
+[2026-10-08T00:49:53+08:00] app exit code: 0
+
+$ /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh artifacts/70-verification/evidence/package/05-after-close.png 纸栈 PaperStack
+screenshot: window '纸栈 PaperStack' not found; falling back to root
+X Error of failed request:  BadColor (invalid Colormap parameter)
+  Major opcode of failed request:  91 (X_QueryColors)
+  Resource id in failed request:  0x0
+  Serial number of failed request:  193
+  Current serial number in output stream:  193
+[exit=1] /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/tests/desktop/screenshot.sh artifacts/70-verification/evidence/package/05-after-close.png 纸栈 PaperStack
+[2026-10-08T00:49:53+08:00] post-close root screenshot unavailable (window already closed)
+[2026-10-08T00:49:53+08:00] no extracted app process remains
+[2026-10-08T00:49:53+08:00] app.log tail:
+[2026-10-08T00:49:53+08:00] == verification finished; evidence: artifacts/70-verification/evidence/package ==

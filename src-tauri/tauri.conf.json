@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "PaperStack",
+  "productName": "paperstack",
   "version": "0.1.0",
   "identifier": "com.quirkybrain.paperstack",
   "build": {
@@ -26,6 +26,32 @@
       },
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost; worker-src 'self' blob:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
       "devCsp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost ws://localhost:1420; worker-src 'self' blob:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb"],
+    "publisher": "Quirkybrain",
+    "copyright": "Copyright (C) 2026 Quirkybrain",
+    "category": "Utility",
+    "shortDescription": "PaperStack - local-first, read-only Markdown and math reader",
+    "longDescription": "PaperStack is a Linux-first, local-first read-only reader for technical documents.\nVersion 0.1.0 renders Markdown with math (KaTeX), Mermaid diagrams and Shiki-highlighted code, fully offline from local files.",
+    "license": "GPL-3.0-only",
+    "licenseFile": "../LICENSE",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png"
+    ],
+    "resources": {
+      "../LICENSE": "LICENSE",
+      "../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md"
+    },
+    "linux": {
+      "deb": {
+        "desktopTemplate": "../packaging/paperstack.desktop.hbs"
+      }
     }
   }
 }

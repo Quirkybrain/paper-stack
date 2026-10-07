@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PaperStack (纸栈) application icon — minimal stack-of-sheets mark.
+  Authored for wp-43 (C2 packaging) in the product accent colour
+  (#176b5b, the accent design token). Intentionally simple: no text,
+  no gradients, reads at 32 px. Rasterised by packaging/generate-icons.sh
+  with ffmpeg/librsvg into src-tauri/icons/.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#176b5b"/>
+  <rect x="176" y="104" width="232" height="296" rx="24" fill="#a9d8cb"/>
+  <rect x="156" y="140" width="232" height="296" rx="24" fill="#cdeee4"/>
+  <rect x="136" y="176" width="232" height="296" rx="24" fill="#ffffff"/>
+  <rect x="176" y="240" width="152" height="18" rx="9" fill="#176b5b"/>
+  <rect x="176" y="286" width="120" height="18" rx="9" fill="#176b5b" opacity="0.72"/>
+  <rect x="176" y="332" width="140" height="18" rx="9" fill="#176b5b" opacity="0.52"/>
+</svg>
