@@ -1,0 +1,3 @@
+WM close timing: 0.12s (first WM_DELETE_WINDOW, clean exit)
+grep 'NON-CLEAN|second WM_DELETE' runs.log: 0 matches (both IT07 runs)
+pgrep after each section: no paperstack process remains

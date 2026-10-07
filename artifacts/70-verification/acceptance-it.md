@@ -4,16 +4,91 @@
 - **Artifact ID**: ART-70-VERIFY-ACCEPTANCE-IT
 - **Artifact Type**: Verification Report（按需求基线 §4 / SRS §8.5 的 IT01–IT08 任务链，在 wp-43 打包产物上逐链执行；含原始证据、缺陷发现与明确 UNVERIFIED 清单）
 - **Status**: VALID
-- **Revision**: 2
+- **Revision**: 3
 - **Owner**: test-engineer
 - **Task**: `wp-44-it`（任务分支 `task/wp-44-it`；父分支 `feat/v0.1.0`；基线提交 `670deae50eb06233ca7fede2ccb5ea340f3ca861`；产出提交主题 `test(acceptance): run it01-it08 on packaged build`）
 - **Task (Rev 2)**: `wp-46-itrerun`（任务分支 `task/wp-46-itrerun`；父分支 `feat/v0.1.0`；基线提交 `cb79a827e3b6dd2736b490d6eb9b0e0a99cba77b`，已含 wp-45 修复（`f8e4dae`，并入 `3a14102`）；产出提交主题 `test(acceptance): verify it fixes and refresh evidence`）
-- **Components**: C-19 测试基础设施（`tests/desktop/run-it.sh` 新增 IT 驱动）；被验证对象为 **wp-43 打包的 .deb 提取运行产物**（发布包 payload），不是开发树二进制
-- **Last Verified**: 2026-10-08（Rev 2：D-IT-1/2/3 影响面复跑于当前树 release 二进制 `ee21ad20…`；Rev 1：全部判定产生自打包二进制 `996f5c6c…`，前向套件 71 文件 / 547 passed）
-- **Scope**: Rev 1：`tests/desktop/**`、`artifacts/70-verification/**`；Rev 2：`tests/desktop/**`、`artifacts/70-verification/**`。未修改 `src/`、`src-tauri/`、`fixtures/`、锁文件、pinned 输入或框架文件；产品缺陷只记录、未修补。
+- **Task (Rev 3)**: `wp-48-itrerun2`（任务分支 `task/wp-48-itrerun2`；父分支 `feat/v0.1.0`；基线提交 `fa424efdc132b7c86ff12be7557c2b2db5e2ea2e`，已含 wp-45（`3a14102`）与 wp-47（`a86a20f`）修复并入；D-IT-3 残余（大文档尾搜/复制）在 wp-47 构建上的独立复验；产出提交主题 `test(acceptance): verify large-doc fixes`）
+- **Components**: C-19 测试基础设施（`tests/desktop/run-it.sh`、`run-itrerun2-wp48.sh`、`sample-cpu.py` 等 IT 驱动）；Rev 1 被验证对象为 **wp-43 打包的 .deb 提取运行产物**；Rev 3 被验证对象为**当前树 release 二进制**（`26c02d2d…`）
+- **Last Verified**: 2026-10-08（Rev 3：IT07 在 wp-47 修复构建 `26c02d2d…` 上独立复验，尾搜/尾导航与复制子项关闭；Rev 1：全部判定产生自打包二进制 `996f5c6c…`，前向套件 71 文件 / 547 passed）
+- **Scope**: Rev 1：`tests/desktop/**`、`artifacts/70-verification/**`；Rev 3：`tests/desktop/**`、`artifacts/70-verification/**`。未修改 `src/`、`src-tauri/`、`fixtures/`、锁文件、pinned 输入；产品缺陷只记录、未修补。
 
 > **证据纪律**：每条判定都对应实际执行的操作与检查过的截图/日志/数据库内容；截图存在本身不作数。
 > **FAIL 一律原样保留**；未执行或不可执行的子项在 §6 明确 UNVERIFIED，不计入 PASS。
+
+> **Rev-merge note（2026-10-08，rm-48-merge-wp48 并集合并）**：本文件由 `feat/v0.1.0` 上两条并行修订链并集合并而成：wp-46-itrerun 的 Rev 2 复跑执行于树 `cb79a82`（早于 wp-47 展示层改动），wp-48-itrerun2 的 Rev 3 在最终树（已含 wp-47 修复）上刷新 IT07 判定。Rev 1–3 各节均按原文保留（Rev 2 由本次合并插入），未改写任何判定；**最新可用判定保持原样记录**（当前修订为 Rev 3；wp-46 中未被 wp-48 覆盖的记录照原文生效）。合并详情见 `artifacts/00-repository/merges/rm-48-merge-wp48.md`。
+
+## Revision 3（2026-10-08，wp-48-itrerun2：wp-47 修复后 IT07 独立复验）
+
+> **修订号口径**：派发引用的「Rev 2」（D-IT-3 残余：尾导航阻塞、CPU 饱和、关闭超时）由 `task/wp-46-itrerun`（提交 `472b1c1`）产出，但该任务**未并入本任务基线**（`feat/v0.1.0@fa424ef`，无 rm-46 合并记录；其报告、脚本与证据仅存在于该任务分支）。本任务按派发口径将本次独立复验编为 **Rev 3**，在 **wp-47 修复构建**上重新验证并覆盖 Rev 2 的 IT07/大文档相关判定；**冲突时以本修订为准**。Rev 2 中 IT02/IT03 的关闭判定不在本次范围，不以本修订替代。Rev 1 §1–§8 原样保留为历史。本任务未修改任何产品代码。
+>
+> **判定纪律**：IT07 的「尾搜→复制」子项在 Rev 1 为 UNVERIFIED（10 MiB+ 语料 75–360s+ 主线程饱和、解析无法在观察窗内完成）。本节以同一判定口径（真实应用 + 脚本输入 + 截图/字节级核对/CPU 采样）在 11 MiB 语料上重新执行；**UNVERIFIED 只有在取得可复跑证据后才关闭**。
+
+### R3.1 构建与基线
+
+| 项 | 值 |
+|---|---|
+| 构建命令 | `pnpm tauri build --no-bundle`（`it-rerun2/build.log`：`Finished release profile [optimized] target(s) in 40.29s`；`BUILD_EXIT=0`） |
+| 二进制 | `src-tauri/target/release/paperstack`；28,104,112 B；mtime 2026-10-08 04:33:35 +0800 |
+| 二进制 SHA-256 | `26c02d2d8f4d254abb9aaf332be8e0f8d1857c1f3cf097464bb0050835f6a8c3`（`it-rerun2/app-binary.sha256`；`runs.log` 各节头部与补充 provenance 重复记录；**≠** Rev 1 的 `996f5c6c…`、wp-46 的 `ee21ad20…`、wp-47 自查的 `94a25e17…`，确认复验对象为本任务基线构建） |
+| 修订 | `fa424efdc132b7c86ff12be7557c2b2db5e2ea2e`（`task/wp-48-itrerun2`；父分支 `feat/v0.1.0`，已含 wp-45 快路径与 wp-47 窗口化挂载/O(1) 摘录并入）；`git diff HEAD -- src src-tauri :!**/tests/**` = 空 |
+| Pinned 输入 | `acceptance-it.md` Rev 1 `7787e69e…`、`acceptance-at.md` Rev 5 `bc5d1160…`、`wp-47-fix3.md` `a7a7ec3c…` 与 handoff 逐一比对一致；`config/git-policy.json` `3b8ddffd…`（只读未改） |
+| 语料 | 源 `evidence/generated/corpus-52MiB.md` sha256 `7557cf7f…cfe94`；`head -c 11534336` 派生 11 MiB = sha256 `b84af672…78767`（与 wp-47 §3.1 同源同尺寸一致，`runs.log` 记录） |
+| 会话/固定条件 | X11 `DISPLAY=:1`、2520×1680；浅色 `GTK_THEME=Adwaita:light` + `color-scheme=prefer-light`；`text-scaling-factor=1.25`（200% 子项后恢复）；应用数据隔离于 `it-rerun2/data`，缓存 `cache-it07`；运行期系统 load ≈3（本机并行负载，`runs.log` 无异常） |
+| 驱动 | `tests/desktop/run-itrerun2-wp48.sh`（分节 `it07\|suite\|all`，分节可重跑）；`tests/desktop/sample-cpu.py`（与 wp-47 证据同一采样契约，头部注明来源） |
+| 证据目录 | `evidence/it-rerun2/`：36 张 PNG + `runs.log`（含两次 IT07 运行历史 + 补充 provenance）+ `it07-r3-cpu.csv`（148 样本）+ 剪贴板/期望载荷字节文件 + `build.log` + `unit-suite-wp48.log`；首轮受自动化缺陷影响的 4 图/1 字节文件移入 `superseded/`（原始字节保留） |
+
+### R3.2 IT07 复跑（旧 → 新）
+
+| 项 | Rev 1（旧） | Rev 3（新） |
+|---|---|---|
+| **IT07 总体** | PASS（键盘全链、抽屉焦点、200% 达成；**10 MiB+ 简化阅读尾搜→复制子项 UNVERIFIED**；D-IT-3：>7 分钟 105–113% CPU） | **PASS（受限子项关闭）**：尾命中导航、复制字节、CPU 回落、WM 关闭均取得可复跑证据；D-IT-3 残余在本构建不可复现 |
+
+| # | 子项 | 本构建观测（2026-10-08） | 证据（`it-rerun2/`） |
+|---|---|---|---|
+| 1 | 键盘链 open→search→back | `Ctrl+O`→选择器→`Ctrl+L` 路径→Return 打开 `links.md`；`Ctrl+F`「Duplicate」→ **1/3** 命中列表 + 正文高亮；`Tab×10`→「跳到正文」焦点环→Return→`Alt+←`→**「已恢复阅读位置」**；`Ctrl+W` 关闭标签回欢迎页 | `it07-r3-a…h`（c/d/g/h） |
+| 2 | 键盘复制（字节核对） | `Tab×8` 聚焦首块「复制」→Return；剪贴板 **29 B**，与期望 `int main(void) { return 0; }\n` `cmp` **EXACT** | `it07-r3-i`、`it07-r3-kb-clipboard.txt` + `runs.log` EXACT 行 |
+| 3 | 键盘更新 | 外部追加→横幅；`Tab×8`→「现在更新」→Return→**toast「已更新，位置近似恢复」**；更新后内容含 KEYBOARD-UPDATE 段落 | `it07-r3-k…o` |
+| 4 | 11 MiB 简化阅读：内容可见时间 | 选择「简化阅读」后：+3.13s 仍「正在解析」、**+4.21s 首屏正文可见**（t1–t3 解析中、t4 渲染；在 Rev 1 中该窗口为 >7 分钟未完成）；简化徽标 + 范围说明横幅就位 | `it07-r3-p`、`it07-r3-content-t1…t4`、`runs.log` 时间线 |
+| 5 | **尾搜 + 尾导航（此前失败项）** | 唯一尾部探针 `x_{132139}`（仅 1 处）→ 计数 **0/1**、预览为目标尾段；点击「**下一项**」→ 计数 **1/1**、视图实际跳到文档尾部（`章节 132140`、命中高亮、`item-132143` 可见）；关闭搜索面板后位置保持。Return 键在两次独立运行中均未推进命中（见 R3.4 O-48-1） | `it07-r3-q`（0/1）、`r`（Return 尝试）、`s`（1/1+尾部）、`t`（面板关闭后保持） |
+| 6 | 大文档复制（此前被遮挡/未取得字节） | 首屏代码块悬停→「复制」→剪贴板 **49 B**，与语料首块期望载荷 `fn sample() -> u32 {\n    42 // fixed code block\n}` `cmp` **EXACT**（3.08s） | `it07-r3-u-code-hover`、`it07-r3-code-clip.txt` + `it07-r3-code-payload.txt` |
+| 7 | CPU 采样（必须回落） | 148 样本/0.5s/75.3s：峰值 **221.7%**（解析+挂载爆发）；选择后 **4.58s** 起 20 连续样本 <10%；**尾导航引发有界爆发** t≈31–41s ~100%（旧构建为 ≥75–360s 无界）；**末 20 样本均值 0.00%**（t≈43s 起空闲至结束） | `it07-r3-cpu.csv`、`runs.log` cpu 摘要 |
+| 8 | WM 关闭 | 首次 `WM_DELETE_WINDOW` → **0.12s** 干净退出；无 NON-CLEAN/第二次关闭/SIGTERM；`pgrep` 无残留 | `it07-r3-close-notes.txt`、`runs.log` |
+| 9 | 抽屉焦点返回 | `Ctrl+B` 开/关大纲→点击正文→Tab：焦点环落在「跳到正文」，未被抽屉滞留 | `it07-r3-w…y` |
+| 10 | 200% 缩放 | `text-scaling-factor=2.0`：阅读、`Ctrl+F`「中文」（0/1 命中预览）、大纲抽屉均可用；随后恢复 1.25 | `it07-r3-z…z3` |
+
+### R3.3 汇总（Rev 3）
+
+| 判定 | 数量 | 说明 |
+|---|---|---|
+| **IT 项 PASS** | **8**（01–08） | 仅 IT07 在本修订内复跑刷新；其余 IT 未复跑，判定沿用 Rev 1（wp-45/wp-47 未触及相应链） |
+| **本次关闭的受限子项** | **2** | IT07「10 MiB+ 简化阅读尾搜与复制」（尾导航 1/1 + 复制 49 B EXACT）；IT07「大视图复制字节核对」 |
+| **子项 FAIL 保留** | **0（本次范围）** | Rev 1 §5 的 D-IT-1（IT02）/D-IT-2（IT03）等保留项未在本次派发范围内复跑，仍按 Rev 1 与所属修复任务的集成结果处理，本修订不新增/不关闭 |
+| **整体 UNVERIFIED** | **0** | — |
+| **受限子项 UNVERIFIED（更新后）** | **3 + 环境项** | 真实 IME、干净系统 `dpkg -i`、Wayland 会话（沿用 Rev 1 §6）；抓包级证据沿用。原 5 项中 2 项本次关闭 |
+
+- 修订映射：D-IT-3 残余（尾导航阻塞/CPU 饱和/关闭超时）→ 旧失败在 wp-47 构建上均**不可复现**，本修订取得通过证据；由 `artifacts/60-implementation/wp-47-fix3.md` 与本文互证。
+- 前向套件：`pnpm test -- --run` → **Test Files 73 passed; Tests 588 passed; 0 failed**（`it-rerun2/unit-suite-wp48.log`，期望 588）。
+- 追溯 ID 不变：IT07→R24/R29/R11；本修订触及 R11（复制）、R24（键盘/缩放）、R29（大文档简化阅读）。
+
+### R3.4 执行观察（不改变上表判定）
+
+| ID | 级别 | 说明 |
+|---|---|---|
+| O-48-1 | 观察（合成输入） | 在搜索输入框获得焦点时，合成 **Return 不推进到命中**（两次独立运行均复现：计数停 0/1、视图不动）；「下一项」按钮正常推进（0/1→1/1 且实际滚动到尾部）。与 O-IT-5（合成 Escape 行为差异）同族；真实键盘行为建议由评审知悉，验收面由「下一项」控件覆盖。 |
+| O-48-2 | 观察（有界性能） | 尾导航在修复后仍触发 **有界** ~10–12s 单核 ~100% 工作量（IT07 t≈31–41s、AT29 t≈17–29s），随后回落 0%；期间应用保持响应（WM 关闭 0.12s）。wp-47 的 100s 采样窗结束于尾导航之前，未覆盖该段；建议后续按性能事项评估窗口挂载/标注成本（不构成验收失败）。 |
+| O-48-3 | 观察（时间量级） | 内容首屏可见时间本机为 **3.1s–4.2s 之间**（Rev 1 为 >7 分钟未完成；wp-47 报告为 ≤3s）。与机器负载/环境差异量级一致，不改变「解析/可见性已解除阻塞」的判定。 |
+
+### R3.5 证据卫生（Rev 3）
+
+- 全部场景 `pgrep -x paperstack` 无遗留；`xclip` 已清理；`color-scheme=prefer-light`、`text-scaling-factor=1.25` 已恢复；`fixtures/` 零写入（输入样张/语料均生成于 `it-rerun2/inputs/`）；产品路径 `git status` 仅含本任务脚本与报告。
+- 无一次性脚本残留：校准探针运行后即删除；受首轮自动化缺陷（第二次搜索未清空输入框导致查询拼接）影响的 4 图/1 字节文件移入 `superseded/` 保留原始字节；最终判定采用修复后的第二次运行产物，两次运行历史均保留于 `runs.log`。
+- 驱动可复跑：`run-itrerun2-wp48.sh it07`（分节）；`suite` 分节复跑全套件。
+
+### R3.6 追溯（Rev 3）
+
+- **本任务新增**：`tests/desktop/run-itrerun2-wp48.sh`、`tests/desktop/sample-cpu.py`、`artifacts/70-verification/evidence/it-rerun2/**`、本修订。
+- **上游**：`wp-47-fix3.md` §1–§3（窗口化挂载/O(1) 摘录、前后测量）、§6 追溯；`acceptance-it.md` Rev 1 §3 IT07、§5 D-IT-3、§6；需求基线 §4 IT07（R24/R29/R11）。
 
 ## Revision 2（2026-10-08，wp-46-itrerun：wp-45 修复后 IT02/IT03/IT07 复跑）
 
