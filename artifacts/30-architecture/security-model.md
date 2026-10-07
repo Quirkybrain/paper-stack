@@ -4,13 +4,14 @@
 - **Artifact ID**: ART-30-SEC
 - **Artifact Type**: Security Model（威胁模型、授权算法、资源策略、内容隔离、能力与 CSP、脱敏、只读保证）
 - **Status**: VALID
-- **Revision**: 1
+- **Revision**: 2
 - **Owner**: solution-architect
 - **Task**: `wp-03-architecture`（任务分支 `task/wp-03-architecture`；父分支 `feat/v0.1.0`；基线提交 `7b6f7338c75e4151cb0d684ef2e4a93bb6a9a64b`；产出提交主题 `docs(architecture): define v0.1.0 architecture and contracts`）
 - **Last Verified**: 2026-10-07
 - **Scope**: v0.1.0 威胁边界与强制控制。安全相关产品条款：R04、R07、R09、R10、R12、R15、R25、R26、R28、NF01–NF03；交互：IX06、IX10、IX14。
 - **Depends On**: `contracts.md`（§3.6、§5）、`data-model.md`（§3.2、§6）；ART-20-RB §3、§7.3；SRS §7；计划书 §4.1、§5.4、§5.6。
 - **Downstream**: Rust `services/{paths,auth,resources}`、`document/render`（消毒 schema）、capabilities/CSP 配置、恶意样例 fixtures、质量审查与安全测试。
+- **变更记录**: Rev 2（2026-10-07，`wp-37-note`）：§5.2 同步——`a` 增加脚注回引 `id` 白名单 `^ps-fn(ref)?-[A-Za-z0-9-]+$`（B-02）；登记 D-3 增量（`math-inline`/`math-display`）已移除、`code` className 仅 `^language-…$`（B-10）；语义与实现对齐，无行为/接口变化；Change Impact 见 `CHANGE-IMPACT-note-1.md`。
 
 ---
 
@@ -110,7 +111,7 @@ REMOTE POLICY (v0.1.0):
 | 允许标签 | `p br hr h1–h6 ul ol li blockquote pre code em strong del a img table thead tbody tfoot tr th td details summary span sup sub section input` |
 | 禁止标签（剥离） | `script style iframe object embed form button svg (原始) math video audio source link meta base template textarea select option` |
 | 全局属性 | 无（默认剥离全部事件属性 `on*`、`style`、`srcset`、`ping`、`target`、`class`，除下列逐元素规则） |
-| `a` | `href`（协议 `http https mailto` + 相对/片段）、`title` |
+| `a` | `href`（协议 `http https mailto` + 相对/片段，含脚注回引 `#ps-fn(ref)-…` 片段）、`title`、`id` 匹配 `^ps-fn(ref)?-[A-Za-z0-9-]+$`（仅脚注回引锚点） |
 | `img` | `src`（协议仅 `http https`；相对路径允许）、`alt`、`title` |
 | `h1–h6` | `id` 匹配 `^ps-h-[a-z0-9-]{1,128}$`（由大纲变换生成，重复标题加 `-1`、`-2` 后缀） |
 | `code` | `className` 匹配 `^language-[A-Za-z0-9_+-]{1,32}$` |
@@ -118,11 +119,12 @@ REMOTE POLICY (v0.1.0):
 | `input` | `type` 仅 `checkbox`；`checked`；`disabled`（由后置插件强制 `disabled=true`，R04） |
 | `details` | `open` |
 | `td`/`th` | `align` 匹配 `^(left|center|right)$` |
-| GFM 脚注 | `section`（`className="footnotes"`、`dataFootnotes`）、`li id` 与 `a href` 片段匹配 `^ps-fn(ref)?-[A-Za-z0-9-]+$` |
+| GFM 脚注 | `section`（`className="footnotes"`、`dataFootnotes`）、`li id` 匹配 `^ps-fn-[A-Za-z0-9-]+$`、`a id` 与 `a href` 片段匹配 `^ps-fn(ref)?-[A-Za-z0-9-]+$` |
 | clobber | `clobberPrefix=""`：id 仅由上述白名单产生且模式受限；应用自身 DOM id 使用 `app-` 前缀避免碰撞 |
 | 协议白名单 | `href: http https mailto`；`src: http https`；其余（`javascript:` `data:` `file:` `asset:`）一律剥离 |
 | 原始 HTML 子集 | 仅可靠处理为上述允许标签；`details/summary` 为明确子集；其余原始 HTML 文本化或剥离并保留可读回退（R08、R09） |
 
+- **D-3 增量（历史，已移除）**：`code` className 曾按 D-3 门禁增加 `math-(inline|display)` 备选；B-10 证实严格按本节 schema（仅 `^language-…$`）`$x^2$`/`$$y$$` 仍由引擎渲染，故该增量已删除，`math-inline`/`math-display` 不再允许（被剥离）；实现与本节逐字一致（wp-36a）。
 - **`dangerouslySetInnerHTML` 禁令（强制）**：仅允许在“消毒后受信引擎输出”单一封装组件（`Document/SanitizedNode`）内出现；代码中其它位置禁止；由质量审查静态检查（R09；ADR-002）。
 - **KaTeX**：`trust:false`、`strict:"warn"`、`maxSize`/`maxExpand` 受控值、宏按文档隔离；输出（含其 `style` 与 MathML 节点）为受信注入——允许注入的结构族为 KaTeX 固定生成的 `span/annotation/math/semantics/mstyle/mrow/…` 与 `class/style/aria-hidden` 等固定属性，不接受文档文本影响属性值（R10）。
 - **Shiki**：高亮在文档文本之外生成；主题/语法随包；输出结构族为 `<pre class="shiki">`/`<code>`/`<span class|style>`（主题配色），为受信注入（R11）。

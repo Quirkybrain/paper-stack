@@ -4,7 +4,7 @@
 - **Artifact ID**: ART-30-IPC
 - **Artifact Type**: Interface Contract（Tauri 命令 / 事件 / 数据模型 / 错误分类 / 版本正确性规范）
 - **Status**: VALID
-- **Revision**: 1
+- **Revision**: 2
 - **Owner**: solution-architect
 - **Contract ID**: `paperstack-ipc-r1`
 - **Task**: `wp-03-architecture`（任务分支 `task/wp-03-architecture`；父分支 `feat/v0.1.0`；基线提交 `7b6f7338c75e4151cb0d684ef2e4a93bb6a9a64b`；产出提交主题 `docs(architecture): define v0.1.0 architecture and contracts`）
@@ -13,6 +13,7 @@
 - **Depends On**: `artifacts/30-architecture/architecture.md`（ART-30-ARCH）；ART-20-RB（Rev 1）；SRS §4–§6；IXD §4–§15。
 - **Downstream**: 实现（Rust 命令/服务、TS services）、UI 规格、模型、测试工程（契约形状测试）、追溯矩阵。
 - **Compatibility**: `r1` 为 v0.1.0 唯一修订。新增命令/事件/可选字段 → `r2` 并同步 TS 类型；删除或改变字段语义必须提升主修订并在架构/变更影响中记录。
+- **变更记录**: Rev 2（2026-10-07，`wp-37-note`）：A-06 同步——搜索折叠措辞修正为与前端一致的逐码点 `foldLower`（逐码点 Unicode 默认小写、无 Final_Sigma 上下文规则、无归一化；与共享向量 `foldingRule` 一致）；语义澄清，无行为/接口变化，`Contract ID` 保持 `paperstack-ipc-r1`；Change Impact 见 `CHANGE-IMPACT-note-1.md`。
 
 ---
 
@@ -76,7 +77,7 @@
 - `read_document(purpose)`：`initial|restore` 可命中校验快照缓存；`refresh` 必须执行稳定读取（§7）；`relink` 用于重定位后的内容读取。任何成功结果携带新的 `VersionInfo`，且 `contentHash` 为新读取字节的 SHA-256。
 - `relink_document`：新文件与最后已知 `contentHash` 相同 → `status="reassociated"`；不同 → `status="new-version"`（同一 `docId` 继续，位置只近似恢复），先说明后由前端采用（R07；IX09）。
 - `get_source_info` / `read_source_window`：仅对已注册 `docId` 可用（含被 `PS_LIMIT_SIZE` 拒绝全量读取的 >50MiB 文档）；按行边界返回，`totalLines` 由 Rust 行索引给出（懒构建、版本变化即失效）；窗口读取同样受授权与存在性检查（R18、R29）。
-- `search_source`：**仅用于 >50MiB 源码窗口模式**（此时前端不持有全文）；Rust 流式扫描当前展示版本的解码文本，字面子串、无正则；`caseSensitive=false` 时按与前端一致的 `toLowerCase` 折叠；同一 `docId` 的版本在扫描前后校验，不一致 → `PS_IO_CHANGED`；结果按文档顺序，超预算返回 `complete=false` 并附 `PS_LIMIT_SEARCH`（R17、R29；IX15“说明已完成索引范围”）。
+- `search_source`：**仅用于 >50MiB 源码窗口模式**（此时前端不持有全文）；Rust 流式扫描当前展示版本的解码文本，字面子串、无正则；`caseSensitive=false` 时按与前端一致的逐码点 `foldLower` 折叠（逐码点 Unicode 默认小写，双方一致；无 Final_Sigma 上下文规则；不做归一化；与 `tests/contracts/vectors/search-parity.json` 的 `foldingRule` 一致；İ 等长度变化折叠按 `boundaryCases` 逐侧固定，属 ADR-007 已接受项）；同一 `docId` 的版本在扫描前后校验，不一致 → `PS_IO_CHANGED`；结果按文档顺序，超预算返回 `complete=false` 并附 `PS_LIMIT_SEARCH`（R17、R29；IX15“说明已完成索引范围”）。
 - `check_resource_access` 永不 reject：返回状态供 UI 决策；只有 `allowed` 才返回 `assetUrl`，且 URL 由 Rust 生成（含 `?v=` 观察键），前端不得自造（R25）。
 - `fetch_remote_image`：仅当 `(docId, origin)` 已会话授权；执行受控获取（security-model §4），成功后写入应用缓存并返回 asset URL；**不自动重试**，用户手动重试重新调用。
 - `save_position`/`save_session`/`touch_recent` 受写入门禁（持久偏好 `rememberRecords` 与会话抑制标志，data-model §6）；被抑制时返回 `SaveResult{saved:false}` 且不报错（R27）。
