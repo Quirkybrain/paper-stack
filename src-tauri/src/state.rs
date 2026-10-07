@@ -90,6 +90,14 @@ impl AppState {
             .path()
             .resource_dir()
             .unwrap_or_else(|_| data_dir.join("resources"));
+        // Legal texts resolve from the bundled resource dir first; in debug
+        // builds the repository root is appended so direct `tauri dev`/`cargo
+        // run` executions work before the bundler stages the resources
+        // (wp-43 C2; release binaries never read build-machine paths).
+        let mut info = InfoService::new(resource_dir);
+        if let Some(repo_root) = crate::services::info::dev_repo_root() {
+            info = info.with_fallback_dir(repo_root);
+        }
         let diagnostics = DiagnosticsService::new(data_dir.join("logs"));
 
         diagnostics.log(&LogEvent {
@@ -200,7 +208,7 @@ impl AppState {
             app: Mutex::new(app_service),
             asset_scope,
             diagnostics,
-            info: InfoService::new(resource_dir),
+            info,
             cache_dir,
         }
     }

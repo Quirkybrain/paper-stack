@@ -42,22 +42,49 @@ pub const LEGAL_THIRD_PARTY_RESOURCE: &str = "THIRD_PARTY_NOTICES.md";
 /// text (architecture §8); the UI renders this key.
 pub const SOURCE_ENTRY_NOTE_KEY: &str = "about.sourceUnconfigured";
 
-/// Application info service over the resource directory that holds the
-/// bundled legal texts.
+/// Application info service over the resource roots that hold the bundled
+/// legal texts.
+///
+/// Resolution order (wp-43 C2): the Tauri resource directory first — that is
+/// where `tauri build`/`tauri-bundler` copies the configured bundle resources
+/// in production (`/usr/lib/paperstack/`) and where `tauri-build` stages them
+/// next to the executable during development — then an optional development
+/// repository root (see [`InfoService::with_fallback_dir`] and
+/// [`dev_repo_root`]). A missing file in all roots stays the graceful
+/// `PS_IO_NOT_FOUND` path; the About page hides the action when the matching
+/// `*Available` flag is false.
 #[derive(Debug)]
 pub struct InfoService {
     resource_dir: PathBuf,
+    fallback_dirs: Vec<PathBuf>,
 }
 
 impl InfoService {
     pub fn new(resource_dir: impl Into<PathBuf>) -> Self {
         Self {
             resource_dir: resource_dir.into(),
+            fallback_dirs: Vec::new(),
         }
+    }
+
+    /// Appends an extra root searched after the resource directory. Used by
+    /// the development fallback and by tests that simulate a repository root.
+    pub fn with_fallback_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.fallback_dirs.push(dir.into());
+        self
     }
 
     pub fn resource_dir(&self) -> &Path {
         &self.resource_dir
+    }
+
+    /// First existing candidate for a bundled legal resource, or `None` when
+    /// neither the resource directory nor a fallback root holds the file.
+    fn resolve_legal_resource(&self, resource_name: &str) -> Option<PathBuf> {
+        std::iter::once(&self.resource_dir)
+            .chain(self.fallback_dirs.iter())
+            .map(|root| root.join(resource_name))
+            .find(|path| path.is_file())
     }
 
     /// `get_app_info` (contract command 33). `sourceEntryUrl` is `null` with an
@@ -87,25 +114,46 @@ impl InfoService {
     /// `(licenseAvailable, thirdPartyAvailable)` for the About page.
     pub fn legal_availability(&self) -> (bool, bool) {
         (
-            self.resource_dir.join(LEGAL_LICENSE_RESOURCE).is_file(),
-            self.resource_dir.join(LEGAL_THIRD_PARTY_RESOURCE).is_file(),
+            self.resolve_legal_resource(LEGAL_LICENSE_RESOURCE)
+                .is_some(),
+            self.resolve_legal_resource(LEGAL_THIRD_PARTY_RESOURCE)
+                .is_some(),
         )
     }
 
-    /// `read_legal_text` (contract command 34): reads the bundled resource;
-    /// a missing resource is the graceful `PS_IO_NOT_FOUND` path (the About
-    /// page hides the action when `*Available` is false).
+    /// `read_legal_text` (contract command 34): reads the first bundled
+    /// resource found in the resolution roots; a missing resource is the
+    /// graceful `PS_IO_NOT_FOUND` path (the About page hides the action when
+    /// `*Available` is false).
     pub fn read_legal_text(&self, kind: LegalTextKind) -> Result<LegalTextResult, AppError> {
         let resource_name = match kind {
             LegalTextKind::License => LEGAL_LICENSE_RESOURCE,
             LegalTextKind::ThirdPartyNotices => LEGAL_THIRD_PARTY_RESOURCE,
         };
-        let path = self.resource_dir.join(resource_name);
+        let path = self
+            .resolve_legal_resource(resource_name)
+            .ok_or_else(|| AppError::new(ErrorCode::IoNotFound))?;
         let text = fs::read_to_string(&path).map_err(AppError::from_io_read)?;
         Ok(LegalTextResult {
             text,
             resource_name: resource_name.to_owned(),
         })
+    }
+}
+
+/// Repository root compiled into the binary, used only as a development
+/// fallback: `AppState` appends it so direct `tauri dev`/`cargo run`
+/// executions resolve the legal texts from the checkout when the bundler did
+/// not stage them (debug builds only; a released binary never reads
+/// build-machine paths).
+pub fn dev_repo_root() -> Option<PathBuf> {
+    #[cfg(debug_assertions)]
+    {
+        option_env!("CARGO_MANIFEST_DIR").map(|manifest_dir| Path::new(manifest_dir).join(".."))
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        None
     }
 }
 
@@ -212,5 +260,50 @@ mod tests {
         );
         assert!(!info.legal.license_available);
         assert!(!info.legal.third_party_available);
+    }
+
+    #[test]
+    fn legal_text_resolution_prefers_the_resource_dir_and_falls_back_to_the_repo_root() {
+        let bundled = tempfile::tempdir().unwrap();
+        let repo_root = tempfile::tempdir().unwrap();
+        fs::write(
+            bundled.path().join(LEGAL_LICENSE_RESOURCE),
+            "bundled GPL text",
+        )
+        .unwrap();
+        fs::write(
+            repo_root.path().join(LEGAL_THIRD_PARTY_RESOURCE),
+            "dev notices text",
+        )
+        .unwrap();
+
+        let service = InfoService::new(bundled.path()).with_fallback_dir(repo_root.path());
+        assert_eq!(service.legal_availability(), (true, true));
+
+        let license = service.read_legal_text(LegalTextKind::License).unwrap();
+        assert_eq!(license.text, "bundled GPL text");
+        assert_eq!(license.resource_name, LEGAL_LICENSE_RESOURCE);
+
+        let notices = service
+            .read_legal_text(LegalTextKind::ThirdPartyNotices)
+            .unwrap();
+        assert_eq!(notices.text, "dev notices text");
+        assert_eq!(notices.resource_name, LEGAL_THIRD_PARTY_RESOURCE);
+    }
+
+    #[test]
+    fn missing_legal_resource_is_a_graceful_not_found_error() {
+        let empty = tempfile::tempdir().unwrap();
+        let service = InfoService::new(empty.path());
+        assert_eq!(service.legal_availability(), (false, false));
+        let error = service.read_legal_text(LegalTextKind::License).unwrap_err();
+        assert_eq!(error.code(), ErrorCode::IoNotFound);
+        assert_eq!(
+            InfoService::new(empty.path())
+                .read_legal_text(LegalTextKind::ThirdPartyNotices)
+                .unwrap_err()
+                .code(),
+            ErrorCode::IoNotFound
+        );
     }
 }
