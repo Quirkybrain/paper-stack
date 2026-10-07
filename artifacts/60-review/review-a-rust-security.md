@@ -4,13 +4,13 @@
 - **Artifact ID**: ART-60-REVIEW-A
 - **Artifact Type**: Independent Review Report（T-64；Rust 服务、路径/授权/资源策略、只读保证、诊断脱敏、命令表面与能力、存储门禁、监测、错误分类、测试质量）
 - **Status**: VALID
-- **Revision**: 1
+- **Revision**: 2
 - **Owner**: quality-reviewer
 - **Task**: `wp-35-review-a`（任务分支 `task/wp-35-review-a`；父分支 `feat/v0.1.0`；基线/评审修订 `aac72e1ef676965bfa743597c1f0820e8e3efed8`；快照覆盖 `src-tauri/src/`、`src-tauri/tests/`、`src-tauri/Cargo.toml`、`src-tauri/tauri.conf.json`、`src-tauri/capabilities/`）
 - **Last Verified**: 2026-10-07
 - **Review base**: `aac72e1`（HEAD，工作树评审前/后 `git status --porcelain` 为空；只读评审，未修改任何 `src/`、`src-tauri/`、tests 或框架文件；本报告为唯一写入）
 - **Scope**: 计划 §6.1 评审 A 清单的 Rust 侧全部（评审目标为上述快照路径）；判定仅对本修订有效。
-- **Verdict**: **FAIL**（1 blocker + 1 major + 6 minor；详见 §2、§5）。授权算法本身、只读保证、诊断脱敏、能力/CSP、存储门禁、监测与错误分类的证据总体很强；失败集中在“撤销/清除授权的运行时语义”两处。
+- **Verdict**: **FAIL**（1 blocker + 1 major + 6 minor；详见 §2、§5）。授权算法本身、只读保证、诊断脱敏、能力/CSP、存储门禁、监测与错误分类的证据总体很强；失败集中在“撤销/清除授权的运行时语义”两处。Rev 2 仅新增可执行验证附录（§9），未改变任何判定。
 
 **Pinned inputs（SHA-256 于 2026-10-07 实测复核，全部一致）**
 
@@ -203,3 +203,64 @@
 | requirements R04/R06/R07/R17/R18/R25/R26/R27/R28、NF01–NF03/NF08/NF11 | §2 与 §3 逐条引用 |
 | wp-14a §7、wp-32 §8、wp-34c/34d 验收 | §4 已记录边界；F-32-1 现状（A-06） |
 | 本评审证据 | `cargo test --manifest-path src-tauri/Cargo.toml --offline`：261 passed/0 failed（2026-10-07，修订 `aac72e1`） |
+| Rev 2 追加证据 | §9：`/tmp/opencode/review-a-verify` 只读 harness（A-01/A-02 可执行复现；仓库外，不构成交付物） |
+
+---
+
+## 9. Revision 2 — Verification Addendum（2026-10-07）
+
+### 9.1 元数据修正（流程说明；无内容变更）
+
+- 首次 `finish` 被 guard 阻塞：`BLOCKED: snapshot_paths does not cover required predecessor/review target: artifacts/60-review/review-a-rust-security.md`——原 handoff 的 `snapshot_paths` 只覆盖评审目标，而 `finish` 会把“已存在且与 `writes`（`artifacts/60-review/`）重叠的 deliverable”视为需快照覆盖的对象。该阻塞周期已由 orchestrator 归档；handoff 以同一任务、同一分支重钉（`base_commit=95e68ac`，`parent_commit=aac72e1`，`writes=[]`，deliverable 为唯一输出）。
+- **评审对象未变**：`git diff aac72e1..HEAD -- src-tauri/` 为空（HEAD `95e68ac` 相对 `aac72e1` 仅新增本报告；`git diff --stat aac72e1..HEAD` = 1 file changed），6 项 pinned 输入 SHA-256 复核仍一致。§3 的全部发现原样有效，未增删或改写。
+
+### 9.2 A-01 追加验证（可执行复现）
+
+**精确调用链**：
+
+- `src/features/reader/use-reader.ts:1128-1133`（启动恢复）：对 `listRecents` 中每个 `available` 条目调用 `openDocuments({paths:[canonicalPath], entry:'restore'})`；`known.available` 仅来自 `list_recents` 的“存在且可读”复核（`storage.rs:1011`），**不含授权检查**。
+- `src-tauri/src/commands/files.rs:96-160`（`open_one`）：`FilesService::open_document`（无授权前置）→ 第 117-128 行**无条件** `grant_file`（失败再 `grant_file_session`）；唯一按 `entry` 分支的是第 86-90 行的记录写回恢复（`entry != restore`）。
+- 读取闸门：`commands/files.rs:255-267`（`authorize_registered`）只查 `AuthRegistry::has_local_access`；第 4 步的 `grant_file` 使该闸门重新为真。
+
+**只读复现（外部 harness，不修改产品代码）**：`/tmp/opencode/review-a-verify/`（Cargo path-dependency，仅调用冻结的 `paperstack_lib` 公共服务；`git diff aac72e1..HEAD -- src-tauri/` 为空证明字节一致）。命令与实测输出：
+
+```text
+$ cd /tmp/opencode/review-a-verify
+$ CARGO_TARGET_DIR=<repo>/src-tauri/target cargo run --offline
+== A-01: open_documents(entry="restore") auto re-grant ==
+  open: doc_id=d-948c330a4b498b71 open_needs_grant=false; grant scope=Persistent
+  read after grant: ok, 4 decoded bytes
+  after revoke_grant: has_local_access=false
+  restart (fresh registry from empty grant set): has_local_access=false
+  restore open_document + grant_file: status=opened doc_id=d-948c330a4b498b71 re-granted scope=Persistent
+  read after restore: ok, 4 decoded bytes -> revoked authorization silently restored
+ALL VERIFICATIONS REPRODUCED (A-01, A-02)
+```
+
+harness 复刻的命令序列即 `open_one` 的两步（open → grant，见上）；输出证明：撤销后空注册表上，`entry="restore"` 语义所走的 open+grant 路径把 `has_local_access` 从 false 翻回 true 并成功读取。**限制（不过度声明）**：未直接调用 `open_documents` 命令本体（需 Tauri `AppHandle`/IPC harness，超出“快速只读”范围）；命令层“无条件 grant”由 `commands/files.rs:117-128` 源码行与上述 4 步输出共同佐证。
+
+### 9.3 A-02 追加验证（可执行复现）
+
+**精确调用链**：
+
+- `src-tauri/src/commands/tree.rs:39-48`（`read_directory`）直接调用 `TreeService::read_directory`，**无任何 AuthRegistry 查询**。
+- `src-tauri/src/services/tree.rs:113-148`：只查进程内 `roots` 与 `is_within_root`；`TreeService` 没有任何按授权撤销逐出根的路径。
+- `src-tauri/src/commands/auth.rs:227-235`（`revoke_grant`）仅 `AuthRegistry::revoke`；`src-tauri/src/commands/storage.rs:193-241`（授权类清除）仅注册表撤销 + 远程缓存清理：两者都不触碰 `TreeService`。
+
+**只读复现（同一 harness；真实 `TreeService`/`AuthRegistry`）**：同一 `cargo run` 输出第二段：
+
+```text
+== A-02: directory revoke does not stop read_directory ==
+  open_directory: root_id=r-70450c79e4fea6d6 scope=Session
+  before revoke: read_directory entries=2
+  after revoke_grant: registry has_local_access=false
+  after revoke: read_directory still Ok -> root entries=2 sub entries=1
+```
+
+输出证明：真实 `AuthRegistry::revoke` 之后，同一 `rootId` 与子目录的 `read_directory` 仍返回完整列表，与 `commands/tree.rs:39-48` 无授权检查的源码行一致，A-02 成立（`clear_records(["authorizations"])` 复用同一路径，见 §9.3 调用链）。
+
+### 9.4 判定重申（Rev 2 权威）
+
+- 逐区域判定不变：**1 FAIL**（路径授权与资源策略，因 A-01/A-02）、2 PASS、3 PASS、4 PASS、5 PASS（附 A-05 minor）、6 PASS、7 PASS、8 PASS（附缺口）；**overall recommendation 仍为 FAIL**（1 blocker A-01 + 1 major A-02 + 6 minor）。
+- 本附录仅新增证据与流程说明；§3 发现、§4 边界、§5 无法验证项、§6 测试质量、§7 建议均保持原样有效。
+- 证据可复跑：`cargo test --manifest-path src-tauri/Cargo.toml --offline`（261/261，§1.4）与 `/tmp/opencode/review-a-verify`（本附录 9.2/9.3；harness 位于仓库外，不作为交付物）。
