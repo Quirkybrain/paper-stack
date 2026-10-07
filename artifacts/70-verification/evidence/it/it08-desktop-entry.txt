@@ -1,0 +1,9 @@
+[Desktop Entry]
+Categories=Utility;
+Comment=PaperStack - local-first, read-only Markdown and math reader
+Exec=paperstack
+StartupWMClass=paperstack
+Icon=paperstack
+Name=纸栈 PaperStack
+Terminal=false
+Type=Application
