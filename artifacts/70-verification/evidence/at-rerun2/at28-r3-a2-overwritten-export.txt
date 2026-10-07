@@ -1,0 +1,6 @@
+paperstack-diagnostics version=1
+generatedAtMs=1791379265920
+app name=纸栈 PaperStack version=0.1.0 ipcContract=paperstack-ipc-r1 tauriVersion=2.12.1 os=linux x86_64
+documents count=0
+limits recentLimit=100 cacheMaxBytes=268435456 logMaxBytes=10485760 largeFileBytes=10485760 hardLimitBytes=52428800 imageBytes=20971520
+redactions document-text, details-allowlist, home-directory, absolute-paths-last-two, url-query-fragment

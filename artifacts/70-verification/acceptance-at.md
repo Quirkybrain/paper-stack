@@ -4,16 +4,80 @@
 - **Artifact ID**: ART-70-VERIFY-ACCEPTANCE-AT
 - **Artifact Type**: Verification Report（真实 release 应用在 X11 `DISPLAY=:1` 上的 AT01–AT30 逐项验收；含原始证据、失败与明确 UNVERIFIED 清单）
 - **Status**: VALID
-- **Revision**: 2
+- **Revision**: 3
 - **Owner**: test-engineer
 - **Task**: `wp-34-desktop-at`（任务分支 `task/wp-34-desktop-at`；父分支 `feat/v0.1.0`；基线提交 `613b4658c63e112c40b6ce171771e6b31732c75f`；产出提交主题 `test(acceptance): run desktop at scenarios and fix parity vector shell`）
 - **Task (Rev 2)**: `wp-34b-atrerun`（任务分支 `task/wp-34b-atrerun`；父分支 `feat/v0.1.0`；基线提交 `33dd600fdf12c3a90b80e4589b856e9e348b8bd6`，已含 wp-34a 修正并入提交 `adf805b`；产出提交主题 `test(acceptance): re-run fixed at scenarios`）
+- **Task (Rev 3)**: `wp-34d-rerun`（任务分支 `task/wp-34d-rerun`；父分支 `feat/v0.1.0`；基线提交 `f6e560802e8c3964a60594a7cd020afc20f91a56`，已含 wp-34c 修正并入提交 `dba385a`；产出提交主题 `test(acceptance): re-run at19/26/28 on fixed revision`）
 - **Components**: C-19 测试基础设施（`tests/desktop/` 新增验收驱动与工具）；被验证对象为桌面 release 二进制（M5 阶段全部已集成功能）
-- **Last Verified**: 2026-10-07（Rev 2 复跑：修正后 release 二进制 + `pnpm test -- --run`）
-- **Scope**: Rev 1：`tests/desktop/**`、`tests/contracts/**`、`artifacts/70-verification/**`；Rev 2：`tests/desktop/**`、`artifacts/70-verification/**`。未修改 `src/`、`src-tauri/`、`fixtures/`、锁文件、pinned 输入或框架文件；产品缺陷只记录、未修补。
+- **Last Verified**: 2026-10-07（Rev 3 复跑：wp-34c 修正后 release 二进制 + `pnpm test -- --run`）
+- **Scope**: Rev 1：`tests/desktop/**`、`tests/contracts/**`、`artifacts/70-verification/**`；Rev 2：`tests/desktop/**`、`artifacts/70-verification/**`；Rev 3：`tests/desktop/**`、`artifacts/70-verification/**`。未修改 `src/`、`src-tauri/`、`fixtures/`、锁文件、pinned 输入或框架文件；产品缺陷只记录、未修补。
 
 > **证据纪律**：本报告的每条判定都对应实际执行的操作与检查过的截图/日志/数据库内容；截图存在本身不作数。
 > **FAIL 一律原样保留**（§5 发现）；未执行或不可执行的项在 §6 明确 UNVERIFIED，不计入 PASS。
+
+## Revision 3（2026-10-07，wp-34d-rerun：wp-34c 修正后残留项复跑）
+
+> Rev 1 §1–§10 与 Rev 2 原样保留为历史；本节为 wp-34c 修正后 release 二进制的复跑证据与**最新判定**；冲突时以 Rev 3 为准。
+> 复跑范围：Rev 2 的 3 个 FAIL（AT19/26/28）+ 回归抽查（AT05/17）；其余 27 项（Rev 2 PASS）未重新执行，判定沿用 Rev 2。本任务未修改任何产品代码。
+
+### R3.1 构建与基线
+
+| 项 | 值 |
+|---|---|
+| 构建命令 | `pnpm tauri build --no-bundle`（`build.log`：`Finished release profile … in 49.45s`，`BUILD_EXIT=0`） |
+| 二进制 | `src-tauri/target/release/paperstack`；32,291,296 bytes；mtime 2026-10-07 20:47 +0800 |
+| 二进制 SHA-256 | `f55428573498851199465cd5040424a132640cf19e7c483aa5a7fb326d5431ce`（`at-rerun2/app-binary.sha256`；**≠** Rev 2 的 `c077db07…5cd269`，确认复跑对象为 wp-34c 修正后构建） |
+| 修订 | `f6e560802e8c3964a60594a7cd020afc20f91a56`（`task/wp-34d-rerun`；含 `dba385a` wp-34c 修正并入） |
+| 会话/固定条件 | X11 `DISPLAY=:1`、2520×1680；浅色 `GTK_THEME=Adwaita:light` + `color-scheme=prefer-light`；`text-scaling-factor=1.25`；应用数据隔离于 `at-rerun2/data`，缓存另行隔离于 `at-rerun2/cache*`（`XDG_CACHE_HOME`，不影响被验行为） |
+| 复跑脚本 | `tests/desktop/run-at-rerun-wp34d.sh`（wp-34d 统一复跑驱动，`at19|at26|at28|regression|all`）；工具 `find-gtk-accept.py`、新增 `find-app-button.py` |
+| 证据目录 | `artifacts/70-verification/evidence/at-rerun2/`：截图、`runs.log`、`build.log`、`app-binary.sha256`、socket 快照、AT26 缓存副本、AT28 导出字节副本、`unit-suite-r3.log` |
+
+### R3.2 复跑矩阵（旧判定 → 新判定）
+
+| AT | Rev 2 | Rev 3 | 复跑操作（与 wp-34b 同输入/同环境） | 关键新证据 |
+|---|---|---|---|---|
+| **AT19** | FAIL（部分修复） | **PASS** | 字号 17→22 后退出、无参数重启（同版本）；追加重启（跨版本精确）；改写锚点块重启（标题/祖先回退近似）；全标题改写重启（top 回退对照） | `at19-r3-e`（同版本块级位置恢复、静默）；`f`（精确→「已恢复阅读位置」）；`g`（近似→「文档已更新，已恢复到相近章节」，且视口滚入恢复区块，落点为记录锚点段落、受信标题「数学公式」在其上方；修复前对照 Rev 2 `at19-r2-g` 为静默停在文首、无任何标签）；`i`（top 回退→近似标签+文首）；`runs.log` DB：`display.fontSizePx=22` 与 4 次 `positions` 记录（含 v3 指纹 `fp1:f2c391…`、`source_range 313–346`） |
+| **AT26** | FAIL（部分修复） | **PASS** | 带路径真实图片 URL（`https://httpbin.org/image/png`）默认阻止→0 请求；「本次文档允许加载」→受控取图 | `at26-r3-a`（阻止对话框正确命名 `https://httpbin.org`）；`b`（占位符）；`at26-r3-sockets-blocked.txt` **0 行**；`at26-r3-sockets-watch.txt` 捕获应用进程至 `3.210.105.125:443` 的 ESTAB（取图调用**实际发起**）；隔离缓存 `remote-images/c-a2c48c6cdb4fc94f`（8090 B PNG）+ `at26-r3-cache-meta.txt`（cache_meta 行）；`at26-r3-app-log.txt` 0×`command_failed`；`d/e`（图片真实渲染） |
+| **AT28** | FAIL（部分修复） | **PASS** | 错误态主文档导出到源目录；既有非源目标重复导出→覆盖确认→成功；全新非源目标→直接成功；已注册文档源目录→专用拒绝 | `at28-r3-d`（「该位置是受保护的源文件或源目录，请另选位置。」，**非**覆盖询问；`probe-out.txt.*` 0 个）；`e1`（首次非源导出成功）→`e2`（「目标文件已存在，是否覆盖？」+取消/确定）→`e3`（点「确定」后成功覆盖 427 B）；`at28-r3-a2-overwritten-export.txt`（覆盖后字节副本）；`f`（非源新目标直接成功；`at28-r3-caseB-export.txt`）；`h`（已注册文档场景同样专用拒绝，documents count=1） |
+| AT05（回归） | PASS | **PASS** | 3 标签、Ctrl+Tab、关闭、MRU | `at05-r3-a`（3 标签）；`at05-r3-f`（关闭当前后 MRU 选中 code.md） |
+| AT17（回归） | PASS | **PASS** | 中文/SECRET/零结果检索 | `at17-r3-b`、`c`、`d`（0/0+「未在当前正文中找到 · 可切换到源码查找」） |
+
+### R3.3 汇总（全部 30 项，Rev 3 最新判定）
+
+| 判定 | 数量 | AT | 与 Rev 2 的差异 |
+|---|---|---|---|
+| **PASS** | **30** | 01–30 | +3（AT19/26/28 修正生效；Rev 2 的 27 项沿用） |
+| **FAIL** | **0** | 无 | −3 |
+| **UNVERIFIED（整体）** | **0** | 无 | 不变 |
+
+- 前向测试基线复核（本分支最终修订）：`pnpm test -- --run` → **Test Files 69 passed; Tests 529 passed**（与 wp-34c 修复报告一致；预期 529；`at-rerun2/unit-suite-r3.log`）。
+- 回归抽查 AT05/17 在修正后二进制上通过；未复跑的 27 项判定沿用 Rev 2（wp-34c 仅改动位置恢复消费、远程取图与诊断导出三条路径及其测试）。
+- 缺陷收敛：Rev 1 的 D-34-1…7 与 Rev 2 的 D-34b-1…3 均有修复映射（`artifacts/60-implementation/wp-34c-fixes.md`）并在 release 桌面复跑中取得通过证据。
+
+### R3.4 观察（不构成未通过项）
+
+| ID | 级别 | 说明 |
+|---|---|---|
+| O-34d-1 | 观察（机制交互） | AT19 标题/祖先回退近似恢复：修复已使非空 blockId 的近似恢复消费生效（滚动入恢复区块 + `nav.return.approx`，`at19-r3-g`）。因 AT19 同时持久化了字号变更，启动时设置载入触发单次布局稳定化校正（INV-AR-05），视口最终稳定在**记录的锚点段落**（改写后的「块公式」段落）而非标题行本身；受信标题「数学公式」位于其上方。修复前为静默停在文首且无标签。该交互不改变 D-34b-1 的修复判定，供评审参考。 |
+| O-34d-2 | 观察（测试环境） | GTK 保存对话框会对位置栏输入的文件名追加扩展名（实测 `probe-out.txt` → `probe-out.txt.txt`、`out-existing.txt` → `out-existing.txt.md`/`.txt` 不等），应用按对话框返回的路径处理。AT28 的「目标已存在」路径通过重复导出同一输入复现（`at28-r3-a2-*`）。属测试环境行为，非产品缺陷。 |
+
+### R3.5 方法、对照与证据卫生
+
+- **AT26 取图证据链**：默认阻止 0 socket → 允许点击后 10 s 内以 0.1 s 间隔采样应用进程树 TCP 连接（捕获 `pid=…` 至 `3.210.105.125:443` 的 ESTAB 及 1 行保活）→ 隔离缓存出现 8090 B 的 `remote-images/` PNG 且 `cache_meta` 有对应行 → 截图显示图片实际渲染，应用日志 0×`command_failed`。仍未使用 tcpdump（无权限），与 §6 口径一致（socket 级替代）。
+- **AT28 服务端语义**：`PS_IO_EXPORT_BLOCKED` 以 `details.reason` 区分受保护源（`protected-source`）与已存在目标（`target-exists`）；前端分别呈现专用说明与覆盖确认。错误态源目录导出修订前后均 0 写入，本次差异为**用户可见说明正确**（组件层用例见 wp-34c；本任务为 release 桌面证据）。
+- **AT19 数据层**：`runs.log` 含 8 次只读 DB 转储（settings/positions/session/recents/documents），覆盖字号持久化与各阶段位置记录。
+- **收尾核验**：全部场景 `pgrep` 无遗留 `paperstack` 进程；`color-scheme=prefer-dark`、`text-scaling-factor=1.25` 已恢复；`fixtures/` 无 `probe-out*` 残留（`find`=0）；产品路径 `git status` 干净。
+- **脚本合并**：wp-34d 的临时 `run-at-rerun5..8.sh` 已合并为 `run-at-rerun-wp34d.sh`（分节可选执行），并新增 `find-app-button.py`（按设计令牌颜色定位应用内按钮）；`run-at-rerun{1,1b,2,3,3b,4}.sh`（wp-34b）保留为历史。
+
+### R3.6 明确 UNVERIFIED 清单（Rev 3 刷新；未列出条目沿用 §6）
+
+| 项 | 原因 / 状态 |
+|---|---|
+| Wayland 会话（NF10/R30/AT30/IT08 的 Wayland 侧） | 本机仅 X11 `:1`；XTEST/libxdo 不适用（沿用 §6） |
+| 抓包级零请求证据（AT26/NF02） | 无 sudo/tcpdump；以进程树 `ss`（阻止态 0 行 + 取图连接采样）替代（沿用 §6） |
+| 真正干净系统安装（AT30/IT08）、WebDriver/tauri-driver、拖放打开、复制失败路径、映射回退文案、前进分支清除、面板状态记忆、目录 2000 条截断/节点级“无权限、越界”状态、横滚实际触发、GIF/WebP、替换保存、深色主题/真实输入/IME、200% 完整任务链、NF04–NF06/NF09 达标结论、LICENSE/第三方声明包内可得性与对应源码入口 | 沿用 §6，不变 |
+| ~~已注册文档下的导出保护拒绝（AT28）~~ | **本次关闭**：`at28-r3-h` 在 release 上取得专用拒绝界面证据（0 写入，documents count=1）；Rev 1 §6 该项不再列为 UNVERIFIED |
 
 ## Revision 2（2026-10-07，wp-34b-atrerun：修正项复跑）
 
