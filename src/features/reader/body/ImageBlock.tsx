@@ -25,6 +25,9 @@ import { resourceAuth } from '../resources/resource-auth'
  *   action, and only that click re-opens the confirmation (INV-AZ-02/05);
  * - a remote image is fetched through `fetch_remote_image` only when this
  *   document session has a grant for its origin; the default is zero requests.
+ *   After the grant, `check_resource_access` reports `allowed` without an
+ *   asset URL, and that decision also drives the controlled fetch (AT26):
+ *   the Rust-generated asset URL appears only once the response is cached.
  *   A failed fetch shows its contract message and a retry that runs exactly
  *   once per explicit click (no automatic retry loops);
  * - `kind=resource` watch events bump this raw `src`'s revision through the
@@ -102,11 +105,19 @@ export function ImageBlock({ node, docId, simplified = false, ...rest }: ImageBl
       .checkResourceAccess({ docId, rawSrc })
       .then((decision) => {
         if (cancelled) return
-        if (decision.status === 'allowed' && decision.assetUrl) {
+        if (decision.status === 'allowed' && decision.assetUrl !== undefined) {
           if (decision.canonicalPath !== undefined) {
             resourceInvalidation.register(docId, rawSrc, decision.canonicalPath)
           }
           setResolved({ src: rawSrc, status: 'allowed', assetUrl: decision.assetUrl, decision })
+          return
+        }
+        if (decision.status === 'allowed' && decision.kind === 'remote') {
+          // A session-granted remote resource is `allowed` with no asset URL
+          // until the controlled fetch caches it (contracts §2 rows 24/30;
+          // security-model §4). Only `fetch_remote_image` produces the
+          // Rust-generated asset URL; failures stay explicit with a retry.
+          fetchRemote(decision)
           return
         }
         if (decision.status === 'outside-root') {

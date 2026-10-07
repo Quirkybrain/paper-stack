@@ -94,7 +94,7 @@ describe('ExportPreviewDialog', () => {
     expect(screen.getByText('PREVIEW TEXT')).toBeTruthy()
   })
 
-  it('asks for overwrite confirmation on PS_IO_EXPORT_BLOCKED and retries on confirm', async () => {
+  it('asks for overwrite confirmation on a target-exists rejection and retries on confirm', async () => {
     let exportCalls = 0
     invokeMock.mockImplementation((command: string) => {
       switch (command) {
@@ -117,6 +117,8 @@ describe('ExportPreviewDialog', () => {
               category: 'io',
               messageKey: 'error.io.exportBlocked',
               retryable: false,
+              // Rust distinguishes the two blocked reasons (D-34b-3/AT28).
+              details: { reason: 'target-exists' },
             })
           }
           return Promise.resolve({ writtenPath: '/tmp/diag.txt', bytes: 42 })
@@ -139,6 +141,66 @@ describe('ExportPreviewDialog', () => {
     expect(invokeMock).toHaveBeenCalledWith('export_diagnostics', {
       req: { exportId: 'export-1', targetPath: '/tmp/diag.txt', overwrite: true },
     })
+  })
+
+  it('explains a protected-source rejection instead of asking for overwrite (D-34b-3/AT28)', async () => {
+    let exportCalls = 0
+    let pickPaths = ['/fixtures/encoding/probe-out.txt']
+    invokeMock.mockImplementation((command: string) => {
+      switch (command) {
+        case 'preview_diagnostics':
+          return Promise.resolve({
+            exportId: 'export-1',
+            generatedAtMs: 1,
+            text: 'PREVIEW TEXT',
+            sections: [],
+            redactionCount: 0,
+            expiresAtMs: 9_000_000_000_000,
+          })
+        case 'pick_export_target':
+          return Promise.resolve(pickResult(pickPaths))
+        case 'export_diagnostics': {
+          exportCalls += 1
+          if (exportCalls === 1) {
+            return Promise.reject({
+              code: 'PS_IO_EXPORT_BLOCKED',
+              category: 'io',
+              messageKey: 'error.io.exportBlocked',
+              retryable: false,
+              details: { reason: 'protected-source' },
+            })
+          }
+          return Promise.resolve({ writtenPath: '/tmp/out.txt', bytes: 42 })
+        }
+        default:
+          return Promise.resolve(undefined)
+      }
+    })
+    // An error-state document has no tab, so the frontend protected set is
+    // empty; only the Rust reason detail distinguishes protection from a
+    // plain existing file (the AT28 case A scenario).
+    renderDialog([])
+    await screen.findByText('PREVIEW TEXT')
+
+    fireEvent.click(screen.getByRole('button', { name: t('diagnostics.export.chooseTarget') }))
+    await screen.findByText(t('diagnostics.export.blocked'))
+    expect(screen.queryByText(t('diagnostics.export.overwrite'))).toBeNull()
+    expect(screen.getByText('PREVIEW TEXT')).toBeTruthy()
+    expect(invokeMock).toHaveBeenCalledWith('export_diagnostics', {
+      req: {
+        exportId: 'export-1',
+        targetPath: '/fixtures/encoding/probe-out.txt',
+        overwrite: false,
+      },
+    })
+    // Confirming an overwrite is impossible: there is no overwrite prompt.
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+
+    // Re-choosing another target keeps the preview and exports honestly.
+    pickPaths = ['/tmp/out.txt']
+    fireEvent.click(screen.getByRole('button', { name: t('diagnostics.export.chooseTarget') }))
+    await screen.findByText(t('diagnostics.export.success', { path: '/tmp/out.txt' }))
+    expect(exportCalls).toBe(2)
   })
 
   it('keeps the preview with the failure message when the write fails', async () => {

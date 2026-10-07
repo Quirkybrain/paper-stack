@@ -32,9 +32,10 @@ use sha2::{Digest, Sha256};
 
 use crate::error::{AppError, ErrorCode};
 use crate::models::{
-    DiagnosticIssue, DiagnosticsAppInfo, DiagnosticsBundle, DiagnosticsDocument, DiagnosticsLimits,
-    DiagnosticsPreview, DiagnosticsPreviewRequest, DiagnosticsSection, ErrorCategory, ErrorDetails,
-    ExportDiagnosticsRequest, ExportResult, DIAGNOSTICS_BUNDLE_VERSION,
+    DetailValue, DiagnosticIssue, DiagnosticsAppInfo, DiagnosticsBundle, DiagnosticsDocument,
+    DiagnosticsLimits, DiagnosticsPreview, DiagnosticsPreviewRequest, DiagnosticsSection,
+    ErrorCategory, ErrorDetails, ExportDiagnosticsRequest, ExportResult,
+    DIAGNOSTICS_BUNDLE_VERSION,
 };
 use crate::services::paths::{is_within_root, lexical_cleanup};
 
@@ -60,13 +61,14 @@ pub const LARGE_FILE_BYTES: u64 = 10 * 1024 * 1024;
 /// Whitelist of `ErrorPayload.details` keys that may appear in logs/bundles
 /// (security-model §7: "details 只允许白名单键"). Keys outside this list are
 /// dropped with a redaction note.
-pub const DETAIL_KEY_ALLOWLIST: [&str; 6] = [
+pub const DETAIL_KEY_ALLOWLIST: [&str; 7] = [
     "rootCandidate",
     "scheme",
     "newOrigin",
     "operation",
     "failures",
     "degraded",
+    "reason",
 ];
 
 // ---------------------------------------------------------------------------
@@ -940,11 +942,13 @@ impl DiagnosticsService {
         if protected.blocks(&target) {
             return Err(export_blocked(
                 "export target is an open source document or inside a protected source directory",
+                "protected-source",
             ));
         }
         if fs::symlink_metadata(&target).is_ok() && !request.overwrite {
             return Err(export_blocked(
                 "export target exists; explicit overwrite confirmation is required",
+                "target-exists",
             ));
         }
         atomic_write_file(&target, text.as_bytes()).map_err(|error| {
@@ -1009,8 +1013,17 @@ fn redaction_notes(include_source_context: bool, include_full_paths: bool) -> Ve
     notes
 }
 
-fn export_blocked(message: &str) -> AppError {
-    AppError::new(ErrorCode::IoExportBlocked).with_message(message)
+/// `PS_IO_EXPORT_BLOCKED` with a machine-readable `reason` detail so the UI
+/// can distinguish a protected source target from an existing-file overwrite
+/// question (security-model §7; D-34b-3/AT28). The value is a fixed enum
+/// string, never a path or user text.
+fn export_blocked(message: &str, reason: &str) -> AppError {
+    AppError::new(ErrorCode::IoExportBlocked)
+        .with_message(message)
+        .with_details(ErrorDetails::from([(
+            "reason".to_owned(),
+            DetailValue::String(reason.to_owned()),
+        )]))
 }
 
 /// Absolute, lexically cleaned target with the nearest existing ancestor
@@ -1021,6 +1034,7 @@ fn resolve_export_target(raw: &str) -> Result<PathBuf, AppError> {
     if trimmed.is_empty() || !path.is_absolute() {
         return Err(export_blocked(
             "export target must be a non-empty absolute path",
+            "invalid-target",
         ));
     }
     canonicalize_best_effort(&lexical_cleanup(path)).map_err(|error| {
@@ -1140,11 +1154,16 @@ mod tests {
             crate::models::DetailValue::String("/tmp/x".to_owned()),
         );
         details.insert(
+            "reason".to_owned(),
+            crate::models::DetailValue::String("protected-source".to_owned()),
+        );
+        details.insert(
             "secretToken".to_owned(),
             crate::models::DetailValue::String("abc".to_owned()),
         );
         let sanitized = sanitize_details(&details);
         assert!(sanitized.contains_key("rootCandidate"));
+        assert!(sanitized.contains_key("reason"));
         assert!(!sanitized.contains_key("secretToken"));
     }
 }

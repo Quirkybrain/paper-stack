@@ -1428,6 +1428,84 @@ describe('ReaderScreen (ui-spec §3.2)', () => {
     await screen.findByText(t('nav.return.approx'))
   })
 
+  it('scrolls to the trusted heading on a cross-version heading fallback (D-34b-1/AT19)', async () => {
+    sessionSnapshot = {
+      tabs: [{ tabId: 'tab-old-1', docId: 'd-a.md', orderIndex: 0, isActive: true }],
+      activeTabId: 'tab-old-1',
+      savedAtMs: 1,
+    }
+    recentsResult = [
+      {
+        docId: 'd-a.md',
+        displayName: 'a.md',
+        canonicalPath: '/docs/a.md',
+        openedAtMs: 1,
+        available: true,
+      },
+    ]
+    texts.set('d-a.md', '# 标题\n\n改写后的段落\n')
+    positionRecords.set('d-a.md', {
+      docId: 'd-a.md',
+      anchor: {
+        versionHash: 'v-old',
+        headingPath: ['标题'],
+        blockFingerprint: 'fp1:changed-paragraph',
+        offsetRatio: 0.5,
+        sourceRange: { startByte: 40, endByte: 60 },
+      },
+      updatedAtMs: 3,
+    })
+    renderReader()
+
+    await screen.findByRole('heading', { level: 1, name: '标题' })
+    // The heading block is the approximate landing point: it must be scrolled
+    // into view and labeled — never silently left at the top (INV-AR-04).
+    await screen.findByText(t('nav.return.approx'))
+    await waitFor(() =>
+      expect(scrollCalls.some((element) => element.getAttribute('data-block-id') === 'b1')).toBe(
+        true,
+      ),
+    )
+  })
+
+  it('falls back to the nearest trusted ancestor heading with the approximate label (D-34b-1/AT19)', async () => {
+    sessionSnapshot = {
+      tabs: [{ tabId: 'tab-old-1', docId: 'd-a.md', orderIndex: 0, isActive: true }],
+      activeTabId: 'tab-old-1',
+      savedAtMs: 1,
+    }
+    recentsResult = [
+      {
+        docId: 'd-a.md',
+        displayName: 'a.md',
+        canonicalPath: '/docs/a.md',
+        openedAtMs: 1,
+        available: true,
+      },
+    ]
+    texts.set('d-a.md', '# 章节\n\n更新后的正文\n')
+    positionRecords.set('d-a.md', {
+      docId: 'd-a.md',
+      anchor: {
+        versionHash: 'v-old',
+        headingPath: ['章节', '已消失的小节'],
+        blockFingerprint: 'fp1:changed-section',
+        offsetRatio: 0.25,
+        sourceRange: { startByte: 40, endByte: 60 },
+      },
+      updatedAtMs: 3,
+    })
+    renderReader()
+
+    await screen.findByRole('heading', { level: 1, name: '章节' })
+    await screen.findByText(t('nav.return.approx'))
+    await waitFor(() =>
+      expect(scrollCalls.some((element) => element.getAttribute('data-block-id') === 'b1')).toBe(
+        true,
+      ),
+    )
+  })
+
   it('applies a restored position when its background tab is activated (AT19)', async () => {
     sessionSnapshot = {
       tabs: [

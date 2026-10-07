@@ -512,7 +512,10 @@ export default function ReaderScreen() {
     // The microtask keeps React state updates out of the effect body itself.
     queueMicrotask(() => {
       setPendingPositionRestore(restore)
-      if (restore.kind === 'exact' && restore.blockId !== null) setRevealBlockId(restore.blockId)
+      // Reveal exact and approximate landing blocks alike: a heading/ancestor
+      // fallback still carries a block id (models §6.2), and the consume
+      // effect must find that block mounted before it scrolls (D-34b-1/AT19).
+      if (restore.blockId !== null) setRevealBlockId(restore.blockId)
     })
   }, [positionRestoreNonce, activeTab, activeResult, reader])
 
