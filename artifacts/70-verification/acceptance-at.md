@@ -4,17 +4,91 @@
 - **Artifact ID**: ART-70-VERIFY-ACCEPTANCE-AT
 - **Artifact Type**: Verification Report（真实 release 应用在 X11 `DISPLAY=:1` 上的 AT01–AT30 逐项验收；含原始证据、失败与明确 UNVERIFIED 清单）
 - **Status**: VALID
-- **Revision**: 3
+- **Revision**: 4
 - **Owner**: test-engineer
 - **Task**: `wp-34-desktop-at`（任务分支 `task/wp-34-desktop-at`；父分支 `feat/v0.1.0`；基线提交 `613b4658c63e112c40b6ce171771e6b31732c75f`；产出提交主题 `test(acceptance): run desktop at scenarios and fix parity vector shell`）
 - **Task (Rev 2)**: `wp-34b-atrerun`（任务分支 `task/wp-34b-atrerun`；父分支 `feat/v0.1.0`；基线提交 `33dd600fdf12c3a90b80e4589b856e9e348b8bd6`，已含 wp-34a 修正并入提交 `adf805b`；产出提交主题 `test(acceptance): re-run fixed at scenarios`）
 - **Task (Rev 3)**: `wp-34d-rerun`（任务分支 `task/wp-34d-rerun`；父分支 `feat/v0.1.0`；基线提交 `f6e560802e8c3964a60594a7cd020afc20f91a56`，已含 wp-34c 修正并入提交 `dba385a`；产出提交主题 `test(acceptance): re-run at19/26/28 on fixed revision`）
+- **Task (Rev 4)**: `wp-38-desktop-rerun`（任务分支 `task/wp-38-desktop-rerun`；父分支 `feat/v0.1.0`；基线提交 `5d977ea40c0d6bea353412f3b83f1cd0ee1e9b56`，已含 wp-35a（Rust 安全修正）与 wp-36a（前端/管线修正）并入；产出提交主题 `test(acceptance): post-fix desktop re-run`）
 - **Components**: C-19 测试基础设施（`tests/desktop/` 新增验收驱动与工具）；被验证对象为桌面 release 二进制（M5 阶段全部已集成功能）
-- **Last Verified**: 2026-10-07（Rev 3 复跑：wp-34c 修正后 release 二进制 + `pnpm test -- --run`）
-- **Scope**: Rev 1：`tests/desktop/**`、`tests/contracts/**`、`artifacts/70-verification/**`；Rev 2：`tests/desktop/**`、`artifacts/70-verification/**`；Rev 3：`tests/desktop/**`、`artifacts/70-verification/**`。未修改 `src/`、`src-tauri/`、`fixtures/`、锁文件、pinned 输入或框架文件；产品缺陷只记录、未修补。
+- **Last Verified**: 2026-10-07（Rev 4 复跑：wp-35a/wp-36a 修正后 release 二进制 + `pnpm test -- --run`（547））
+- **Scope**: Rev 1：`tests/desktop/**`、`tests/contracts/**`、`artifacts/70-verification/**`；Rev 2：`tests/desktop/**`、`artifacts/70-verification/**`；Rev 3：`tests/desktop/**`、`artifacts/70-verification/**`；Rev 4：`tests/desktop/**`、`artifacts/70-verification/**`。未修改 `src/`、`src-tauri/`、`fixtures/`、锁文件、pinned 输入或框架文件；产品缺陷只记录、未修补。
 
 > **证据纪律**：本报告的每条判定都对应实际执行的操作与检查过的截图/日志/数据库内容；截图存在本身不作数。
 > **FAIL 一律原样保留**（§5 发现）；未执行或不可执行的项在 §6 明确 UNVERIFIED，不计入 PASS。
+
+## Revision 4（2026-10-07，wp-38-desktop-rerun：wp-35a/wp-36a 评审修正后的桌面复跑）
+
+> Rev 1–3 原样保留为历史；本节为 wp-35a（Rust 安全修正）与 wp-36a（前端/管线修正）并入后的 release 二进制复跑证据与**最新判定**；冲突时以 Rev 4 为准。
+> 复跑范围（评审 A §10.3(3) + 评审 B §9.1(3)）：AT02、AT06（含 A-01 新增「撤销后重启不复活」链）、AT09、AT12、AT14、AT15（含 B-02 脚注回引）、AT16、AT25、AT27、AT30（含 B-04 文档信息面板）；另执行全量前端套件与 i18n 守卫。本任务未修改任何产品代码。
+
+### R4.1 构建与基线
+
+| 项 | 值 |
+|---|---|
+| 构建命令 | `pnpm tauri build --no-bundle`（`at-rerun3/build.log`：`Finished \`release\` profile [optimized] target(s) in 43.15s`；`build.exit`=0） |
+| 二进制 | `src-tauri/target/release/paperstack`；32,318,216 bytes；mtime 2026-10-07 22:34:52 +0800 |
+| 二进制 SHA-256 | `054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e`（`at-rerun3/app-binary.sha256`；**≠** Rev 1 `748ca730…`、Rev 2 `c077db07…`、Rev 3 `f5542857…`，确认复跑对象为 wp-35a/wp-36a 修正后构建） |
+| 修订 | `5d977ea40c0d6bea353412f3b83f1cd0ee1e9b56`（`task/wp-38-desktop-rerun`；父分支 `feat/v0.1.0`；已含 wp-35a、wp-36a 修正并入） |
+| Pinned 输入 | 5 份输入（本报告 Rev 3、wp-35a/wp-36a 修复报告、评审 A/B）SHA-256 与 `state/handoffs/wp-38-desktop-rerun.json` 逐一比对一致（只读未改） |
+| 会话/固定条件 | 与 Rev 1–3 同口径：X11 `DISPLAY=:1`、2520×1680；浅色 `GTK_THEME=Adwaita:light` + `color-scheme=prefer-light`；`text-scaling-factor=1.25`；应用数据隔离于 `at-rerun3/data`，各节缓存另行隔离于 `at-rerun3/cache-atNN` |
+| 复跑脚本 | `tests/desktop/run-at-rerun-wp38.sh`（分节 `at02\|at06\|at06-revoke\|at09\|at12\|at14\|at15\|at16\|at25\|at27\|at30\|suite\|all`；沿用 `acceptance-lib.sh`，新增 `dump_grants` 只读授权转储） |
+| 证据目录 | `artifacts/70-verification/evidence/at-rerun3/`：89 张 PNG + `runs.log`（4046 行）+ `build.log`、`app-binary.sha256`、`unit-suite-r4.log`、`i18n-guard-r4.log`、`at30-r4-placeholder-scan.txt`、`inputs/`（脚注/数学样张为脚本生成于证据目录的输入副本，未改 `fixtures/`；3 张中间迭代截图存于 `superseded/`） |
+
+### R4.2 复跑矩阵（Rev 4 判定）
+
+| AT | 复跑操作（同输入/同固定条件） | 关键证据 | 判定 |
+|---|---|---|---|
+| **AT02** | 目录选择器打开 `fixtures/tree/root`：根 7 行（含 link-broken「已缺失」、link-outside「链接指向授权范围之外」行内标签）→ 展开 sub→deep → 打开 c.md；空目录 dir2 →「此目录为空。」；不可读目录 → `PS_IO_PERMISSION` 横幅。A-02 授权门之后正常扫描无回归 | `at02-r4-a…i`（c.md 在文件名按钮中激活）；`runs.log` | **PASS** |
+| **AT06** | (a) 正常链：math+tables → 激活 tables → 干净退出 → 无参数重启恢复 2 标签/顺序/激活（`session_tabs=2/recents=2`）；偏好关→欢迎页+最近阅读列出两文档。(b) **A-01 新链**：显式打开 doc.md（1 持久授权）→ 设置→隐私→撤销（「授权已被撤销，已停止新的读取。」）→ 退出（DB grants=0）→ 无参数重启：标签**不可用** + 正文 `PS_AUTH_REVOKED`（未静默重授）→ 重试仍被拒（grants 保持 0、无新授权） | `at06-r4-a…l`；`authorizations dump` 3 段（1→0→0）；DB dumps | **PASS** |
+| **AT09** | 恶意样张（拒绝本地资源提示后）：`<script>` 整块剥离（无执行、无弹窗）、style/iframe/javascript:/data:/vbscript: 均为惰性文本；宏炸弹仅本公式回退；50 节点 Mermaid 触发上限；复选框不可改。另开「script+数学」样张：`$x^2+y^2=z^2$`、`$\alpha$`、`$$∫…$$` **实际渲染**（D-3 备选移除后 KaTeX 仍工作），script 无痕 | `at09-r4-b…g` | **PASS** |
+| **AT12** | flowchart/sequence/class 实际渲染为 SVG；语法错误局部回退（图种/错误摘要/查看源码）；pie 不支持说明；「放大」覆盖层渲染并关闭——两处注入点均经唯一受信封装正常 | `at12-r4-a…g`；静态守卫 `single-trusted-html-entry.test.ts` 2/2 | **PASS** |
+| **AT14** | links.md 大纲：点击 Duplicate (1)/(2) 分别滚动至第一/第二处重复标题（两目标可区分） | `at14-r4-a…e` | **PASS** |
+| **AT15** | (a) links.md：`#duplicate-标题` 跳转成功且**无**「未找到该标题」；缺失 fragment → 横幅「未找到该标题。」、位置不动；`#more-links` 页内跳转。(b) **B-02 脚注**：同脚注两处引用 → 点引用¹滚动至脚注区（标题本地化「脚注」，无英文 `Footnotes`）→ 点第一个「↩」返回**第一处**引用；点第二引用 →「↩²」返回**第二处**引用；全程无「未找到该标题」 | `at15-r4-a…i` | **PASS** |
+| **AT16** | 脚注导航历史：引用¹跳转 → Alt+← 返回引用处（「已恢复阅读位置」）→ Alt+→ 前进回脚注；第二引用跳转 → Alt+← 返回；无错误横幅 | `at16-r4-a…f` | **PASS** |
+| **AT25** | 聚合授权对话框（范围/1 资源/「记住此目录授权」默认不勾选）→ 拒绝 → 占位保留；打开目录建立 session root；设置→隐私撤销**持久文件授权**（notice + 列表清空）；**清除记录→授权类别**（对话框可滚动、授权行可勾选、结果「授权 已清除 1 项」）后：展开尚未加载的 `sub` → 行内「授权已被撤销，已停止新的读取。」+重试；重试仍被拒；**对照**：显式重新打开目录后同一重试恢复扫描，DB 出现新的 session 目录授权 | `at25-r4-a…j`；`authorizations dump` | **PASS** |
+| **AT27** | 种子（2 文档 + 目录 root）→ 隐私面板计数（最近阅读 2/位置与会话 4/授权 2）→ 清除对话框勾选 最近阅读+位置与会话+**授权** → 结果面板逐类计数（最近阅读 2/位置 0/会话 4/**授权 2**）→ 关闭后计数归零 → 干净退出：`session_tabs=0, recents=0, positions=0, grants=0`（**写回抑制生效**：两个打开标签未回写）→ 重启=欢迎页、无最近记录 | `at27-r4-a…h`；DB dumps + `authorizations dump` | **PASS** |
+| **AT30** | 更多→关于：产品/版本 0.1.0/所属者 Quirkybrain/GPL-3.0-only/GPLv3 与离线说明；「获取对应源码」显示**翻译后文案**（无原始 i18n 键，D-34-1 修复保持）；许可证查看器同 Rev 2（「找不到文件或资源。」，属 wp-41/45 既有 UNVERIFIED）；**B-04 新面板**：文件名按钮展开「文档信息」= 编码 utf-8、完整路径正确、内容版本哈希、资源问题空态、只读；显式关闭回阅读；占位扫描（`coming soon/敬请期待/即将推出/建设中/under construction`）生产源码 **0 命中**；更多菜单含 B-05「更新行为」项 | `at30-r4-a…f`、`at30-r4-placeholder-scan.txt` | **PASS** |
+| **套件** | `pnpm test -- --run` → **71 文件 / 547 passed / 0 failed**（与 wp-36a 期望 547 一致）；`no-hardcoded-strings`（扩展 i18n 守卫）与 `single-trusted-html-entry` 定向复跑 **6/6** | `unit-suite-r4.log`、`i18n-guard-r4.log` | **PASS** |
+
+### R4.3 汇总（全部 30 项，Rev 4 最新判定）
+
+| 判定 | 数量 | AT | 与 Rev 3 的差异 |
+|---|---|---|---|
+| **PASS** | **30** | 01–30 | 数量不变；10 项经 wp-35a/wp-36a 修正后二进制桌面复跑 + 全量套件刷新，其余 20 项沿用 Rev 3 |
+| **FAIL** | **0** | 无 | 不变 |
+| **UNVERIFIED（整体）** | **0** | 无 | 不变 |
+
+- 复跑覆盖 Review A §10.3(3)（AT02/06/25/27）与 Review B §9.1(3)（AT09/12/14/15/16/30）的全部受影响桌面项。
+- 修正映射：A-01→AT06 新链；A-02→AT02（正常扫描）+AT25（核销后扫描拒绝与显式重开对照）；B-01→AT12；B-02→AT15/AT16；B-03→AT15 脚注标题；B-04/B-05→AT30；B-09→套件守卫；B-10→AT09 数学渲染。未复跑的 20 项判定沿用 Rev 3（修正未触及；其中 AT19/26/28 属 Rev 3 已覆盖的 wp-34c 范围）。
+- 未复跑项明细：01、03、04、05、07、08、10、11、13、17、18、19、20、21、22、23、24、26、28、29（及 Rev 3 的 AT05/17 回归抽查未再执行）。
+
+### R4.4 观察（不构成未通过项）
+
+| ID | 级别 | 说明 |
+|---|---|---|
+| O-38-1 | 观察（机制交互） | AT25/AT27 的目录授权核销路径：UI「打开目录」建立 **session-scope** root，不进入「持久授权」列表；因此目录扫描拒绝经 `clear_records(["authorizations"])` 取得（A-02 的第二条验收路径），并以「显式重新打开目录→重试恢复」作对照；文件级持久授权的撤销链由 AT06 覆盖。 |
+| O-38-2 | 观察（交互） | AT06 撤销后：标签先显示不可用横幅 + `PS_AUTH_REVOKED` 正文与重试/诊断；点击「重试」后横幅切换为错误态视图（重试/诊断保留，正文仍为 `PS_AUTH_REVOKED`），授权计数保持 0——即重试仍不重新授权（与 wp-35a §5.3 的 retry=restore 语义一致）。 |
+| O-38-3 | 观察（既有边界） | 「查看许可证」仍显示「找不到文件或资源。」，与 Rev 2 相同；LICENSE/第三方声明打包属 wp-41/45，沿用 §6 既有 UNVERIFIED，不构成回归。 |
+| O-38-4 | 观察（菜单变化） | 更多菜单因 B-05 新增「更新行为」项，关于项由第 4 位移至第 5 位（键盘路径 Down×5）；界面与服务端行为正常。 |
+
+### R4.5 证据卫生
+
+- 每次场景结束 `pgrep` 均无遗留 `paperstack`（最终复核 `pgrep -x paperstack` 无匹配）；`color-scheme=prefer-dark`、`text-scaling-factor=1.25` 已恢复。
+- `fixtures/` 无写入/残留（本任务输入样张均生成于 `at-rerun3/inputs/`）；`at02/noperm` 已恢复 755；产品路径 `git status` 干净（仅新增复跑脚本）。
+- 中间迭代的 3 张过期截图移至 `at-rerun3/superseded/`（保留原始字节，避免与最终证据混淆）。
+- 脚本：`tests/desktop/run-at-rerun-wp38.sh` 为唯一新增的可复现驱动（分节可重跑）；无一次性脚本残留。
+
+### R4.6 明确 UNVERIFIED 清单（Rev 4 刷新；未列出条目沿用 §6）
+
+| 项 | 原因 / 状态 |
+|---|---|
+| ~~撤销后重启不复活（A-01 桌面链）~~ | **本次关闭**：`at06-r4-h…l`（撤销→重启→不可用+`PS_AUTH_REVOKED`→重试仍拒），授权计数保持 0 |
+| ~~目录授权核销后的扫描拒绝（A-02 桌面链）~~ | **本次关闭**：`at25-r4-h/i`（核销后展开拒绝+重试拒绝）与 `at25-r4-j`（显式重开恢复扫描） |
+| Wayland 会话；抓包级零请求证据；真正干净系统安装；WebDriver/tauri-driver；拖放打开；复制失败路径；映射回退文案；前进分支清除；面板状态记忆；2000 条截断/节点级状态；横滚实际触发；GIF/WebP；替换保存；深色主题/真实输入/IME；200% 完整任务链；NF04–06/NF09 达标结论；LICENSE/第三方声明包内可得性与对应源码入口 | 沿用 §6，不变 |
+| 许可证/第三方声明内容查看（AT30） | 查看器打开即「找不到文件或资源。」，与 Rev 2 相同；属 wp-41/45 |
+
+- **追溯（Rev 4）**：`tests/desktop/run-at-rerun-wp38.sh`、`at-rerun3/**`；wp-35a §2.1（A-01）、§2.2（A-02）；wp-36a §2.1（B-01）、§2.2（B-02）、§2.3（B-03）、§2.4（B-04）、§2.5（B-05）、§2.7（B-10）；Review A §10.3；Review B §9.1。
 
 ## Revision 3（2026-10-07，wp-34d-rerun：wp-34c 修正后残留项复跑）
 
