@@ -3,7 +3,11 @@ import type { Properties } from 'hast'
 import { visit } from 'unist-util-visit'
 
 import { fingerprintBlockText } from '../hash'
-import { positionToUtf16Range, utf16RangeToUtf8Bytes } from '../source-map'
+import {
+  createSourceOffsetIndex,
+  positionToUtf16Range,
+  type SourceOffsetIndex,
+} from '../source-map'
 import type { BlockKind, BlockRecord, OutlineEntry, SearchSegment } from '../types'
 import { extractOutline, headingText } from './outline'
 import { collectSegmentDrafts } from './segments'
@@ -21,6 +25,11 @@ import { collectSegmentDrafts } from './segments'
  * (link reference definitions) and front matter (`yaml`) render no block
  * content, so they are skipped. `sourceRange` is UTF-16 (pipeline §2.4b);
  * `sourceRangeBytes` is the converted range used for `data-src-*` (§3).
+ *
+ * All block ranges map through one shared `SourceOffsetIndex` (F-32-2): a
+ * per-block conversion that restarted from index 0 made the transform
+ * O(blocks × text). Callers that already built an index (the pipeline) pass it
+ * in; tests may omit it and get a local one.
  */
 
 export interface TransformSideData {
@@ -29,7 +38,11 @@ export interface TransformSideData {
   segments: SearchSegment[]
 }
 
-export function runMdastTransforms(tree: Root, text: string): TransformSideData {
+export function runMdastTransforms(
+  tree: Root,
+  text: string,
+  offsets: SourceOffsetIndex = createSourceOffsetIndex(text),
+): TransformSideData {
   const outline = extractOutline(tree)
   applyHeadingAnchors(tree, outline)
   const blocks: BlockRecord[] = []
@@ -77,7 +90,7 @@ export function runMdastTransforms(tree: Root, text: string): TransformSideData 
       kind,
       headingPath: headingStack.map((heading) => heading.text),
       sourceRange: range,
-      sourceRangeBytes: utf16RangeToUtf8Bytes(text, range),
+      sourceRangeBytes: offsets.rangeToBytes(range),
       fingerprint: fingerprintBlockText(blockSearchText(drafts.map((draft) => draft.text))),
       segIds,
     })

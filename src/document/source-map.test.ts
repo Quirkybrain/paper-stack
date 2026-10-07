@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  createSourceOffsetIndex,
   nodeSourceRangeBytes,
   positionToUtf16Range,
   utf16IndexToUtf8ByteOffset,
@@ -126,5 +127,64 @@ describe('range helpers', () => {
     }
     expect(nodeSourceRangeBytes(text, node)).toEqual({ startByte: 0, endByte: 6 })
     expect(nodeSourceRangeBytes(text, { position: null })).toBeNull()
+  })
+})
+
+describe('createSourceOffsetIndex (F-32-2 shared single-pass index)', () => {
+  const lineCount = (value: string): number => value.split('\n').length
+
+  const samples = [
+    '',
+    'abc',
+    '你好',
+    'a😀b',
+    'e\u0301',
+    'a\r\nb',
+    '混合 mixed 😀 text',
+    'line1\nline2\nline3',
+    '段\n段落😀\n',
+  ]
+
+  it('agrees with the standalone converters on every index and byte offset', () => {
+    for (const text of samples) {
+      const index = createSourceOffsetIndex(text)
+      expect(index.byteLength).toBe(utf8ByteLength(text))
+      for (let position = 0; position <= text.length; position += 1) {
+        const byte = utf16IndexToUtf8ByteOffset(text, position)
+        expect(index.utf16ToByte(position)).toBe(byte)
+        expect(index.lineAtUtf16(position)).toBe(lineCount(text.slice(0, position)))
+      }
+      for (let byte = 0; byte <= index.byteLength; byte += 1) {
+        expect(index.byteToUtf16(byte)).toBe(utf8ByteOffsetToUtf16Index(text, byte))
+      }
+    }
+  })
+
+  it('stays exact across checkpoint boundaries on a larger mixed text', () => {
+    const text = 'a你😀\n'.repeat(300)
+    const index = createSourceOffsetIndex(text)
+    expect(index.byteLength).toBe(utf8ByteLength(text))
+    for (let position = 0; position <= text.length; position += 1) {
+      expect(index.utf16ToByte(position)).toBe(utf16IndexToUtf8ByteOffset(text, position))
+    }
+    for (let byte = 0; byte <= index.byteLength; byte += 7) {
+      expect(index.byteToUtf16(byte)).toBe(utf8ByteOffsetToUtf16Index(text, byte))
+    }
+    expect(index.lineAtUtf16(text.length)).toBe(301)
+  })
+
+  it('clamps ranges and offsets exactly like the standalone helpers', () => {
+    const text = '你好'
+    const index = createSourceOffsetIndex(text)
+    expect(index.utf16ToByte(-1)).toBe(0)
+    expect(index.utf16ToByte(99)).toBe(6)
+    expect(index.byteToUtf16(1)).toBe(0)
+    expect(index.byteToUtf16(99)).toBe(2)
+    expect(index.lineAtUtf16(-5)).toBe(1)
+    expect(index.lineAtUtf16(99)).toBe(1)
+    expect(index.rangeToBytes({ startUtf16: 0, endUtf16: 2 })).toEqual({
+      startByte: 0,
+      endByte: 6,
+    })
   })
 })

@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
+import { createSourceOffsetIndex } from '../../document/source-map'
 import type { SearchSegment } from '../../document/types'
 import {
   findBodyHits,
   findMatchRanges,
   findSourceHits,
+  foldLower,
   hitSnippet,
   isFormulaHit,
   sourceHitsFromResult,
@@ -12,8 +14,8 @@ import {
 
 /**
  * Search semantics oracle (ADR-007; rendering-pipeline §2.4c; SRS §5.3):
- * literal substring, optional `toLowerCase`, no normalization, document order.
- * CJK, emoji and CRLF vectors mirror the source-map unit edges.
+ * literal substring, per-code-point `foldLower`, no normalization, document
+ * order. CJK, emoji and CRLF vectors mirror the source-map unit edges.
  */
 
 function segment(overrides: Partial<SearchSegment> & Pick<SearchSegment, 'text'>): SearchSegment {
@@ -46,6 +48,31 @@ describe('findMatchRanges', () => {
 
   it('returns nothing for an empty query', () => {
     expect(findMatchRanges('anything', '', false)).toEqual([])
+  })
+
+  it('folds Greek sigma per code point, not with Final_Sigma context (F-32-1)', () => {
+    // Whole-string toLowerCase would fold 'ΟΔΟΣ' to 'οδος' (final ς) and match
+    // both words; the Rust-parity fold yields 'οδοσ', so only the word that is
+    // already final-sigma matches the query.
+    expect(findMatchRanges('ΟΔΟΣ οδος', 'οδος', false)).toEqual([{ start: 5, end: 9 }])
+    expect(findMatchRanges('ΟΔΟΣ οδος', 'οδοσ', false)).toEqual([{ start: 0, end: 4 }])
+  })
+})
+
+describe('foldLower (single shared folding helper)', () => {
+  it('does not apply the context-sensitive Final_Sigma rule', () => {
+    expect(foldLower('ΟΔΟΣ οδος')).toBe('οδοσ οδος')
+    expect(foldLower('Σ')).toBe('σ')
+  })
+
+  it('agrees with whole-string toLowerCase when no U+03A3 is present', () => {
+    for (const value of ['Straße STRASSE ẞ', 'K k Å å', 'İstanbul', '前缀🚀中文', 'e\u0301']) {
+      expect(foldLower(value)).toBe(value.toLowerCase())
+    }
+  })
+
+  it('keeps the accepted length-changing İ fold', () => {
+    expect(foldLower('İ')).toBe('i\u0307')
   })
 })
 
@@ -113,6 +140,17 @@ describe('findSourceHits', () => {
     expect(findSourceHits('Secret secret', 'secret', false)).toHaveLength(2)
     expect(findSourceHits('Secret secret', 'secret', true)).toHaveLength(1)
   })
+
+  it('maps dense multi-hit results exactly through one shared index (F-32-3)', () => {
+    const raw = '段落0 段落1\n段落2 段落3\n'
+    const hits = findSourceHits(raw, '段落', false)
+    expect(hits.map((hit) => [hit.startByte, hit.endByte, hit.lineNumber])).toEqual([
+      [0, 6, 1],
+      [8, 14, 1],
+      [16, 22, 2],
+      [24, 30, 2],
+    ])
+  })
 })
 
 describe('sourceHitsFromResult', () => {
@@ -147,5 +185,18 @@ describe('hitSnippet', () => {
       { segments: [], rawText: null },
     )
     expect(snippet).toBeNull()
+  })
+
+  it('produces identical snippets with or without a shared offset index', () => {
+    const raw = 'line one\nline two with match here\n'
+    const hit = findSourceHits(raw, 'match', false)[0]
+    const plain = hitSnippet(hit, { segments: [], rawText: raw })
+    const indexed = hitSnippet(hit, {
+      segments: [],
+      rawText: raw,
+      offsetIndex: createSourceOffsetIndex(raw),
+    })
+    expect(indexed).toBe(plain)
+    expect(indexed).toContain('match')
   })
 })

@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 
 import { t } from '../../app/i18n'
 import { IconButton } from '../../components/IconButton'
+import { createSourceOffsetIndex } from '../../document/source-map'
 import type { SearchSegment } from '../../document/types'
 import {
   hitKey,
@@ -53,6 +54,14 @@ export function SearchBar({
   const [draft, setDraft] = useState(() => state.query)
   const inputRef = useRef<HTMLInputElement>(null)
   const composingRef = useRef(false)
+
+  // One shared offset index for the whole result list (F-32-3): building it
+  // only while the panel is open keeps closed-search documents at zero extra
+  // cost. `rawText` identity changes with the displayed version.
+  const sourceOffsetIndex = useMemo(
+    () => (state.open && rawText !== null ? createSourceOffsetIndex(rawText) : null),
+    [state.open, rawText],
+  )
 
   // Open (or Ctrl+F again): focus the input and select the existing query.
   useEffect(() => {
@@ -211,7 +220,11 @@ export function SearchBar({
       {visibleMatches.length > 0 ? (
         <ul className="ps-search-results">
           {visibleMatches.map((hit, index) => {
-            const snippet = hitSnippet(hit, { segments, rawText })
+            const snippet = hitSnippet(hit, {
+              segments,
+              rawText,
+              offsetIndex: sourceOffsetIndex,
+            })
             const isCurrent = index === current - 1
             return (
               <li key={hitKey(hit)}>
