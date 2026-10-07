@@ -99,6 +99,32 @@ Environment override: `DISPLAY_SMOKE` (default `:1`).
 (`artifacts/70-verification/early-run.md`) records item-by-item visual
 observations; items that could not be executed are marked `UNVERIFIED`.
 
+## Acceptance runs and fixed-item re-runs (wp-34 / wp-34b / wp-34d)
+
+`acceptance-lib.sh` provides the shared driver helpers (isolated
+`XDG_DATA_HOME`, controlled launch/termination, scripted input, screenshots,
+DB snapshots). The group scripts `run-at-a.sh` … `run-at-e.sh` drive AT01–AT30
+(wp-34 acceptance, evidence `evidence/at/`), `run-at-rerun{1,1b,2,3,3b,4}.sh`
+re-ran the fixed items for wp-34b (evidence `evidence/at-rerun/`), and the
+unified wp-34d driver re-runs the residual AT19/26/28 defects on the wp-34c
+binary:
+
+```sh
+bash tests/desktop/run-at-rerun-wp34d.sh [at19|at26|at28|regression|all]
+# evidence: artifacts/70-verification/evidence/at-rerun2/
+```
+
+Helpers used by the recovery paths:
+
+- `find-gtk-accept.py` — locates the GTK file-chooser accept button in a root
+  screenshot (accent-blue blob) so save-dialog closure can be verified
+  visually instead of by window-tree timing.
+- `find-app-button.py` — locates an in-app button by design-token colour
+  (`accent` #176b5b / `danger` #b42318) in a client screenshot; used for the
+  export preview's 选择保存位置 and the overwrite confirmation's 确定.
+- `run-at-rerun-wp34d.sh` additionally isolates `XDG_CACHE_HOME` per scenario
+  and preserves the overwritten/case-B export bytes as evidence.
+
 ## Known limitations
 
 - X11 only. libxdo/XTEST do not work on Wayland, and this host has no Wayland
