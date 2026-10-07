@@ -1,0 +1,21 @@
+# wp-40 desktop smoke: isolated session DB dump (read-only)
+# captured: 2026-10-07T23:30:40.436760
+DB: /tmp/opencode/wp40/desktop-data/data/com.quirkybrain.paperstack/paperstack.sqlite3
+tables: ['authorizations', 'cache_meta', 'documents', 'positions', 'recents', 'session_meta', 'session_tabs', 'settings', 'sidebar_state']
+
+## session_tabs ['tab_id', 'doc_id', 'order_index', 'is_active', 'updated_at']
+('tab-1', 'd-9ad28dcd3211ac06', 0, 1, 1791386937212)
+
+## session_meta ['key', 'value_json']
+('active_tab_id', '"tab-1"')
+('saved_at_ms', '1791386937212')
+
+## recents ['doc_id', 'opened_at', 'last_path']
+('d-9ad28dcd3211ac06', 1791386928123, '/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/fixtures/rendering/mixed-cn-en.md')
+('d-47bae29b61b13b38', 1791386932563, '/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/fixtures/rendering/code.md')
+
+## documents ['doc_id', 'canonical_path', 'display_name', 'format', 'encoding', 'content_hash', 'size_bytes', 'last_seen_at']
+('d-9ad28dcd3211ac06', '/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/fixtures/rendering/mixed-cn-en.md', 'mixed-cn-en.md', 'markdown', 'utf-8', 'c9fdff7c119c0cca7c1fb9198d806ce27e0c04357341214292774bd2c973c1ca', 617, 1791386928118)
+('d-47bae29b61b13b38', '/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/fixtures/rendering/code.md', 'code.md', 'markdown', 'utf-8', 'a3bddb9964c5b3dcad234d984c51fbab196ba6a3f00a5cfc3fa8c9df7a844b6a', 1465, 1791386932561)
+
+## positions ['doc_id', 'version_hash', 'heading_path_json', 'block_fingerprint', 'offset_ratio', 'source_range_json', 'updated_at']
