@@ -4,15 +4,70 @@
 - **Artifact ID**: ART-70-VERIFY-ACCEPTANCE-IT
 - **Artifact Type**: Verification Report（按需求基线 §4 / SRS §8.5 的 IT01–IT08 任务链，在 wp-43 打包产物上逐链执行；含原始证据、缺陷发现与明确 UNVERIFIED 清单）
 - **Status**: VALID
-- **Revision**: 1
+- **Revision**: 2
 - **Owner**: test-engineer
 - **Task**: `wp-44-it`（任务分支 `task/wp-44-it`；父分支 `feat/v0.1.0`；基线提交 `670deae50eb06233ca7fede2ccb5ea340f3ca861`；产出提交主题 `test(acceptance): run it01-it08 on packaged build`）
+- **Task (Rev 2)**: `wp-46-itrerun`（任务分支 `task/wp-46-itrerun`；父分支 `feat/v0.1.0`；基线提交 `cb79a827e3b6dd2736b490d6eb9b0e0a99cba77b`，已含 wp-45 修复（`f8e4dae`，并入 `3a14102`）；产出提交主题 `test(acceptance): verify it fixes and refresh evidence`）
 - **Components**: C-19 测试基础设施（`tests/desktop/run-it.sh` 新增 IT 驱动）；被验证对象为 **wp-43 打包的 .deb 提取运行产物**（发布包 payload），不是开发树二进制
-- **Last Verified**: 2026-10-08（本报告全部判定产生自打包二进制 `996f5c6c…`；前向套件 `pnpm test -- --run` = 71 文件 / 547 passed）
-- **Scope**: `tests/desktop/**`、`artifacts/70-verification/**`。未修改 `src/`、`src-tauri/`、`fixtures/`、锁文件、pinned 输入；产品缺陷只记录、未修补。
+- **Last Verified**: 2026-10-08（Rev 2：D-IT-1/2/3 影响面复跑于当前树 release 二进制 `ee21ad20…`；Rev 1：全部判定产生自打包二进制 `996f5c6c…`，前向套件 71 文件 / 547 passed）
+- **Scope**: Rev 1：`tests/desktop/**`、`artifacts/70-verification/**`；Rev 2：`tests/desktop/**`、`artifacts/70-verification/**`。未修改 `src/`、`src-tauri/`、`fixtures/`、锁文件、pinned 输入或框架文件；产品缺陷只记录、未修补。
 
 > **证据纪律**：每条判定都对应实际执行的操作与检查过的截图/日志/数据库内容；截图存在本身不作数。
 > **FAIL 一律原样保留**；未执行或不可执行的子项在 §6 明确 UNVERIFIED，不计入 PASS。
+
+## Revision 2（2026-10-08，wp-46-itrerun：wp-45 修复后 IT02/IT03/IT07 复跑）
+
+> Rev 1 的 §1–§8 原样保留为历史（其判定产生自 wp-43 打包提取二进制）。本节为 wp-45 缺陷修复（提交 `f8e4dae`，并入 `3a14102`；修复报告 `artifacts/60-implementation/wp-45-fix-it.md`）后受影响 IT 子项的复跑证据与**最新判定**；冲突时以 Rev 2 为准。复跑对象为**当前树重建的 release 二进制**（`cb79a82`），**不是**已过期于 wp-45 之前的 wp-43 `.deb` 提取产物。
+
+### R2.1 构建与基线
+
+| 项 | 值 |
+|---|---|
+| 构建命令 | `pnpm tauri build --no-bundle`（`it-rerun/build.log`：`Finished release profile [optimized] target(s) in 45.21s`；`BUILD_EXIT=0`） |
+| 二进制 | `src-tauri/target/release/paperstack`；28,104,136 B；mtime 2026-10-08 02:53:33 +0800 |
+| 二进制 SHA-256 | `ee21ad20ff190ef6c4fceb6d0e2314394009e2c75a127f4697e016d282c404a7`（`it-rerun/app-binary.txt`；`runs.log` 各节 header 重复记录） |
+| 修订 | `cb79a827e3b6dd2736b490d6eb9b0e0a99cba77b`（`task/wp-46-itrerun`；父分支 `feat/v0.1.0`）；`git diff HEAD -- src src-tauri :!**/tests/**` = 空（二进制构建自当前产品树） |
+| Pinned 输入 | `acceptance-it.md` Rev 1 `7787e69e…`、`acceptance-at.md` Rev 5 `bc5d1160…`、`wp-45-fix-it.md` `76b74260…` 与 handoff 逐一比对一致；`config/git-policy.json` `3b8ddffd…`（只读未改） |
+| 会话/固定条件 | X11 `DISPLAY=:1`、2520×1680；浅色 `GTK_THEME=Adwaita:light`；`text-scaling-factor=1.25`；应用数据隔离于 `it-rerun/data`，各节 `XDG_CACHE_HOME` 独立 |
+| 驱动 | `tests/desktop/run-itrerun.sh`（分节 `it02\|it03\|it07\|suite\|all`；沿用 `acceptance-lib.sh`） |
+| 证据目录 | `artifacts/70-verification/evidence/it-rerun/`：PNG + `runs.log`（含本次迭代追加历史，最终判定引用最后一次运行产物）+ `it07-r2-parse-cpu.txt` + 剪贴板字节文件 + `unit-suite-itrerun.log` |
+
+> Rev 2 复跑范围仅限 wp-45 触及的 IT02/IT03/IT07 子项；其余 IT01/04/05/06/08 未复跑，判定沿用 Rev 1（wp-45 未改动相应路径）；Rev 1 §6 的受限项不变（详见 R2.4）。
+
+### R2.2 逐项复跑（旧 → 新判定）
+
+| 项 | Rev 1 | Rev 2 | 复跑要点 | 关键证据（`it-rerun/`） |
+|---|---|---|---|---|
+| **IT02** | PASS（子项 FAIL：D-IT-1） | **PASS（D-IT-1 关闭）** | ASCII 跨文件链接回归正常；D-IT-1 复现路径 `[中文名文档](./中文文档.md)` **直接打开** `中文文档.md`（标题「中文名文档」+ 正文渲染），Alt+← 可返回；两侧正文均以 Ctrl+A/Ctrl+C 剪贴板字节核对 | `it02-r2-b-second-doc.png`、`it02-r2-d-cjk-doc-try1.png`、`it02-r2-cjk-doc-clip-try1.txt`（含「这份文档的文件名含中文」）、`it02-r2-second-doc-clip.txt`、`it02-r2-c-back.png` |
+| **IT03** | PASS（缺陷 D-IT-2 保留） | **PASS（D-IT-2 关闭）** | rename-over 替换保存后 **t≈0.8s 即出现正常更新横幅**（「文件已有新版本。你正在阅读的内容未改变。」+「更新并清除选区」/「稍后」），**无**「找不到原文件」/unavailable、无手动「重试」；选区高亮保留；「稍后」折叠为「有新版本」条+徽标；源码视图 v1→v2 与阅读视图 v2 一致（剪贴板核对）；**原地写入对照 v3** 正常；全程无错误态 | `it03-r2-c-replace-t1.png`、`it03-r2-d-replace-banner.png`、`it03-r2-e-later-collapsed.png`、`it03-r2-f-source-v1.png`～`it03-r2-n-inplace-updated.png`、`it03-r2-source-v1-clip.txt`（v1 line）、`it03-r2-source-v2-clip.txt`（v2 line）、`it03-r2-reading-v3-clip.txt`（v3 控制段落） |
+| **IT07** | PASS（10 MiB+ 简化阅读尾搜/复制 UNVERIFIED） | **PASS（其余子项）；大文档子项 FAIL 保留（D-IT-3 部分修复）** | **已改善（D-IT-3 解析/索引面）**：选「简化阅读」后内容 **t≈5s** 可见（`it07-r2-e-parse-t5.png`）；全文索引在选项后约 10s 内完成——尾段唯一探针 `段落 132144`（仅存在于被截断的文本尾行）**总命中数 1**（面板显示 0/1 且预览为目标尾段）；首屏代码块「复制」取得字节级 **EXACT** 载荷（49 B，`fn sample() -> u32 {…}`，与规范化期望逐字节一致）。**未达成（D-IT-3 残余）**：点击尾命中（「下一项」与 Return 均已尝试）在 2s 观察窗内**未推进**（仍为 0/1、视图未滚动至尾部）；WebKitWebProcess 在选项后 **75.4s 内 168/168 次采样全部 ≥100% CPU**（最小 102%、最大 254%、末次 111.4%，无回落；另有不计入本证据目录的预跑探针显示 360s 仍无回落）；11 MiB 实例的 WM 关闭请求 8s 超时→SIGTERM 兜底。→「简化模式……搜索与复制完整可用」在 11 MiB 路径仍未达成 | `it07-r2-e-parse-t5.png`、`it07-r2-g-simplified-view.png`（徽标+范围横幅）、`it07-r2-k-tail-search.png`（总命中 1 的预览）、`it07-r2-l-tail-next.png`、`it07-r2-m-tail-return.png`（均停在 0/1、未跳转）、`it07-r2-code-clip.txt` + `it07-r2-code-payload.txt`（`cmp` EXACT）、`it07-r2-parse-cpu.txt`、`runs.log` |
+
+### R2.3 汇总（Rev 2）
+
+| 判定 | 数量 | 说明 |
+|---|---|---|
+| **IT 项 PASS** | **8**（01–08） | IT02/IT03 在 Rev 2 范围内刷新为无保留 PASS；IT07 除大文档子项外仍 PASS |
+| **子项 FAIL 保留** | **1** | IT07 大文档尾命中导航/复制（D-IT-3 残余：超大 block 数的渐进挂载/渲染主线程饱和） |
+| **子项已关闭** | **2** | IT02 非 ASCII 跨文件链接（D-IT-1）；IT03 替换保存（D-IT-2） |
+| **整体 UNVERIFIED** | **0** | 所有 IT 均有可执行判定 |
+
+- **C3（G-05）复验说明**：Rev 2 仅覆盖 wp-45 影响面（IT02/IT03/IT07 子项），不构成对 Rev 1 打包产物全链的替代；完整 C3 结论仍以 Rev 1 §4 为准，其两个子项（D-IT-1/D-IT-2）在 Rev 2 中于当前树二进制上关闭；D-IT-3 部分修复、残余子项保留。
+- 前向套件：`pnpm test -- --run` → **Test Files 72 passed; Tests 568 passed; 0 failed**（`unit-suite-itrerun.log`，期望 568）。
+- 追溯 ID 不变：IT01→R01/R04/R11、IT02→R14/R15/R16/R17、IT03→R18/R21/R22、IT04→R22/R05、IT05→R25/R26/R13、IT06→R06/R07/R27、IT07→R24/R29/R11、IT08→R30/NF12/NF10。
+
+### R2.4 观察与残余（不改变上表判定）
+
+| ID | 级别 | 说明 |
+|---|---|---|
+| O-46-1 | 观察（既有缺陷，仍开放） | O-IT-2（2 MiB 复杂度提示在简化阅读后重现）未修复、未定根因。本次预跑探针在同型 2 MiB 语料上再次观察到该提示重现（探针证据不在本修订证据目录内）；11 MiB 尺寸型提示在本次复跑中未复现。建议按原路由分诊。 |
+| O-46-2 | 观察（D-IT-3 残余定位） | 残余饱和点在**渐进挂载/渲染主线程**：快速路径已解决解析/索引/首屏与首屏代码复制；144k 级 block 数的持续挂载使输入处理间歇丢失、尾部 reveal 无法在观察窗内完成。本报告不改产品代码，交 implementation/debug 诊断。 |
+| — | 沿用 Rev 1 §6 | 真实 IME、干净系统 `dpkg -i`、Wayland、抓包级证据等受限项不变。 |
+
+### R2.5 证据卫生（Rev 2）
+
+- 全部场景结束 `pgrep -x paperstack` 无遗留；`xclip` 已清理；`color-scheme=prefer-dark`、`text-scaling-factor=1.25` 已恢复；`fixtures/` 零写入；写操作限于 `evidence/it-rerun/**`。
+- 无一次性脚本残留：驱动 `tests/desktop/run-itrerun.sh` 为唯一新增可复现脚本（分节可重跑）；预跑探针脚本已删除（其结论仅作 O-46-1 观察）。
+- `runs.log` 含本次迭代的追加历史（含一次早先的 IT07 尝试），最终判定引用各节最后一次运行产物；历史条目原样保留。
 
 ## 1. 输入与基线核验（pinned inputs，2026-10-08）
 

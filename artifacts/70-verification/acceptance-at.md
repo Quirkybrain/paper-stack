@@ -4,19 +4,71 @@
 - **Artifact ID**: ART-70-VERIFY-ACCEPTANCE-AT
 - **Artifact Type**: Verification Report（真实 release 应用在 X11 `DISPLAY=:1` 上的 AT01–AT30 逐项验收；含原始证据、失败与明确 UNVERIFIED 清单）
 - **Status**: VALID
-- **Revision**: 5
+- **Revision**: 6
 - **Owner**: test-engineer
 - **Task**: `wp-34-desktop-at`（任务分支 `task/wp-34-desktop-at`；父分支 `feat/v0.1.0`；基线提交 `613b4658c63e112c40b6ce171771e6b31732c75f`；产出提交主题 `test(acceptance): run desktop at scenarios and fix parity vector shell`）
 - **Task (Rev 2)**: `wp-34b-atrerun`（任务分支 `task/wp-34b-atrerun`；父分支 `feat/v0.1.0`；基线提交 `33dd600fdf12c3a90b80e4589b856e9e348b8bd6`，已含 wp-34a 修正并入提交 `adf805b`；产出提交主题 `test(acceptance): re-run fixed at scenarios`）
 - **Task (Rev 3)**: `wp-34d-rerun`（任务分支 `task/wp-34d-rerun`；父分支 `feat/v0.1.0`；基线提交 `f6e560802e8c3964a60594a7cd020afc20f91a56`，已含 wp-34c 修正并入提交 `dba385a`；产出提交主题 `test(acceptance): re-run at19/26/28 on fixed revision`）
 - **Task (Rev 4)**: `wp-38-desktop-rerun`（任务分支 `task/wp-38-desktop-rerun`；父分支 `feat/v0.1.0`；基线提交 `5d977ea40c0d6bea353412f3b83f1cd0ee1e9b56`，已含 wp-35a（Rust 安全修正）与 wp-36a（前端/管线修正）并入；产出提交主题 `test(acceptance): post-fix desktop re-run`）
 - **Task (Rev 5)**: `wp-42-atrefresh`（任务分支 `task/wp-42-atrefresh`；父分支 `feat/v0.1.0`；基线提交 `49f48baf336116a9ecc99545f6e02e11702c75b0`；系统验证 §7.4 G-01 条件 C1：全量 AT01–AT30 在同一现行 release 二进制上刷新；产出提交主题 `test(acceptance): refresh full at matrix on current tree`）
+- **Task (Rev 6)**: `wp-46-itrerun`（任务分支 `task/wp-46-itrerun`；父分支 `feat/v0.1.0`；基线提交 `cb79a827e3b6dd2736b490d6eb9b0e0a99cba77b`，已含 wp-45 修复（`f8e4dae`，并入 `3a14102`）；复跑 wp-45 影响面 AT15/AT21/AT22/AT29；产出提交主题 `test(acceptance): verify it fixes and refresh evidence`）
 - **Components**: C-19 测试基础设施（`tests/desktop/` 新增验收驱动与工具）；被验证对象为桌面 release 二进制（M5 阶段全部已集成功能）
-- **Last Verified**: 2026-10-08（Rev 5 全量刷新：AT01–AT30 全部在唯一 release 二进制 `054040ba…` 上重新执行并判定；前向套件 `pnpm test -- --run` = 71 文件 / 547 passed）
-- **Scope**: Rev 1：`tests/desktop/**`、`tests/contracts/**`、`artifacts/70-verification/**`；Rev 2：`tests/desktop/**`、`artifacts/70-verification/**`；Rev 3：`tests/desktop/**`、`artifacts/70-verification/**`；Rev 4：`tests/desktop/**`、`artifacts/70-verification/**`；Rev 5：`tests/desktop/**`、`artifacts/70-verification/**`。未修改 `src/`、`src-tauri/`、`fixtures/`、锁文件、pinned 输入或框架文件；产品缺陷只记录、未修补。
+- **Last Verified**: 2026-10-08（Rev 6：wp-45 影响面 AT15/21/22/29 复跑于当前树 release 二进制 `ee21ad20…`；Rev 5：AT01–AT30 全量刷新于唯一 release 二进制 `054040ba…`，前向套件 71 文件 / 547 passed）
+- **Scope**: Rev 1：`tests/desktop/**`、`tests/contracts/**`、`artifacts/70-verification/**`；Rev 2/3/4：`tests/desktop/**`、`artifacts/70-verification/**`；Rev 5：`tests/desktop/**`、`artifacts/70-verification/**`；Rev 6：`tests/desktop/**`、`artifacts/70-verification/**`。未修改 `src/`、`src-tauri/`、`fixtures/`、锁文件、pinned 输入或框架文件；产品缺陷只记录、未修补。
 
 > **证据纪律**：本报告的每条判定都对应实际执行的操作与检查过的截图/日志/数据库内容；截图存在本身不作数。
 > **FAIL 一律原样保留**（§5 发现）；未执行或不可执行的项在 §6 明确 UNVERIFIED，不计入 PASS。
+
+## Revision 6（2026-10-08，wp-46-itrerun：wp-45 修复影响面的 AT 复跑）
+
+> Rev 1–5 原样保留为历史；本节为 wp-45（D-IT-1/2/3 修复，提交 `f8e4dae` 并入 `3a14102`）后**受影响 AT 子项**在当前树 release 二进制上的复跑证据与**最新判定**；冲突时以 Rev 6 为准。复跑对象为**当前树重建的 release 二进制**（`cb79a82`），**不是** Rev 5 的 `054040ba…`（其构建早于 wp-45，`output/*.deb` 亦然）。未复跑项沿用 Rev 5 判定（wp-45 未触及相应代码路径）。
+
+### R6.1 构建与基线
+
+| 项 | 值 |
+|---|---|
+| 构建命令 | `pnpm tauri build --no-bundle`（`it-rerun/build.log`：`Finished release profile [optimized] target(s) in 45.21s`；`BUILD_EXIT=0`） |
+| 二进制 | `src-tauri/target/release/paperstack`；28,104,136 B；mtime 2026-10-08 02:53:33 +0800 |
+| 二进制 SHA-256 | `ee21ad20ff190ef6c4fceb6d0e2314394009e2c75a127f4697e016d282c404a7`（`at-rerun4/app-binary.txt`；与 IT Rev 2 同一构建产物） |
+| 修订 | `cb79a827e3b6dd2736b490d6eb9b0e0a99cba77b`（`task/wp-46-itrerun`；父分支 `feat/v0.1.0`）；`git diff HEAD -- src src-tauri :!**/tests/**` = 空 |
+| Pinned 输入 | `acceptance-at.md` Rev 5 `bc5d1160…`、`acceptance-it.md` Rev 1 `7787e69e…`、`wp-45-fix-it.md` `76b74260…` 与 handoff 一致；`config/git-policy.json` `3b8ddffd…`（只读未改） |
+| 会话/固定条件 | X11 `DISPLAY=:1`、2520×1680；浅色 `GTK_THEME=Adwaita:light`；`text-scaling-factor=1.25`；数据隔离于 `at-rerun4/data`，各节 `XDG_CACHE_HOME` 独立 |
+| 驱动 | `tests/desktop/run-at-rerun-wp46.sh`（分节 `at15\|at21\|at22\|at29\|all`；沿用 `acceptance-lib.sh`；不改动历史脚本 `run-at-rerun4.sh`） |
+| 证据目录 | `artifacts/70-verification/evidence/at-rerun4/`：PNG + `runs.log` + 剪贴板字节文件 |
+
+### R6.2 复跑矩阵（旧 → 新判定）
+
+| AT | Rev 5 | Rev 6 | 复跑操作 | 关键证据（`at-rerun4/`） |
+|---|---|---|---|---|
+| **AT15** | PASS | **PASS** | links.md：#duplicate-标题 跳转、缺失 fragment→「未找到该标题。」提示、页内 #more-links 跳转（未改动路径的抽查）；D-IT-1 影响面：新输入复跑非 ASCII 跨文件链接 `[中文名文档](./中文文档.md)` 与百分号编码空格目标 `[带 空格 文档](./带%20空格%20文档.md)`——**两者均真实打开目标**（标题+正文剪贴板字节核对）；Rev 5 的脚注链未复跑（wp-45 未触及，沿用 R5 判定） | `at15-r5-b-fragment-jump.png`、`at15-r5-c-missing-fragment-notice.png`、`at15-r5-d-page-internal-jump.png`、`at15-r5-f-cjk-opened-try1.png`、`at15-r5-h-space-opened-try1.png`、`at15-r5-cjk-clip-try1.txt`、`at15-r5-space-clip-try1.txt` |
+| **AT21** | PASS | **PASS** | append v2→横幅→「现在更新」→内容 v2；**替换保存 v3（copyfile+os.replace）→ t≈0.8s 直接出现正常更新横幅**（无「找不到原文件」/unavailable）→「稍后」→折叠条+徽标→重开→「现在更新」→阅读含替换标记 | `at21-r5-b-banner-append.png`、`at21-r5-c-updated-v2.png`、`at21-r5-d-replace-fast.png`、`at21-r5-e-replace-banner.png`、`at21-r5-f-later-collapsed.png`、`at21-r5-h-updated-v3.png`、`at21-r5-reading-v3-clip.txt`（含 R5-REPLACE） |
+| **AT22** | PASS | **PASS** | 150 ms 原地快速写入 A/B→合并为单候选→「现在更新」→RAPID-B、无回退；**150 ms 快速替换保存 C/D→直接更新横幅→「现在更新」**→终态含 **RAPID-B + RAPID-D、无 RAPID-C** | `at22-r5-a-rapid-banner.png`、`at22-r5-b/c-update-t1/t4.png`、`at22-r5-d-replace-banner.png`、`at22-r5-e/f`、`at22-r5-reading-clip.txt` |
+| **AT29** | PASS（R5.6：11 MiB 搜索最终计数 UNVERIFIED） | **PASS（子项 FAIL 保留）** | 11 MiB → 大文档对话框 → 选择「简化阅读」（徽标+范围说明横幅）；尾段唯一探针 `段落 132144` 返回**最终命中数 1**（R5.6 计数项**本次关闭**）；但「下一项」/Return 在 2s 观察窗内**未推进**到命中（计数停在 0/1、视图未滚动至尾部），随后输入处理随主线程饱和变得不稳定（同 D-IT-3 残余，见 acceptance-it Rev 2 IT07）；52 MiB → 源码分段视图正常（启动到窗口 2815 ms、RSS 181,732 KB、横幅「文件超过本版全量处理上限…」） | `at29-r5-a-dialog.png`、`at29-r5-b-simplified.png`、`at29-r5-c-tail-search.png`、`at29-r5-d-tail-next.png`（0/1 计数+预览）、`at29-r5-e-tail-return.png`、`at29-r5-f-52mib-source.png`、`runs.log` |
+
+### R6.3 汇总（Rev 6：4 项复跑刷新 + 26 项沿用）
+
+| 判定 | 数量 | AT |
+|---|---|---|
+| **PASS** | **30** | 01–30（Rev 5 的 26 项判定沿用 + 4 项复跑刷新） |
+| **FAIL（整体）** | **0** | — |
+| **子项 FAIL 保留** | **1** | **AT29：11 MiB 简化阅读的尾命中导航/复制不可达**（D-IT-3 残余：解析/索引/首屏已被 wp-45 修复，超大 block 数的渐进挂载/渲染主线程仍饱和——与 acceptance-it Rev 2 IT07 同源证据；按既有缺陷路由，不隐瞒） |
+| **UNVERIFIED（整体）** | **0** | —（R5.6 的 AT29 计数项本次关闭；其余环境受限项见 R6.5） |
+
+- 前向套件：`pnpm test -- --run` → **Test Files 72 passed; Tests 568 passed; 0 failed**（`it-rerun/unit-suite-itrerun.log`；与 wp-45 §3.2 期望 568 一致）。
+- **口径说明**：Rev 6 是 wp-45 影响面的定向复跑，**不替代** Rev 5 的全量 AT01–AT30 同树刷新；AT29 的「子项 FAIL 保留」是对 R29「简化模式……搜索与复制完整可用」的诚实标记（Rev 5 该子项为流程受限的 UNVERIFIED，本次已取得可复跑的失败证据）。
+
+### R6.4 观察（不改变上表判定）
+
+| ID | 级别 | 说明 |
+|---|---|---|
+| O-46-3 | 观察（主线程饱和） | AT29/IT07 的 11 MiB 实例：WM 关闭请求 8s 超时后由 SIGTERM 兜底终止；与渐进挂载持续占用主线程一致（参见 acceptance-it Rev 2 R2.4 O-46-2）。 |
+| O-46-4 | 观察（既有缺陷） | O-IT-2（2 MiB 复杂度提示重现）两报告均仍开放；本次预跑探针在 2 MiB 语料再次观察到（探针未纳入证据目录），11 MiB 尺寸型提示未复现。 |
+
+### R6.5 证据卫生与 UNVERIFIED（Rev 6）
+
+- 每次场景结束 `pgrep -x paperstack` 无遗留；`xclip` 已清理；`color-scheme=prefer-dark`、`text-scaling-factor=1.25` 已恢复；`fixtures/` 零写入（新增输入样张均在 `at-rerun4/inputs/` 生成）。
+- 脚本：`tests/desktop/run-at-rerun-wp46.sh` 为唯一新增可复现驱动（分节可重跑）；无一次性脚本残留。
+- UNVERIFIED 清单刷新：R5.6 中「AT29 11 MiB 简化模式搜索的最终命中计数」**本次获得证据并关闭**（计数 1）；R5.6 其余环境/范围受限项（Wayland、抓包级证据、干净安装、WebDriver、拖放打开等）沿用不变。新增子项 FAIL 见 R6.3，不再以 UNVERIFIED 表述。
 
 ## Revision 5（2026-10-08，wp-42-atrefresh：全量 AT01–AT30 同树刷新）
 
