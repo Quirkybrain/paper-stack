@@ -4,6 +4,8 @@ import { createElement, useMemo, type ReactNode } from 'react'
 import { t } from '../../../app/i18n'
 import { clipboard } from '../../../services'
 import { Button } from '../../../components/Button'
+import { SanitizedNode } from '../../../document/SanitizedNode'
+import { katexOptions } from '../../../document/plugins/katex'
 import { useReaderUi } from '../ui-context'
 import { useCopyFeedback } from './copy-feedback'
 import type { FormulaInspectTarget } from './types'
@@ -12,6 +14,10 @@ import type { FormulaInspectTarget } from './types'
  * Formula panel inside the 340px non-modal inspect drawer (ui-spec §3.6,
  * VC-06; T-46): formula preview, raw source without `$`, source chapter and
  * diagnostics, plus copy / view-source / zoom tools.
+ *
+ * The preview reuses the pipeline-frozen KaTeX options (`katexOptions`,
+ * trust:false + maxSize/maxExpand caps) and injects its output through the
+ * single `document/SanitizedNode` wrapper (B-01).
  *
  * Copy feedback follows EDGE-09: only a confirmed clipboard write shows
  * “已复制”, reverting after ~1.5s; a failure stays until the next attempt.
@@ -22,10 +28,9 @@ export const FORMULA_COPY_FEEDBACK_MS = 1500
 export function renderFormulaPreview(source: string): string | null {
   try {
     return katex.renderToString(source, {
+      ...katexOptions({}),
       displayMode: false,
       throwOnError: false,
-      trust: false,
-      strict: 'warn',
     })
   } catch {
     return null
@@ -49,7 +54,7 @@ export function FormulaPanel({ target }: FormulaPanelProps) {
   const previewNode: ReactNode =
     previewHtml === null
       ? createElement('code', { className: 'ps-formula-source-fallback' }, target.source)
-      : createElement('span', { dangerouslySetInnerHTML: { __html: previewHtml } })
+      : createElement(SanitizedNode, { html: previewHtml })
 
   return (
     <div className="ps-formula-panel">

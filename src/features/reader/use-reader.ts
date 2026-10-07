@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 
+import { t } from '../../app/i18n'
 import {
   createTaskToken,
   documentModelCache,
@@ -213,7 +214,13 @@ export interface ReaderControls {
   /** Global settings sync from the settings host (default mode + records). */
   syncGlobalSettings(next: { updateModeDefault?: UpdateMode; rememberRecords?: boolean }): void
   handleWatchChanged(payload: WatchChangedPayload): void
-  recheckActive(): void
+  /**
+   * Window-focus compensation (contracts §7.5; models §3.2 W7): stat-check
+   * the active tab and every open document, since a watch event may have been
+   * missed while the window was unfocused. Background candidates stay staged
+   * until activation (INV-UM-04).
+   */
+  recheckOpenTabs(): void
   saveSession(): Promise<SaveResult>
   handleCloseRequested(event: { preventDefault(): void }): Promise<void>
 
@@ -421,8 +428,10 @@ export function useReader(): ReaderControls {
 
   /**
    * Per-tab parse options for the single pipeline: the global syntax mode,
-   * the current document's inline-dollar override (ui-spec §3.7) and the
-   * simplified-reading subset when that mode was chosen (R29).
+   * the current document's inline-dollar override (ui-spec §3.7), the
+   * simplified-reading subset when that mode was chosen (R29), and the
+   * localized GFM footnote label (B-03: generated UI text never hardcodes an
+   * English default).
    */
   const parseOptionsFor = useCallback(
     (tabId: string): ParseDocumentOptions => {
@@ -431,6 +440,7 @@ export function useReader(): ReaderControls {
         mode: syntaxModeRef.current,
         inlineMath: inlineMathRef.current.get(tabId) ?? true,
         simplified: tab?.largeDocMode === 'simplified',
+        footnoteLabel: t('document.footnoteLabel'),
       }
     },
     [],
@@ -917,29 +927,43 @@ export function useReader(): ReaderControls {
    * (R07; AT07): same bytes restore the identity without a version change;
    * different bytes are explained first and adopted as a new version with an
    * approximate position (INV-AR-04).
+   *
+   * The command crossed an async boundary: the adoption only applies when the
+   * target tab still displays the same docId at the same generation as when
+   * the request was issued (contracts §6.2/§6.3; INV-VC-02/06; B-06). A tab
+   * navigated to another document, relinked or closed meanwhile keeps its new
+   * state with zero visible effect from the late result.
    */
   const adoptRelinkResult = useCallback(
     (tab: ReaderTab, result: RelinkResult) => {
+      const current = stateRef.current.tabs.find((candidate) => candidate.tabId === tab.tabId)
+      if (
+        !current ||
+        current.docId !== tab.docId ||
+        current.session.generation !== tab.session.generation
+      ) {
+        return
+      }
       if (result.status === 'reassociated') {
         // Same bytes: identity is restored without a version change.
         setRelinkNotice('document.relink.reassociated')
-        dispatchSession(tab.tabId, sessionRecovered())
+        dispatchSession(current.tabId, sessionRecovered())
         return
       }
       // Different bytes: explain first, then adopt as a new version of
       // the same docId; the position can only be approximate.
       setRelinkNotice('document.relink.newVersion')
       dispatchSession(
-        tab.tabId,
+        current.tabId,
         sessionDisplayReplaced(result.snapshot.version, result.snapshot.text),
       )
-      send(tabPhase(tab.tabId, 'parsing', null))
+      send(tabPhase(current.tabId, 'parsing', null))
       void startParse(
-        tab.tabId,
-        tab.docId,
+        current.tabId,
+        current.docId,
         result.snapshot.text,
         result.snapshot.version,
-        tab.session.generation + 1,
+        current.session.generation + 1,
       )
     },
     [dispatchSession, send, startParse],
@@ -1610,11 +1634,11 @@ export function useReader(): ReaderControls {
     [dispatchSession, refreshTab],
   )
 
-  const recheckActive = useCallback(() => {
-    const active = selectActiveTab(stateRef.current)
-    if (!active) return
-    if (active.session.status === 'loading' || active.phase === 'reading') return
-    refreshTab(active.tabId)
+  const recheckOpenTabs = useCallback(() => {
+    for (const tab of stateRef.current.tabs) {
+      if (tab.session.status === 'loading' || tab.phase === 'reading') continue
+      refreshTab(tab.tabId)
+    }
   }, [refreshTab])
 
   const saveSession = useCallback(async (): Promise<SaveResult> => {
@@ -1686,7 +1710,7 @@ export function useReader(): ReaderControls {
     updateModeFor,
     syncGlobalSettings,
     handleWatchChanged,
-    recheckActive,
+    recheckOpenTabs,
     saveSession,
     handleCloseRequested,
     largeDocPromptFor,

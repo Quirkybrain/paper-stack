@@ -4,9 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const invokeMock = vi.hoisted(() => vi.fn())
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }))
 
+import katex from 'katex'
+
 import { t } from '../../../app/i18n'
+import {
+  KATEX_MAX_EXPAND,
+  KATEX_MAX_SIZE_EM,
+  katexOptions,
+} from '../../../document/plugins/katex'
 import { ReaderUiContext, type ReaderUi } from '../ui-context'
-import { FORMULA_COPY_FEEDBACK_MS, FormulaPanel } from './FormulaPanel'
+import { FORMULA_COPY_FEEDBACK_MS, FormulaPanel, renderFormulaPreview } from './FormulaPanel'
 import type { FormulaInspectTarget } from './types'
 
 /**
@@ -54,6 +61,27 @@ describe('FormulaPanel (ui-spec §3.6, T-46)', () => {
     expect(screen.getByText(t('formula.diagnostics'))).toBeTruthy()
     expect(screen.getByText(t('error.parse.local'))).toBeTruthy()
     expect(screen.getByText('PS_PARSE_LOCAL')).toBeTruthy()
+  })
+
+  it('reuses the pipeline-frozen KaTeX caps for the preview (B-01)', () => {
+    const spy = vi.spyOn(katex, 'renderToString')
+    try {
+      renderFormulaPreview('x')
+      expect(spy).toHaveBeenCalledWith('x', {
+        ...katexOptions({}),
+        displayMode: false,
+        throwOnError: false,
+      })
+    } finally {
+      spy.mockRestore()
+    }
+
+    // Observable caps: a 100em rule is clamped to the frozen 20em maxSize.
+    const html = renderFormulaPreview('\\rule{100em}{1em}')
+    expect(html).not.toBeNull()
+    expect(html).toContain(`width="${KATEX_MAX_SIZE_EM}em"`)
+    expect(html).not.toContain('width="100em"')
+    expect(KATEX_MAX_EXPAND).toBeGreaterThan(0)
   })
 
   it('copies exactly the raw source and confirms for ~1.5s', async () => {

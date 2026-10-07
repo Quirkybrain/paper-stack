@@ -13,11 +13,12 @@ import type { SourceRangeUtf16 } from '../types'
  *
  * ③ parsing: `remark-math` turns `$…$`/`$$…$$` into mdast `inlineMath`/`math`
  * nodes; after `remark-rehype` they carry the `language-math` marker plus
- * `math-inline`/`math-display` and become `code` elements. The bounded
- * sanitize-schema extension (`sanitize.ts`, D-3) lets those marker classes
- * survive ⑦; the engine then renders each node with KaTeX and replaces it
- * with trusted output (never re-sanitized, never re-parsed from document
- * text).
+ * `math-inline`/`math-display` and become `code` elements. Under the strict
+ * §5.2 schema only `language-math` survives sanitize (B-10: the D-3 class
+ * alternation was unnecessary), which is the marker this engine and
+ * `rehype-katex` both recognize; the engine then renders each node with KaTeX
+ * and replaces it with trusted output (never re-sanitized, never re-parsed
+ * from document text).
  *
  * Per-node isolation: every marker is rendered once in a pre-flight try/catch;
  * a failing node (unknown macro, engine limit) becomes a local `.math-error`

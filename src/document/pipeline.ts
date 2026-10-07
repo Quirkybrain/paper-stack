@@ -40,6 +40,16 @@ const EMPTY_STATS: PipelineStats = {
   headingCount: 0,
 }
 
+/**
+ * Non-linguistic fallback for direct pipeline runs (unit tests / defensive
+ * callers): the app always injects the catalog label through
+ * `ParseDocumentOptions.footnoteLabel`. A single space is used because
+ * `mdast-util-to-hast` coerces a falsy label back to its upstream English
+ * default (`state.options.footnoteLabel || 'Footnotes'`), and B-03 forbids
+ * shipping that untranslated heading.
+ */
+export const BLANK_FOOTNOTE_LABEL = ' '
+
 export function resolvePipelineOptions(
   options: ParseDocumentOptions = {},
 ): ResolvedPipelineOptions {
@@ -47,6 +57,7 @@ export function resolvePipelineOptions(
     mode: options.mode ?? 'technical',
     inlineMath: options.inlineMath ?? true,
     simplified: options.simplified ?? false,
+    footnoteLabel: options.footnoteLabel ?? BLANK_FOOTNOTE_LABEL,
   }
 }
 
@@ -78,7 +89,11 @@ export async function parseDocument(
 
     // ⑤–⑦: hast conversion, raw HTML parsing, sanitize and the read-only patch.
     const hastProcessor = unified()
-      .use(remarkRehype, { allowDangerousHtml: true, clobberPrefix: 'ps-' })
+      .use(remarkRehype, {
+        allowDangerousHtml: true,
+        clobberPrefix: 'ps-',
+        footnoteLabel: resolved.footnoteLabel,
+      })
       .use(rehypeRaw)
       .use(rehypeSanitize, sanitizeSchema)
       .use(rehypeForceTaskCheckboxDisabled)

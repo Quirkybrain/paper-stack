@@ -43,6 +43,51 @@
   white-space: nowrap;
 }
 
+/* Document info layer (UI01; B-04): encoding, path, version, resource issues */
+.ps-document-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ps-space-2);
+  margin-bottom: var(--ps-space-2);
+}
+
+.ps-document-info-title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.ps-document-info-row {
+  margin: 0 0 var(--ps-space-1);
+  word-break: break-all;
+}
+
+.ps-document-info-issues-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.ps-document-info-issues-empty {
+  margin: 0;
+  color: var(--ps-color-muted);
+}
+
+.ps-document-info-issues {
+  margin: var(--ps-space-1) 0 0;
+  padding-left: var(--ps-space-4);
+}
+
+.ps-document-info-issues code {
+  margin-left: var(--ps-space-1);
+  color: var(--ps-color-muted);
+}
+
+.ps-document-info-readonly {
+  margin: var(--ps-space-2) 0 0;
+  color: var(--ps-color-muted);
+  font-size: 13px;
+}
+
 .ps-toolbar-spacer {
   flex: 1;
 }
