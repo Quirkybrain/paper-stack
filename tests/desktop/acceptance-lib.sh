@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # acceptance-lib.sh — shared helpers for the wp-34 AT01–AT30 desktop
 # acceptance runs (ADR-010; implementation plan §5.3/§5.5; test-engineer,
-# task wp-34-desktop-at).
+# task wp-34-desktop-at) and the wp-34b fixed-item re-runs (task
+# wp-34b-atrerun; AT06/07/14/15/19/26/28/30 + regression spot-checks).
 #
 # This library is sourced by tests/desktop/run-at-*.sh group scripts. It
 # provides: isolated app data, controlled launch/termination of the release
@@ -13,13 +14,16 @@
 # WM_DELETE_WINDOW close, screenshots are evidence not verification).
 #
 # Environment overrides: DISPLAY_AT (default :1), AT_GROUP (label written to
-# the log; default derived from the calling script).
+# the log; default derived from the calling script), AT_EVIDENCE (evidence
+# directory; default artifacts/70-verification/evidence/at — set to
+# .../evidence/at-rerun for the wp-34b re-runs so the wp-34 evidence is
+# preserved).
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DESKTOP="$ROOT/tests/desktop"
 HELPER="$DESKTOP/xdo-helper"
-EVIDENCE="$ROOT/artifacts/70-verification/evidence/at"
+EVIDENCE="${AT_EVIDENCE:-$ROOT/artifacts/70-verification/evidence/at}"
 INPUTS="$EVIDENCE/inputs"
 AT_DATA="$EVIDENCE/data"           # isolated XDG_DATA_HOME for all AT runs
 APP_BIN="$ROOT/src-tauri/target/release/paperstack"
@@ -95,6 +99,38 @@ paste_text() {
 }
 
 get_clip() { timeout 5 xclip -selection clipboard -o 2>/dev/null; }
+
+# db_path: the isolated app records database.
+db_path() { printf '%s\n' "$AT_DATA/com.quirkybrain.paperstack/paperstack.sqlite3"; }
+
+# db_dump <tag>: read-only records snapshot appended to runs.log (session,
+# recents, positions, documents, startup/privacy settings). Run while the app
+# is terminated so the read reflects the committed at-rest state.
+db_dump() {
+  local tag="$1"
+  printf '\n== DB dump [%s] %s ==\n' "$tag" "$(db_path)" >>"$RUNS"
+  python3 - "$(db_path)" >>"$RUNS" 2>&1 <<'PY'
+import sqlite3, sys
+db = sys.argv[1]
+con = sqlite3.connect(f'file:{db}?mode=ro', uri=True)
+def dump(label, query):
+    try:
+        rows = con.execute(query).fetchall()
+    except Exception as exc:  # noqa: BLE001 - diagnostics only
+        print(f'-- {label}: ERR {exc}')
+        return
+    print(f'-- {label}: {len(rows)}')
+    for row in rows:
+        print('  ', row)
+dump('session_tabs', 'select tab_id, doc_id, order_index, is_active from session_tabs order by order_index')
+dump('recents', 'select doc_id, last_path, opened_at from recents order by opened_at desc')
+dump('positions', 'select doc_id, version_hash, heading_path_json, '
+                  'substr(block_fingerprint,1,24), offset_ratio, source_range_json '
+                  'from positions')
+dump('documents', 'select doc_id, canonical_path, display_name from documents order by doc_id')
+dump('settings', 'select key, value_json from settings order by key')
+PY
+}
 
 # pixel_at <png> <x> <y>: print "r g b" of one pixel (ffmpeg raw crop).
 pixel_at() {
