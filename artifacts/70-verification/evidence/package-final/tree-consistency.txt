@@ -1,0 +1,8 @@
+== tree consistency vs evidence revisions (wp-50, 2026-10-08T05:10:01+08:00) ==
+HEAD=a4e7a1ca65ddaffd13031add02f4f7acbb486a19
+frontend src: identical to fa424ef (AT Rev7 / IT Rev3 build) [588 suite basis]
+rust src: identical to f8e4dae (wp-45 282 suite basis)
+tests/contracts: identical to b41a0d3 (system-verification 89 suite basis)
+packaging/LICENSE/notices: identical to wp-43 revision 7f5de8a
+wp-43 deb (superseded): b0f44fdba83b1bfa5bbca80293ee14c8dd1b25e32a602bd74bf098fa754b4968 11519100 bytes (built at 7f5de8a, pre-wp-45/47)
+final deb:              f72e3dbab442e71dd0df9e0d2ebe90e5699b60960af2ab6824164ba8d4788799 11526468 bytes (built at a4e7a1c, contains wp-45/47 fixes)

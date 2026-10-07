@@ -1,0 +1,10 @@
+== final artifact identity (2026-10-08T05:07:48+08:00) ==
+deb path=src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb size=11526468 bytes mtime=2026-10-08 05:07:44.517378444 +0800
+f72e3dbab442e71dd0df9e0d2ebe90e5699b60960af2ab6824164ba8d4788799  src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb
+binary path=src-tauri/target/release/paperstack size=28104112 bytes mtime=2026-10-08 05:07:44.530886784 +0800
+26c02d2d8f4d254abb9aaf332be8e0f8d1857c1f3cf097464bb0050835f6a8c3  src-tauri/target/release/paperstack
+old deb sha256 (wp-43): b0f44fdba83b1bfa5bbca80293ee14c8dd1b25e32a602bd74bf098fa754b4968 (size 11519100)
+== output/ supersession ==
+old: b0f44fdba83b1bfa5bbca80293ee14c8dd1b25e32a602bd74bf098fa754b4968 (wp-43 build, pre wp-45/wp-47)
+new: f72e3dbab442e71dd0df9e0d2ebe90e5699b60960af2ab6824164ba8d4788799 (2026-10-08T05:07:48+08:00)
+output size=11526468 mtime=2026-10-08 05:07:48.418265556 +0800

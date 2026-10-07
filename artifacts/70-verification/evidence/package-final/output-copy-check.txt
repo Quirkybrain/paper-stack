@@ -1,0 +1,3 @@
+f72e3dbab442e71dd0df9e0d2ebe90e5699b60960af2ab6824164ba8d4788799  output/paperstack_0.1.0_amd64.deb
+f72e3dbab442e71dd0df9e0d2ebe90e5699b60960af2ab6824164ba8d4788799  src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb
+output copy: byte-identical to bundle artifact
