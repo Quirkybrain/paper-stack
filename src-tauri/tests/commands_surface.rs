@@ -662,6 +662,16 @@ fn export_to(
     )
 }
 
+/// Machine-readable blocked reason carried by `PS_IO_EXPORT_BLOCKED`
+/// (D-34b-3/AT28): the UI must never read a protected source target as an
+/// overwrite question.
+fn export_blocked_reason(error: &AppError) -> &str {
+    match error.details().and_then(|details| details.get("reason")) {
+        Some(DetailValue::String(value)) => value.as_str(),
+        other => panic!("expected string reason detail, got {other:?}"),
+    }
+}
+
 #[test]
 fn export_rejects_open_documents_and_their_parent_directories() {
     let (temp, service, _clock) = diagnostics_fixture(LOG_MAX_BYTES);
@@ -678,9 +688,11 @@ fn export_rejects_open_documents_and_their_parent_directories() {
     let inside = notes.join("diagnostics.txt");
     let error = export_to(&service, &preview.export_id, &inside, true, &protected).unwrap_err();
     assert_eq!(error.code(), ErrorCode::IoExportBlocked);
+    assert_eq!(export_blocked_reason(&error), "protected-source");
 
     let exact = export_to(&service, &preview.export_id, &source, true, &protected).unwrap_err();
     assert_eq!(exact.code(), ErrorCode::IoExportBlocked);
+    assert_eq!(export_blocked_reason(&exact), "protected-source");
 
     // The failed exports must not consume the preview.
     let outside = temp.path().join("export.txt");
@@ -703,6 +715,7 @@ fn export_requires_absolute_target_and_overwrite_confirmation() {
     )
     .unwrap_err();
     assert_eq!(relative.code(), ErrorCode::IoExportBlocked);
+    assert_eq!(export_blocked_reason(&relative), "invalid-target");
 
     let target = temp.path().join("existing.txt");
     fs::write(&target, "old").unwrap();
@@ -715,6 +728,7 @@ fn export_requires_absolute_target_and_overwrite_confirmation() {
     )
     .unwrap_err();
     assert_eq!(blocked.code(), ErrorCode::IoExportBlocked);
+    assert_eq!(export_blocked_reason(&blocked), "target-exists");
 
     export_to(
         &service,
@@ -824,6 +838,7 @@ fn export_protects_error_state_source_directories_too() {
     )
     .unwrap_err();
     assert_eq!(error.code(), ErrorCode::IoExportBlocked);
+    assert_eq!(export_blocked_reason(&error), "protected-source");
 
     // Non-source target: the export still succeeds with the same preview.
     let outside = temp.path().join("export-ok.txt");

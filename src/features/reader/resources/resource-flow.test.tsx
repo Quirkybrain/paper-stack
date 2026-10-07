@@ -152,6 +152,91 @@ describe('remote image flow (T-58)', () => {
     expect(fetchRemoteImageMock).toHaveBeenCalledWith({ docId: 'd-a', url: IMG_URL })
   })
 
+  it('runs the controlled fetch when the grant makes the decision allowed without an asset URL (D-34b-2/AT26)', async () => {
+    checkResourceAccessMock.mockResolvedValue(remoteBlocked())
+    grantRemoteSessionMock.mockResolvedValue({
+      grantId: 'g-remote',
+      kind: 'remote',
+      scope: 'session',
+      docId: 'd-a',
+      origins: [IMG_ORIGIN],
+      grantedAtMs: 1,
+    })
+    fetchRemoteImageMock.mockResolvedValue({
+      assetUrl: 'asset://remote/a.png?v=1',
+      mime: 'image/png',
+      sizeBytes: 10,
+      finalUrl: IMG_URL,
+      cacheKey: 'k1',
+      fromCache: false,
+    })
+    renderHarness([{ src: IMG_URL, alt: '远程图' }])
+    await screen.findByText(t('image.remoteBlocked'))
+    expect(fetchRemoteImageMock).not.toHaveBeenCalled()
+
+    // The real backend reports `allowed` with no assetUrl for a granted
+    // origin (contracts §2 rows 24/30; security-model §4): the component
+    // must run the controlled fetch instead of showing a load failure.
+    checkResourceAccessMock.mockResolvedValue({
+      status: 'allowed',
+      kind: 'remote',
+      origin: IMG_ORIGIN,
+    })
+    await allowRemoteDialog()
+    const image = await screen.findByRole('img', { name: '远程图' })
+    expect(image.getAttribute('src')).toBe('asset://remote/a.png?v=1')
+    expect(fetchRemoteImageMock).toHaveBeenCalledTimes(1)
+    expect(fetchRemoteImageMock).toHaveBeenCalledWith({ docId: 'd-a', url: IMG_URL })
+  })
+
+  it('keeps a granted-fetch failure explicit with retry only on click (D-34b-2/AT26)', async () => {
+    checkResourceAccessMock.mockResolvedValue(remoteBlocked())
+    grantRemoteSessionMock.mockResolvedValue({
+      grantId: 'g-remote',
+      kind: 'remote',
+      scope: 'session',
+      docId: 'd-a',
+      origins: [IMG_ORIGIN],
+      grantedAtMs: 1,
+    })
+    const remoteFailed: ErrorPayload = {
+      code: 'PS_REMOTE_FAILED',
+      category: 'resource',
+      messageKey: 'error.resource.remoteFailed',
+      retryable: true,
+    }
+    fetchRemoteImageMock.mockRejectedValueOnce(remoteFailed)
+    fetchRemoteImageMock.mockResolvedValue({
+      assetUrl: 'asset://remote/a.png?v=2',
+      mime: 'image/png',
+      sizeBytes: 10,
+      finalUrl: IMG_URL,
+      cacheKey: 'k1',
+      fromCache: false,
+    })
+    renderHarness([{ src: IMG_URL, alt: '远程图' }])
+    await screen.findByText(t('image.remoteBlocked'))
+
+    checkResourceAccessMock.mockResolvedValue({
+      status: 'allowed',
+      kind: 'remote',
+      origin: IMG_ORIGIN,
+    })
+    await allowRemoteDialog()
+
+    expect(await screen.findByText(t('error.resource.remoteFailed'))).toBeTruthy()
+    expect(fetchRemoteImageMock).toHaveBeenCalledTimes(1)
+    // No automatic retry loop.
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(fetchRemoteImageMock).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: t('image.retry') }))
+    await waitFor(() => expect(fetchRemoteImageMock).toHaveBeenCalledTimes(2))
+    await screen.findByRole('img', { name: '远程图' })
+  })
+
   it('shows the redirect-blocked message and retries only on explicit click', async () => {
     checkResourceAccessMock.mockResolvedValue(remoteBlocked())
     grantRemoteSessionMock.mockResolvedValue({

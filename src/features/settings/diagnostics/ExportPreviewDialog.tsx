@@ -99,11 +99,21 @@ export function ExportPreviewDialog({ onClose, protectedPaths }: ExportPreviewDi
         })
       } catch (cause) {
         const payload = toErrorPayload(cause)
-        if (!overwrite && payload.code === 'PS_IO_EXPORT_BLOCKED') {
-          // Same code protects source locations and asks for overwrite
-          // confirmation (contracts §5); the local check above already ruled
-          // out known source targets, so ask before the second attempt.
-          setOverwriteTarget(targetPath)
+        if (payload.code === 'PS_IO_EXPORT_BLOCKED') {
+          // `PS_IO_EXPORT_BLOCKED` carries a machine-readable reason
+          // (security-model §7; D-34b-3/AT28): only `target-exists` is an
+          // overwrite question. A protected source target (including sources
+          // known only to Rust, e.g. error-state documents) must be explained
+          // and re-chosen, never confirmed as an overwrite.
+          if (payload.details?.reason === 'target-exists') {
+            if (overwrite) {
+              setNotice({ tone: 'danger', key: 'diagnostics.export.saveFailed' })
+            } else {
+              setOverwriteTarget(targetPath)
+            }
+          } else {
+            setNotice({ tone: 'danger', key: 'diagnostics.export.blocked' })
+          }
         } else {
           setNotice({ tone: 'danger', key: 'diagnostics.export.saveFailed' })
         }
