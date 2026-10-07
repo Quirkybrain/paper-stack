@@ -1,4 +1,4 @@
-import { useEffect, type CSSProperties } from 'react'
+import { useEffect, useRef, type CSSProperties } from 'react'
 
 import { Icon } from './Icon'
 import { IconButton } from './IconButton'
@@ -42,15 +42,22 @@ export function Toast({
   durationMs = TOAST_SUCCESS_DURATION_MS,
   className,
 }: ToastProps) {
+  // Keep the latest dismiss callback in a ref so the auto-dismiss timer is not
+  // reset by an unrelated parent re-render with a new function identity.
+  const onDismissRef = useRef(onDismiss)
   useEffect(() => {
-    if (tone !== 'success' || onDismiss === undefined) return
+    onDismissRef.current = onDismiss
+  })
+  const hasDismiss = onDismiss !== undefined
+  useEffect(() => {
+    if (tone !== 'success' || !hasDismiss) return
     const timer = window.setTimeout(() => {
-      onDismiss()
+      onDismissRef.current?.()
     }, durationMs)
     return () => {
       window.clearTimeout(timer)
     }
-  }, [tone, durationMs, onDismiss])
+  }, [tone, durationMs, hasDismiss])
 
   return (
     <div

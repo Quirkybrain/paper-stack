@@ -7,6 +7,7 @@ import {
   type DocumentSessionState,
   type SessionAction,
 } from '../../app/session'
+import type { LargeDocMode } from '../../document/modes/modes'
 import type { ErrorPayload } from '../../services/types'
 
 /**
@@ -25,7 +26,14 @@ import type { ErrorPayload } from '../../services/types'
  * - the last closed tab leaves the reader empty (INV-TL-05).
  */
 
-export type ReaderPhase = 'reading' | 'parsing' | 'ready' | 'failed' | 'cancelled'
+export type ReaderPhase =
+  | 'reading'
+  | 'parsing'
+  | 'ready'
+  | 'failed'
+  | 'cancelled'
+  /** Open-time large-document prompt; nothing is read until the user chooses. */
+  | 'largeDoc'
 
 /** Per-tab main view (ui-spec §3.5): source view shares the display version. */
 export type ReaderViewMode = 'reading' | 'source'
@@ -44,6 +52,8 @@ export interface ReaderTab {
   bannerCollapsed: boolean
   /** Reading or read-only source; switching never updates or adds history. */
   viewMode: ReaderViewMode
+  /** D5 display mode: full / simplified / sourceWindow (models §0.2; R29). */
+  largeDocMode: LargeDocMode
 }
 
 export interface ReaderState {
@@ -77,6 +87,7 @@ export function createReaderTab(input: NewTabInput): ReaderTab {
     error: null,
     bannerCollapsed: false,
     viewMode: 'reading',
+    largeDocMode: 'full',
   }
 }
 
@@ -88,6 +99,7 @@ export type ReaderAction =
   | { type: 'tab/phase'; tabId: string; phase: ReaderPhase; error?: ErrorPayload | null }
   | { type: 'tab/banner'; tabId: string; collapsed: boolean }
   | { type: 'tab/view'; tabId: string; mode: ReaderViewMode }
+  | { type: 'tab/largeDoc'; tabId: string; mode: LargeDocMode }
   | {
       type: 'tab/docReplace'
       tabId: string
@@ -131,6 +143,12 @@ export const tabBanner = (tabId: string, collapsed: boolean): ReaderAction => ({
 
 export const tabView = (tabId: string, mode: ReaderViewMode): ReaderAction => ({
   type: 'tab/view',
+  tabId,
+  mode,
+})
+
+export const tabLargeDoc = (tabId: string, mode: LargeDocMode): ReaderAction => ({
+  type: 'tab/largeDoc',
   tabId,
   mode,
 })
@@ -296,6 +314,19 @@ export function readerReducer(state: ReaderState, action: ReaderAction): ReaderS
       }
     }
 
+    case 'tab/largeDoc': {
+      const tab = state.tabs.find((candidate) => candidate.tabId === action.tabId)
+      if (!tab || tab.largeDocMode === action.mode) return state
+      return {
+        ...state,
+        tabs: state.tabs.map((candidate) =>
+          candidate.tabId === action.tabId
+            ? { ...candidate, largeDocMode: action.mode }
+            : candidate,
+        ),
+      }
+    }
+
     case 'tab/docReplace': {
       const tab = state.tabs.find((candidate) => candidate.tabId === action.tabId)
       if (!tab || tab.docId === action.docId) return state
@@ -314,6 +345,7 @@ export function readerReducer(state: ReaderState, action: ReaderAction): ReaderS
                 error: null,
                 bannerCollapsed: false,
                 viewMode: 'reading',
+                largeDocMode: 'full',
               }
             : candidate,
         ),

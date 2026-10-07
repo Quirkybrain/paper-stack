@@ -46,6 +46,7 @@ export function resolvePipelineOptions(
   return {
     mode: options.mode ?? 'technical',
     inlineMath: options.inlineMath ?? true,
+    simplified: options.simplified ?? false,
   }
 }
 
@@ -99,21 +100,28 @@ export async function parseDocument(
       },
     }
 
-    for (const engine of listEngines()) {
-      try {
-        const next = await engine.transform(hast, context)
-        if (next) hast = next
-      } catch {
-        // Failure isolation (rendering-pipeline §4): a failing engine degrades
-        // locally and never blocks the rest of the document. Error messages
-        // may contain document text, so only the engine name is recorded.
-        diagnostics.push({
-          code: 'PS_PARSE_LOCAL',
-          category: 'parse',
-          messageKey: 'error.parse.local',
-          retryable: false,
-          details: { engine: engine.name },
-        })
+    // ⑧–⑩: engine slots run strictly after sanitize, in spec order. The
+    // simplified subset skips them entirely: heavy blocks keep their sanitized
+    // source form (code blocks, `.math` source, mermaid code block) while the
+    // block/segment source map stays identical to the full pipeline
+    // (rendering-pipeline §5: "简化模式仍是同一管线的子集").
+    if (!resolved.simplified) {
+      for (const engine of listEngines()) {
+        try {
+          const next = await engine.transform(hast, context)
+          if (next) hast = next
+        } catch {
+          // Failure isolation (rendering-pipeline §4): a failing engine degrades
+          // locally and never blocks the rest of the document. Error messages
+          // may contain document text, so only the engine name is recorded.
+          diagnostics.push({
+            code: 'PS_PARSE_LOCAL',
+            category: 'parse',
+            messageKey: 'error.parse.local',
+            retryable: false,
+            details: { engine: engine.name },
+          })
+        }
       }
     }
 

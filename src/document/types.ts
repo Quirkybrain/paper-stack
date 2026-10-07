@@ -107,11 +107,19 @@ export interface ParseDocumentOptions {
    * protocol so the interface is frozen now.
    */
   inlineMath?: boolean
+  /**
+   * Simplified-reading subset (rendering-pipeline §5; R29/AT29): the same
+   * pipeline keeps text/structure/search/source-map output but skips the
+   * heavy engine slots (⑧ KaTeX, ⑨ Shiki, ⑩ Mermaid placeholder); heavy
+   * blocks then show their source, exactly like the frozen mode table says.
+   */
+  simplified?: boolean
 }
 
 export interface ResolvedPipelineOptions {
   mode: PipelineMode
   inlineMath: boolean
+  simplified: boolean
 }
 
 /**

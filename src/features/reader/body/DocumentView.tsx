@@ -37,6 +37,12 @@ export interface DocumentViewProps {
   /** Session generation; changes invalidate progressive-mount progress. */
   generation: number
   /**
+   * Simplified reading subset (R29): images render as alt placeholders and
+   * heavy engines were skipped by the pipeline; the block/segment source map
+   * is unchanged.
+   */
+  simplified?: boolean
+  /**
    * Block that must be mounted before focusing it (search/history locate);
    * the progressive mount never skips a revealed block (ui-spec §3.4).
    */
@@ -69,6 +75,7 @@ interface OverrideContextValue {
   docId: string
   rawText: string
   result: ParseDocumentResult
+  simplified: boolean
   highlightBySeg: ReadonlyMap<string, readonly SearchHighlightRange[]>
   sourceExcerptFor(blockId: string): string | undefined
   onDocumentLink?: (href: string) => void
@@ -179,7 +186,11 @@ function DivOverride(props: OverrideProps): ReactNode {
 
 function ImgOverride(props: OverrideProps): ReactNode {
   const context = useOverrideContext()
-  return createElement(ImageBlock, { ...props, docId: context?.docId ?? '' } as never)
+  return createElement(ImageBlock, {
+    ...props,
+    docId: context?.docId ?? '',
+    simplified: context?.simplified ?? false,
+  } as never)
 }
 
 /** Link routing subset (R15/R16): fragments scroll/record; http(s) go to the
@@ -284,6 +295,7 @@ export function DocumentView({
   rawText,
   result,
   generation,
+  simplified = false,
   revealBlockId,
   searchHighlights,
   onDocumentLink,
@@ -323,11 +335,12 @@ export function DocumentView({
       docId,
       rawText,
       result,
+      simplified,
       highlightBySeg,
       sourceExcerptFor,
       ...(onDocumentLink ? { onDocumentLink } : {}),
     }),
-    [docId, rawText, result, highlightBySeg, sourceExcerptFor, onDocumentLink],
+    [docId, rawText, result, simplified, highlightBySeg, sourceExcerptFor, onDocumentLink],
   )
 
   const content = useMemo(() => {
