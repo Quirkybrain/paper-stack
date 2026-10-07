@@ -6,11 +6,12 @@ use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use paperstack_lib::error::ErrorCode;
-use paperstack_lib::models::{DetailValue, GrantKind, GrantRecord, GrantScope};
-use paperstack_lib::services::auth::{AuthRegistry, GrantPersistence};
+use paperstack_lib::models::{DetailValue, GrantKind, GrantRecord, GrantScope, OpenEntry};
+use paperstack_lib::services::auth::{AuthRegistry, GrantPersistence, OpenAuthorizationOutcome};
 use paperstack_lib::services::paths::{self, LocalReadOutcome, PathProbe, SystemPathProbe};
 use tempfile::TempDir;
 
@@ -628,6 +629,66 @@ fn startup_revalidation_clears_session_and_marks_missing_persistent() {
     assert!(!registry.is_unavailable(&missing.grant_id));
 }
 
+#[test]
+fn restore_does_not_regrant_revoked_authorization() {
+    let fixture = Fixture::new();
+    let path = canonical(&fixture.root.join("a.md"));
+    let store = Arc::new(RecordingStore::default());
+    let mut registry = AuthRegistry::with_persistence(Box::new(StoreHandle(store.clone())));
+    let probe = SystemPathProbe;
+
+    // 1. An explicit open registers the persistent grant (AT06 baseline).
+    let grant = registry.grant_file(&path, 1).unwrap();
+    assert_eq!(store.upserts.lock().unwrap().len(), 1);
+
+    // 2. The user revokes it: registry and persisted row are both gone.
+    registry.revoke(&grant.grant_id).unwrap();
+    assert!(registry.list().is_empty());
+    assert!(!registry.has_local_access(&path));
+    assert_eq!(
+        store.deletes.lock().unwrap().as_slice(),
+        std::slice::from_ref(&grant.grant_id)
+    );
+
+    // 3. A restart restore over the revoked authorization must not re-grant
+    // (INV-AZ-10; models §10.2; data-model §3.2): the decision needs fresh
+    // confirmation, creates no record and never reaches the persistence hook.
+    let outcome = registry
+        .authorize_open_entry(OpenEntry::Restore, &path, 2)
+        .unwrap();
+    assert_eq!(outcome, OpenAuthorizationOutcome::NeedsConfirmation);
+    assert!(
+        registry.list().is_empty(),
+        "restore must not create a grant"
+    );
+    assert_eq!(
+        store.upserts.lock().unwrap().len(),
+        1,
+        "restore must not touch the persistence upsert"
+    );
+    assert!(!registry.has_local_access(&path));
+
+    // A revoked grant keeps new reads stopped: the read path stays closed
+    // until an explicit user confirmation.
+    let denied = registry
+        .authorize_local_read(&probe, &fixture.root(), "a.md")
+        .unwrap_err();
+    assert_eq!(denied.code(), ErrorCode::AuthOutsideRoot);
+
+    // 4. With a valid authorization the restore proceeds unchanged.
+    let regranted = registry.grant_file(&path, 3).unwrap();
+    assert_eq!(store.upserts.lock().unwrap().len(), 2);
+    let outcome = registry
+        .authorize_open_entry(OpenEntry::Restore, &path, 4)
+        .unwrap();
+    assert_eq!(outcome, OpenAuthorizationOutcome::Restored);
+    assert_eq!(registry.list(), vec![regranted]);
+    let allowed = registry
+        .authorize_local_read(&probe, &fixture.root(), "a.md")
+        .unwrap();
+    assert!(matches!(allowed, LocalReadOutcome::Authorized(_)));
+}
+
 #[cfg(unix)]
 #[test]
 fn unreadable_persistent_grant_is_marked_unavailable() {
@@ -663,6 +724,7 @@ struct RecordingStore {
     upserts: Mutex<Vec<String>>,
     deletes: Mutex<Vec<String>>,
     fail_upsert: bool,
+    fail_delete: AtomicBool,
 }
 
 #[derive(Debug)]
@@ -683,6 +745,9 @@ impl GrantPersistence for StoreHandle {
 
     fn delete(&self, grant_id: &str) -> Result<(), paperstack_lib::error::AppError> {
         self.0.deletes.lock().unwrap().push(grant_id.to_owned());
+        if self.0.fail_delete.load(Ordering::SeqCst) {
+            return Err(paperstack_lib::error::AppError::new(ErrorCode::DbFailure));
+        }
         Ok(())
     }
 }
@@ -719,4 +784,45 @@ fn persistence_failure_is_surfaced_and_grant_is_not_added() {
         .unwrap_err();
     assert_eq!(error.code(), ErrorCode::DbFailure);
     assert!(registry.list().is_empty());
+}
+
+#[test]
+fn revoke_delete_failure_keeps_the_grant_and_retry_completes() {
+    let fixture = Fixture::new();
+    let store = Arc::new(RecordingStore::default());
+    store.fail_delete.store(true, Ordering::SeqCst);
+    let mut registry = AuthRegistry::with_persistence(Box::new(StoreHandle(store.clone())));
+    let probe = SystemPathProbe;
+    let path = canonical(&fixture.root.join("a.md"));
+    let grant = registry.grant_file(&path, 1).unwrap();
+
+    // A-03 option (a): a failed persistent delete leaves the whole revocation
+    // undone — the grant stays listed, readable and asset-scoped — and the
+    // storage error is surfaced instead of a half-revoked state.
+    let error = registry.revoke(&grant.grant_id).unwrap_err();
+    assert_eq!(error.code(), ErrorCode::DbFailure);
+    assert_eq!(registry.list(), vec![grant.clone()]);
+    assert!(registry.has_local_access(&path));
+    let allowed = registry
+        .authorize_local_read(&probe, &fixture.root(), "a.md")
+        .unwrap();
+    let LocalReadOutcome::Authorized(read) = allowed else {
+        panic!("expected authorization");
+    };
+    assert!(registry.asset_scope().contains(&read.canonical_path));
+
+    // Retry once the storage recovers: the revocation now completes, so it
+    // never becomes unrecoverable (no `PS_IO_NOT_FOUND` on retry).
+    store.fail_delete.store(false, Ordering::SeqCst);
+    let revoked = registry.revoke(&grant.grant_id).unwrap();
+    assert!(revoked.revoked);
+    assert!(registry.list().is_empty());
+    assert!(!registry.has_local_access(&path));
+    assert_eq!(
+        store.deletes.lock().unwrap().len(),
+        2,
+        "the failed delete attempt is retried"
+    );
+    let second = registry.revoke(&grant.grant_id).unwrap_err();
+    assert_eq!(second.code(), ErrorCode::IoNotFound);
 }

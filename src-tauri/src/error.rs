@@ -11,6 +11,7 @@ use std::str::FromStr;
 use thiserror::Error;
 
 use crate::models::{ErrorCategory, ErrorDetails, ErrorPayload, SourceRange};
+use crate::services::diagnostics::sanitize_details;
 
 /// Whether a stable code can carry a `sourceRange` (contracts §5 table).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -384,7 +385,9 @@ impl AppError {
     }
 
     /// Wire payload with the stable code, category, `messageKey` and
-    /// `retryable` flag (contracts §5).
+    /// `retryable` flag (contracts §5). This is the single payload exit:
+    /// `details` is filtered through the security-model §7 allowlist, so no
+    /// caller can smuggle a non-allowlisted key into a payload (A-08).
     pub fn to_payload(&self) -> ErrorPayload {
         ErrorPayload {
             code: self.code.as_str().to_owned(),
@@ -392,7 +395,7 @@ impl AppError {
             message_key: self.code.message_key().to_owned(),
             retryable: self.code.retryable(),
             source_range: self.source_range,
-            details: self.details.clone(),
+            details: self.details.as_ref().map(sanitize_details),
         }
     }
 
@@ -581,6 +584,39 @@ mod tests {
         let back: ErrorPayload = serde_json::from_value(value).unwrap();
         assert_eq!(back, payload);
         assert_eq!(ErrorPayload::from(&error), payload);
+    }
+
+    #[test]
+    fn payload_drops_non_allowlisted_details() {
+        let mut details = BTreeMap::new();
+        details.insert(
+            "rootCandidate".to_owned(),
+            DetailValue::String("/home/user/notes/img".to_owned()),
+        );
+        details.insert(
+            "operation".to_owned(),
+            DetailValue::String("clear".to_owned()),
+        );
+        details.insert(
+            "secretToken".to_owned(),
+            DetailValue::String("must-not-leak".to_owned()),
+        );
+        details.insert("absolutePath".to_owned(), DetailValue::Bool(true));
+
+        let error = AppError::new(ErrorCode::AuthOutsideRoot).with_details(details);
+        let payload = error.to_payload();
+        let payload_details = payload.details.expect("allowlisted details must survive");
+        assert_eq!(
+            payload_details.get("rootCandidate"),
+            Some(&DetailValue::String("/home/user/notes/img".to_owned()))
+        );
+        assert!(payload_details.contains_key("operation"));
+        assert!(!payload_details.contains_key("secretToken"));
+        assert!(!payload_details.contains_key("absolutePath"));
+        assert_eq!(payload_details.len(), 2);
+
+        // The source error keeps its details; only the wire exit filters.
+        assert_eq!(error.details().map(ErrorDetails::len), Some(4));
     }
 
     #[test]

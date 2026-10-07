@@ -195,14 +195,15 @@ fn apply_authorization_clear(state: &AppState, mut result: ClearResult) -> Clear
     let mut remote_failures = 0usize;
     let mut removed_cache_entries = 0u64;
     for doc_id in &outcome.remote_doc_ids {
-        match revoke_remote_cache(state, doc_id) {
-            Ok(removed) => removed_cache_entries += removed,
-            Err(error) => {
-                remote_failures += 1;
-                state
-                    .diagnostics
-                    .record_app_error(Some(doc_id.as_str()), &error);
-            }
+        let report = revoke_remote_cache(state, doc_id);
+        removed_cache_entries += report.removed_cache_entries;
+        if report.failed_removals > 0 || report.scope_failures > 0 {
+            remote_failures += 1;
+            state.diagnostics.record_app_error(
+                Some(doc_id.as_str()),
+                &AppError::new(ErrorCode::RemoteFailed)
+                    .with_message("remote cache cleanup was incomplete during authorization clear"),
+            );
         }
     }
     state.diagnostics.log(&LogEvent {

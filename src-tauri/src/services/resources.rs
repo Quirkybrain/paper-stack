@@ -129,7 +129,9 @@ fn protocol_error(message: impl Into<String>) -> AppError {
 
 /// Parses a remote reference: only `https` with a host passes
 /// (security-model §4). `http` and every other scheme is
-/// `PS_REMOTE_PROTOCOL`.
+/// `PS_REMOTE_PROTOCOL`. Credential-bearing URLs are rejected before any
+/// cache/allow-list/DNS/transport action (A-07; security-model §4
+/// minimization: a document must never hand out credentials).
 pub fn parse_remote_url(raw: &str) -> Result<Url, AppError> {
     let url = Url::parse(raw).map_err(|_| protocol_error("remote URL is not valid"))?;
     if url.scheme() != "https" {
@@ -137,6 +139,9 @@ pub fn parse_remote_url(raw: &str) -> Result<Url, AppError> {
     }
     if url.host_str().is_none() {
         return Err(protocol_error("remote URL has no host"));
+    }
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err(protocol_error("remote URL must not contain credentials"));
     }
     Ok(url)
 }
@@ -705,6 +710,12 @@ impl RemoteService {
                     }
                     if next.scheme() != "https" {
                         return Err(redirect_blocked(&next, "redirect must stay on https"));
+                    }
+                    if !next.username().is_empty() || next.password().is_some() {
+                        return Err(redirect_blocked(
+                            &next,
+                            "redirect target must not contain credentials",
+                        ));
                     }
                     let next_origin = origin_from_url(&next).map_err(|_| {
                         redirect_blocked(&next, "redirect target has no valid origin")

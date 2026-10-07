@@ -403,6 +403,23 @@ impl Storage {
         Self::finish_open(connection, path, false)
     }
 
+    /// NF08 storage open ladder (data-model §4.4/§4.5): try the regular
+    /// read-write open first; when that fails, fall back to a read-only open
+    /// of the same file so records stay readable (a higher schema revision or
+    /// an unwritable path is a read-only degrade, not a memory wipe). A file
+    /// that cannot be read even read-only (e.g. corrupted) yields `None` and
+    /// keeps the read-write error for diagnostics.
+    pub fn open_with_degrade(data_dir: &Path) -> (Option<Storage>, Option<AppError>) {
+        let path = data_dir.join(DATABASE_FILE_NAME);
+        match Self::open_path(&path) {
+            Ok(storage) => (Some(storage), None),
+            Err(read_write_error) => match Self::open_read_only_path(&path) {
+                Ok(storage) => (Some(storage), Some(read_write_error)),
+                Err(_) => (None, Some(read_write_error)),
+            },
+        }
+    }
+
     /// Read-only degraded open (data-model §4.5): no migration, `query_only`
     /// enforced, usable for the “newer revision” and memory-degrade paths.
     pub fn open_read_only_path(path: &Path) -> Result<Self, AppError> {

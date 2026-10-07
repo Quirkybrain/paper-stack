@@ -5,8 +5,11 @@
 use std::fs;
 use std::path::PathBuf;
 
-use paperstack_lib::error::ErrorCode;
-use paperstack_lib::models::{AnchorRecord, GlobalSettings, GlobalSettingsPatch, SourceRange};
+use paperstack_lib::error::{AppError, ErrorCode};
+use paperstack_lib::models::{
+    AnchorRecord, GlobalSettings, GlobalSettingsPatch, GrantKind, GrantRecord, GrantScope,
+    SourceRange,
+};
 use paperstack_lib::services::storage::{
     default_migrations, migrate_connection, CacheEntry, Migration, Storage, DATABASE_FILE_NAME,
     SCHEMA_REVISION,
@@ -144,7 +147,19 @@ fn newer_schema_revision_is_refused_read_write_and_readable_in_read_only_degrade
     let temp = TempDir::new().unwrap();
     let db_path = temp.path().join(DATABASE_FILE_NAME);
     {
-        let _storage = Storage::open_path(&db_path).unwrap();
+        let storage = Storage::open_path(&db_path).unwrap();
+        // A persistent grant proves records stay readable in the degrade.
+        storage
+            .upsert_grant(&GrantRecord {
+                grant_id: "g-read-only-degrade".to_owned(),
+                kind: GrantKind::File,
+                scope: GrantScope::Persistent,
+                canonical_path: Some("/tmp/paperstack-read-only-degrade.md".to_owned()),
+                origins: None,
+                doc_id: None,
+                granted_at_ms: 1,
+            })
+            .unwrap();
     }
     {
         let connection = Connection::open(&db_path).unwrap();
@@ -165,9 +180,49 @@ fn newer_schema_revision_is_refused_read_write_and_readable_in_read_only_degrade
     );
     drop(storage);
 
+    // The NF08 startup ladder (`AppState::create`; A-05) reaches the same
+    // read-only degrade and reports the read-write failure honestly.
+    let (degraded, read_write_error) = Storage::open_with_degrade(temp.path());
+    assert_eq!(
+        read_write_error.as_ref().map(AppError::code),
+        Some(ErrorCode::DbMigration)
+    );
+    let degraded = degraded.expect("read-only degrade must be reachable");
+    assert!(degraded.is_read_only());
+    assert_eq!(degraded.schema_revision().unwrap(), 2);
+    assert_eq!(degraded.load_settings().unwrap(), GlobalSettings::default());
+    let grants = degraded.load_grants().unwrap();
+    assert_eq!(grants.len(), 1);
+    assert_eq!(grants[0].grant_id, "g-read-only-degrade");
+    drop(degraded);
+
     // The file is preserved and not downgraded (data-model §4.5).
     let connection = Connection::open(&db_path).unwrap();
     assert_eq!(scalar_i64(&connection, "PRAGMA user_version"), 2);
+}
+
+#[test]
+fn storage_open_degrade_ladder_prefers_read_write_and_reports_corruption() {
+    // A healthy directory opens read-write with no degrade status.
+    let temp = TempDir::new().unwrap();
+    let (storage, error) = Storage::open_with_degrade(temp.path());
+    let storage = storage.expect("a fresh database must open");
+    assert!(!storage.is_read_only());
+    assert!(error.is_none());
+
+    // A corrupt file is not silently degraded or wiped: no storage handle and
+    // the PS_DB_MIGRATION error is preserved (NF08; data-model §4.4).
+    let bad = TempDir::new().unwrap();
+    let bad_path = bad.path().join(DATABASE_FILE_NAME);
+    let garbage = b"\x00\x01not a sqlite database at all\xff\xfe";
+    fs::write(&bad_path, garbage).unwrap();
+    let (storage, error) = Storage::open_with_degrade(bad.path());
+    assert!(storage.is_none());
+    assert_eq!(
+        error.map(|error| error.code()),
+        Some(ErrorCode::DbMigration)
+    );
+    assert_eq!(fs::read(&bad_path).unwrap(), garbage);
 }
 
 #[test]

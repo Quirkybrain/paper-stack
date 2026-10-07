@@ -154,7 +154,7 @@ mod tests {
 
     use super::*;
     use crate::models::GrantScope;
-    use crate::services::auth::{AuthRegistry, ClearRevokeStatus};
+    use crate::services::auth::{AuthRegistry, ClearRevokeStatus, GrantPersistence};
     use crate::services::paths::{LocalReadOutcome, SystemPathProbe};
 
     /// Deterministic scope double: records the exact call sequence and can be
@@ -221,6 +221,29 @@ mod tests {
     fn controller() -> (AssetScopeController, Arc<RecordingBackend>) {
         let backend = Arc::new(RecordingBackend::default());
         (AssetScopeController::new(backend.clone()), backend)
+    }
+
+    /// Persistence double whose `delete` failure can be toggled (A-03).
+    #[derive(Debug, Default, Clone)]
+    struct ToggleDeleteStore {
+        fail_delete: Arc<AtomicBool>,
+    }
+
+    impl GrantPersistence for ToggleDeleteStore {
+        fn load_all(&self) -> Result<Vec<GrantRecord>, AppError> {
+            Ok(Vec::new())
+        }
+
+        fn upsert(&self, _record: &GrantRecord) -> Result<(), AppError> {
+            Ok(())
+        }
+
+        fn delete(&self, _grant_id: &str) -> Result<(), AppError> {
+            if self.fail_delete.load(Ordering::SeqCst) {
+                return Err(AppError::new(ErrorCode::DbFailure));
+            }
+            Ok(())
+        }
     }
 
     struct Fixture {
@@ -419,6 +442,38 @@ mod tests {
             ],
             "a re-confirmation must re-apply the exact allow mapping"
         );
+    }
+
+    #[test]
+    fn revoke_persistence_failure_keeps_the_scope_and_completes_on_retry() {
+        let fixture = Fixture::new();
+        let (controller, backend) = controller();
+        let store = ToggleDeleteStore::default();
+        let mut registry = AuthRegistry::with_persistence(Box::new(store.clone()));
+        registry.set_runtime_scope(controller);
+
+        let file = fixture.file("a.md");
+        let grant = registry.grant_file(&file, 1).unwrap();
+        assert_eq!(backend.ops(), [format!("allow_file {}", file.display())]);
+
+        // A failed persistent delete (A-03) leaves the whole revocation
+        // undone: no forbid is issued and the grant stays active.
+        store.fail_delete.store(true, Ordering::SeqCst);
+        let error = registry.revoke(&grant.grant_id).unwrap_err();
+        assert_eq!(error.code(), ErrorCode::DbFailure);
+        assert!(backend.forbid_ops().is_empty());
+        assert_eq!(registry.list(), vec![grant.clone()]);
+        assert!(registry.has_local_access(&file));
+
+        // Retry once the storage recovers completes the revocation.
+        store.fail_delete.store(false, Ordering::SeqCst);
+        registry.revoke(&grant.grant_id).unwrap();
+        assert_eq!(
+            backend.forbid_ops(),
+            [format!("forbid_file {}", file.display())]
+        );
+        assert!(registry.list().is_empty());
+        assert!(!registry.has_local_access(&file));
     }
 
     #[test]

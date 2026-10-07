@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use sha2::{Digest, Sha256};
 
 use crate::error::{AppError, ErrorCode};
-use crate::models::{GrantKind, GrantRecord, GrantScope, RevokeResult};
+use crate::models::{GrantKind, GrantRecord, GrantScope, OpenEntry, RevokeResult};
 use crate::services::asset_scope::AssetScopeController;
 use crate::services::paths::{self, LocalReadOutcome, PathProbe};
 
@@ -135,6 +135,23 @@ impl ClearRevocationOutcome {
     }
 }
 
+/// Authorization effect of one `open_documents` item (contracts §2.1 command
+/// 4; R25/R06; INV-AZ-10).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OpenAuthorizationOutcome {
+    /// Explicit user entry (`dialog`/`drop`/`cli`/`system`/`tree`/`recent`):
+    /// the persistent single-file grant was registered (or refreshed).
+    Granted(GrantRecord),
+    /// `entry="restore"` with an existing valid grant: the restore proceeds
+    /// on that authorization and nothing is granted.
+    Restored,
+    /// `entry="restore"` without a valid grant: restore is not an
+    /// authorization source; the caller rejects the item and the UI must
+    /// obtain a fresh explicit confirmation (models §10.2; data-model §3.2;
+    /// security-model §2.1 revoke semantics).
+    NeedsConfirmation,
+}
+
 /// In-memory authorization registry.
 #[derive(Debug, Default)]
 pub struct AuthRegistry {
@@ -192,6 +209,30 @@ impl AuthRegistry {
 
     pub fn is_unavailable(&self, grant_id: &str) -> bool {
         self.unavailable.contains(grant_id)
+    }
+
+    /// Applies the `open_documents` authorization step for one item
+    /// (contracts §2.1 command 4; R25/R06): an explicit user entry registers
+    /// the persistent single-file grant (the command layer handles the NF08
+    /// session fallback when persistence fails); `entry="restore"` never
+    /// grants and only observes the registry, so a revoked or cleared
+    /// authorization can never be silently re-created by a restart
+    /// (INV-AZ-10; models §10.2; security-model T6).
+    pub fn authorize_open_entry(
+        &mut self,
+        entry: OpenEntry,
+        canonical_path: &Path,
+        now_ms: i64,
+    ) -> Result<OpenAuthorizationOutcome, AppError> {
+        if entry == OpenEntry::Restore {
+            return Ok(if self.has_local_access(canonical_path) {
+                OpenAuthorizationOutcome::Restored
+            } else {
+                OpenAuthorizationOutcome::NeedsConfirmation
+            });
+        }
+        self.grant_file(canonical_path, now_ms)
+            .map(OpenAuthorizationOutcome::Granted)
     }
 
     /// Grants persistent single-file read access (data-model §3.2). Re-granting
@@ -346,6 +387,13 @@ impl AuthRegistry {
     /// Revokes by grant id. Unknown ids are `PS_IO_NOT_FOUND` (command 27).
     /// Revoking removes the matching asset scope entries: exact file for file
     /// grants, everything at/below the root for directory grants.
+    ///
+    /// Ordering (A-03): the persistent row is deleted *before* the in-memory
+    /// state changes. When the delete fails the whole revocation is undone —
+    /// the grant stays listed and readable and the asset scope keeps allowing
+    /// it — so a retry after the storage recovers completes. No half-revoked
+    /// state (registry gone, old asset URL still servable, retry
+    /// `PS_IO_NOT_FOUND`) can occur.
     pub fn revoke(&mut self, grant_id: &str) -> Result<RevokeResult, AppError> {
         let removed: Vec<GrantRecord> = self
             .grants
@@ -356,10 +404,10 @@ impl AuthRegistry {
         if removed.is_empty() {
             return Err(AppError::new(ErrorCode::IoNotFound));
         }
-        self.grants.retain(|grant| grant.grant_id != grant_id);
         if let Some(store) = &self.persistence {
             store.delete(grant_id)?;
         }
+        self.grants.retain(|grant| grant.grant_id != grant_id);
         self.unavailable.remove(grant_id);
         let mut scope_failure = None;
         for record in &removed {
