@@ -56,7 +56,12 @@ fn rss_kb() -> u64 {
     let raw = fs::read_to_string("/proc/self/smaps_rollup").unwrap_or_default();
     for line in raw.lines() {
         if let Some(value) = line.strip_prefix("Rss:") {
-            return value.trim().trim_end_matches(" kB").trim().parse().unwrap_or(0);
+            return value
+                .trim()
+                .trim_end_matches(" kB")
+                .trim()
+                .parse()
+                .unwrap_or(0);
         }
     }
     0
@@ -90,7 +95,10 @@ fn nf07_five_hundred_open_refresh_switch_cycles_stay_bounded() {
     let body_b = document_body("B", "针B");
     fs::write(&path_a, &body_a).unwrap();
     fs::write(&path_b, &body_b).unwrap();
-    assert!(body_a.len() > 24 * 1024, "keep the soak payloads meaningful");
+    assert!(
+        body_a.len() > 24 * 1024,
+        "keep the soak payloads meaningful"
+    );
 
     let config = FilesConfig {
         snapshot_cache_capacity: 1,
@@ -106,15 +114,25 @@ fn nf07_five_hundred_open_refresh_switch_cycles_stay_bounded() {
 
     for cycle in 0..CYCLES {
         let (path, needle, expected_hash) = if cycle % 2 == 0 {
-            (&path_a, "针A", paperstack_lib::services::files::sha256_hex(body_a.as_bytes()))
+            (
+                &path_a,
+                "针A",
+                paperstack_lib::services::files::sha256_hex(body_a.as_bytes()),
+            )
         } else {
-            (&path_b, "针B", paperstack_lib::services::files::sha256_hex(body_b.as_bytes()))
+            (
+                &path_b,
+                "针B",
+                paperstack_lib::services::files::sha256_hex(body_b.as_bytes()),
+            )
         };
 
         let opened = service.open_document(&path.to_string_lossy()).unwrap();
         assert!(!opened.source_only, "soak documents are full-read sized");
 
-        let initial = service.read_document(&opened.doc_id, ReadPurpose::Initial).unwrap();
+        let initial = service
+            .read_document(&opened.doc_id, ReadPurpose::Initial)
+            .unwrap();
         assert_eq!(initial.version.content_hash, expected_hash, "cycle {cycle}");
 
         let refreshed = service

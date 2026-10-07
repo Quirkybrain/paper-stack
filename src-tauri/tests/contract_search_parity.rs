@@ -12,17 +12,19 @@
 //!   with `str::encode_utf16`.
 //!
 //! Expected values in the vectors come from the contracts/ADR, never from
-//! implementation output. The two `boundaryCases` are explicit divergences:
-//! one accepted by ADR-007 (length-changing `İ` fold), one a tracked contract
-//! violation in this file's subject (JS Final_Sigma context folding); both are
-//! asserted per side so drift is visible before the fix lands.
+//! implementation output. `boundaryCases` pins only the accepted ADR-007
+//! divergence (length-changing `İ` fold). The former Final_Sigma contract
+//! divergence was resolved in wp-32a by aligning the front-end fold to this
+//! side's per-code-point fold; its shared expectation is exercised through the
+//! normal `cases` mechanism (`greek-final-sigma-per-code-point`, asserted
+//! below and by the front-end suite).
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use paperstack_lib::error::{ErrorCode, SourceRangePolicy};
 use paperstack_lib::models::{ErrorCategory, SearchSourceRequest};
-use paperstack_lib::services::files::{FilesService, sha256_hex};
+use paperstack_lib::services::files::{sha256_hex, FilesService};
 use serde_json::Value;
 use tempfile::TempDir;
 
@@ -94,10 +96,16 @@ fn expected_hits(entry: &Value) -> Vec<(u64, u64, u64)> {
 fn search_parity_cases_match_the_shared_vectors() {
     let vectors = load_json("../tests/contracts/vectors/search-parity.json");
     let cases = vectors["cases"].as_array().unwrap();
-    assert!(cases.len() >= 11, "parity vectors must stay complete");
+    assert!(cases.len() >= 12, "parity vectors must stay complete");
     let mut query_count = 0usize;
+    let mut greek_shared_case_seen = false;
     for case in cases {
         let id = case["id"].as_str().unwrap();
+        if id == "greek-final-sigma-per-code-point" {
+            // F-32-1 cleanup (wp-32b): the resolved Greek divergence is
+            // asserted here as shared parity, not as a boundary divergence.
+            greek_shared_case_seen = true;
+        }
         let corpus = case["corpus"].as_str().unwrap();
         for query in case["queries"].as_array().unwrap() {
             let needle = query["query"].as_str().unwrap();
@@ -111,7 +119,14 @@ fn search_parity_cases_match_the_shared_vectors() {
             query_count += 1;
         }
     }
-    assert!(query_count >= 20, "expected the full query matrix, got {query_count}");
+    assert!(
+        query_count >= 20,
+        "expected the full query matrix, got {query_count}"
+    );
+    assert!(
+        greek_shared_case_seen,
+        "the shared Greek final-sigma case must stay exercised through `cases`"
+    );
 }
 
 #[test]
@@ -155,13 +170,21 @@ fn search_parity_fixture_file_matches_the_shared_vectors() {
 }
 
 #[test]
-fn search_boundary_cases_pin_both_documented_divergences() {
+fn search_boundary_cases_pin_the_accepted_divergence() {
     let vectors = load_json("../tests/contracts/vectors/search-parity.json");
     let boundary = vectors["boundaryCases"].as_array().unwrap();
-    assert_eq!(boundary.len(), 2, "two known divergences are pinned");
-    let kinds: Vec<&str> = boundary.iter().map(|case| case["kind"].as_str().unwrap()).collect();
-    assert!(kinds.contains(&"accepted-length-changing-fold"));
-    assert!(kinds.contains(&"contract-divergence"));
+    assert!(
+        !boundary.is_empty(),
+        "the accepted ADR-007 length-changing İ fold must stay pinned"
+    );
+    let kinds: Vec<&str> = boundary
+        .iter()
+        .map(|case| case["kind"].as_str().unwrap())
+        .collect();
+    assert!(
+        kinds.contains(&"accepted-length-changing-fold"),
+        "the accepted ADR-007 length-changing İ fold must stay pinned"
+    );
     for case in boundary {
         let id = case["id"].as_str().unwrap();
         let corpus = case["corpus"].as_str().unwrap();
@@ -172,13 +195,12 @@ fn search_boundary_cases_pin_both_documented_divergences() {
             assert_eq!(
                 rust,
                 expected_hits(&query["rust"]),
-                "case {id:?}: Rust behavior changed; if this was the fix for the \
-                 Final_Sigma contract divergence, update the vector and the wp-32 report"
+                "case {id:?}: Rust behavior changed; revise the vector and the report"
             );
             assert_ne!(
                 rust,
                 expected_hits(&query["frontend"]),
-                "case {id:?}: the documented divergence closed; revise the vector, the \
+                "case {id:?}: the accepted divergence closed; revise the vector, the \
                  front-end suite and the report"
             );
         }
@@ -193,7 +215,11 @@ fn error_taxonomy_vector_matches_the_compiled_table_32_of_32() {
     assert_eq!(ErrorCode::ALL.len(), 32);
 
     let category_name = |category: ErrorCategory| -> String {
-        serde_json::to_value(category).unwrap().as_str().unwrap().to_owned()
+        serde_json::to_value(category)
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_owned()
     };
     let policy_name = |code: ErrorCode| -> &'static str {
         match code.source_range_policy() {
