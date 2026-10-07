@@ -143,11 +143,13 @@ textarea {
   border: 0;
 }
 
-/* Skip link: visible only while focused (ui-spec §6.2) */
+/* Skip link: fully hidden until focused (ui-spec §6.2; W-1 fix). The
+   transform moves it off-screen by more than its own height, so no border or
+   baseline sliver can remain visible at the window top edge. */
 .ps-skip-link {
   position: absolute;
   left: var(--ps-space-4);
-  top: calc(-1 * var(--ps-space-6));
+  top: 0;
   z-index: 2000;
   padding: var(--ps-space-2) var(--ps-space-3);
   background: var(--ps-color-surface);
@@ -155,11 +157,12 @@ textarea {
   border: 1px solid var(--ps-color-border);
   border-radius: var(--ps-radius-sm);
   text-decoration: none;
-  transition: top var(--ps-transition-fast);
+  transform: translateY(-200%);
+  transition: transform var(--ps-transition-fast);
 }
 
 .ps-skip-link:focus-visible {
-  top: var(--ps-space-2);
+  transform: translateY(var(--ps-space-2));
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -2,8 +2,10 @@ import type { Element } from 'hast'
 import { useEffect, useState, type ComponentProps } from 'react'
 
 import { t } from '../../../app/i18n'
+import { Button } from '../../../components/Button'
 import { auth } from '../../../services'
 import type { AccessStatus } from '../../../services/types'
+import { useReaderUi } from '../ui-context'
 
 /**
  * Image block (ui-spec §3.6/§9.1; rendering-pipeline §2.11; R13/R25/R26).
@@ -46,6 +48,7 @@ export function ImageBlock({ node, docId, ...rest }: ImageBlockProps) {
   const rawSrc = typeof node?.properties?.src === 'string' ? node.properties.src : undefined
   const alt = typeof node?.properties?.alt === 'string' ? node.properties.alt : ''
   const [resolved, setResolved] = useState<ResolvedImage | null>(null)
+  const ui = useReaderUi()
 
   useEffect(() => {
     if (!rawSrc) return undefined
@@ -80,7 +83,25 @@ export function ImageBlock({ node, docId, ...rest }: ImageBlockProps) {
         : { src: rawSrc, status: 'missing', assetUrl: undefined }
 
   if (rawSrc && state.status === 'allowed' && state.assetUrl !== undefined) {
-    return <img {...rest} src={state.assetUrl} alt={alt} />
+    const assetUrl = state.assetUrl
+    if (!ui) return <img {...rest} src={assetUrl} alt={alt} />
+    return (
+      <span className="ps-image" data-image-state="allowed">
+        <img {...rest} src={assetUrl} alt={alt} />
+        <Button
+          variant="secondary"
+          className="ps-image-zoom"
+          onClick={() =>
+            ui.openZoom({
+              label: alt !== '' ? alt : rawSrc,
+              content: <img src={assetUrl} alt={alt} />,
+            })
+          }
+        >
+          {t('zoom.title')}
+        </Button>
+      </span>
+    )
   }
   if (rawSrc && !(resolved && resolved.src === rawSrc)) {
     return (

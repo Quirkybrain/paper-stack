@@ -12,12 +12,14 @@ import {
 } from '../../app/session'
 import { TaskAbortedError, parseDocumentWithFallback } from '../../document/worker/client'
 import type { PipelineMode } from '../../document/types'
-import { PaperStackError, app, files, settings, storage, toErrorPayload, watch } from '../../services'
+import { PaperStackError, app, files, settings, storage, toErrorPayload, tree, watch } from '../../services'
 import type {
+  DirectoryRoot,
   ErrorPayload,
   OpenEntry,
   OpenOutcome,
   OpenRequest,
+  RecentEntry,
   SaveResult,
   VersionInfo,
   WatchChangedPayload,
@@ -36,9 +38,11 @@ import {
   tabOpen,
   tabPhase,
   tabSessionAction,
+  tabView,
   type ReaderAction,
   type ReaderState,
   type ReaderTab,
+  type ReaderViewMode,
 } from './reader-state'
 
 /**
@@ -65,9 +69,16 @@ export interface ReaderControls {
   clearOpenErrors(): void
   /** True when the quit-time session save failed and the window was kept open. */
   closeSaveFailed: boolean
+  /** Currently opened directory root for the file tree (one at a time). */
+  directory: DirectoryRoot | null
+  /** Message key of the last relink outcome (welcome “原文件不可用” flow). */
+  relinkNotice: string | null
+  clearRelinkNotice(): void
   pickAndOpen(): Promise<void>
+  pickDirectory(): Promise<void>
   openPaths(paths: readonly string[], entry: OpenEntry): Promise<void>
   openRequest(request: OpenRequest): Promise<void>
+  relinkRecent(entry: RecentEntry): Promise<void>
   activateTab(tabId: string): void
   closeTab(tabId: string): void
   closeActiveTab(): void
@@ -75,6 +86,7 @@ export interface ReaderControls {
   cancelTab(tabId: string): void
   retryTab(tabId: string): void
   setBannerCollapsed(tabId: string, collapsed: boolean): void
+  setViewMode(tabId: string, mode: ReaderViewMode): void
   handleWatchChanged(payload: WatchChangedPayload): void
   recheckActive(): void
   saveSession(): Promise<SaveResult>
@@ -114,6 +126,8 @@ export function useReader(): ReaderControls {
   }, [])
   const [openErrors, setOpenErrors] = useState<OpenFailure[]>([])
   const [closeSaveFailed, setCloseSaveFailed] = useState(false)
+  const [directory, setDirectory] = useState<DirectoryRoot | null>(null)
+  const [relinkNotice, setRelinkNotice] = useState<string | null>(null)
   const syntaxRef = useRef(DEFAULT_SYNTAX)
   const refreshingRef = useRef(new Set<string>())
   const closeAttemptedRef = useRef(false)
@@ -237,6 +251,56 @@ export function useReader(): ReaderControls {
     }
   }, [openPaths])
 
+  /**
+   * “打开目录” (Ctrl+Shift+O): the picker result never authorizes by itself;
+   * `tree.openDirectory` creates the session-scoped root used by the file
+   * tree service (contracts §8/§9, R25). Cancel changes nothing.
+   */
+  const pickDirectory = useCallback(async () => {
+    try {
+      const picked = await files.pickDirectory()
+      if (picked.cancelled || picked.paths.length === 0) return
+      const root = await tree.openDirectory({ path: picked.paths[0], persist: false })
+      setDirectory(root)
+    } catch (error) {
+      setOpenErrors([{ path: '', error: toErrorPayload(error) }])
+    }
+  }, [])
+
+  /**
+   * Unavailable recents relink (ui-spec §3.1): re-select through the system
+   * picker, attempt `relink_document` for the known docId when the document is
+   * still registered, and always open the chosen file afterwards. Cancel
+   * leaves every state unchanged.
+   */
+  const relinkRecent = useCallback(
+    async (entry: RecentEntry) => {
+      let picked
+      try {
+        picked = await files.pickFiles()
+      } catch (error) {
+        setOpenErrors([{ path: '', error: toErrorPayload(error) }])
+        return
+      }
+      if (picked.cancelled || picked.paths.length === 0) return
+      const newPath = picked.paths[0]
+      try {
+        const result = await files.relinkDocument({ docId: entry.docId, newPath })
+        setRelinkNotice(
+          result.status === 'reassociated'
+            ? 'document.relink.reassociated'
+            : 'document.relink.newVersion',
+        )
+      } catch {
+        // The record may come from an earlier session; the explicit
+        // re-selection below is still the user's decision.
+        setRelinkNotice(null)
+      }
+      await openPaths([newPath], 'recent')
+    },
+    [openPaths],
+  )
+
   const openRequest = useCallback(
     async (request: OpenRequest) => {
       await openPaths(request.paths, request.source === 'cli' ? 'cli' : 'system')
@@ -309,6 +373,15 @@ export function useReader(): ReaderControls {
     [send],
   )
 
+  const setViewMode = useCallback(
+    (tabId: string, mode: ReaderViewMode) => {
+      send(tabView(tabId, mode))
+    },
+    [send],
+  )
+
+  const clearRelinkNotice = useCallback(() => setRelinkNotice(null), [])
+
   const refreshTab = useCallback(
     (tabId: string) => {
       const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
@@ -376,9 +449,14 @@ export function useReader(): ReaderControls {
     openErrors,
     clearOpenErrors,
     closeSaveFailed,
+    directory,
+    relinkNotice,
+    clearRelinkNotice,
     pickAndOpen,
+    pickDirectory,
     openPaths,
     openRequest,
+    relinkRecent,
     activateTab,
     closeTab,
     closeActiveTab,
@@ -386,6 +464,7 @@ export function useReader(): ReaderControls {
     cancelTab,
     retryTab,
     setBannerCollapsed,
+    setViewMode,
     handleWatchChanged,
     recheckActive,
     saveSession,

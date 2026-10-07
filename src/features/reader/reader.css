@@ -12,8 +12,17 @@
   background: var(--ps-color-bg);
 }
 
+.ps-reader-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  position: relative;
+}
+
 .ps-reader-main {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
   background: var(--ps-color-surface);
@@ -158,15 +167,66 @@
 
 /* Code blocks: single container + aria-hidden line-number gutter (VC-05).
    The gutter is separate from the literal code text, so copy payloads built
-   from the code element never include line numbers. */
+   from the code element never include line numbers. wp-24 adds the action bar
+   and the collapsed/wrapped presentation. */
 .code-block {
   display: flex;
+  flex-direction: column;
   align-items: stretch;
   border: 1px solid var(--ps-color-border);
   border-radius: var(--ps-radius-sm);
   background: var(--ps-color-surface);
   margin: 0 0 var(--ps-space-4);
   overflow: hidden;
+}
+
+.ps-code-row {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.ps-code-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ps-space-2);
+  min-height: var(--ps-control-h);
+  padding: var(--ps-space-1) var(--ps-space-2);
+  border-bottom: 1px solid var(--ps-color-border);
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity var(--ps-transition-fast);
+}
+
+/* Keyboard reachable at all times (EDGE-11): the bar is only transparent
+   until hover/focus, never `display: none`. */
+.code-block:hover .ps-code-actions,
+.code-block:focus-within .ps-code-actions {
+  opacity: 1;
+}
+
+.ps-code-language {
+  color: var(--ps-color-muted);
+  font-family: var(--ps-font-mono);
+  font-size: 13px;
+}
+
+.ps-code-collapsed-note {
+  margin: 0;
+  padding: var(--ps-space-1) var(--ps-space-2);
+  color: var(--ps-color-muted);
+  font-size: 13px;
+}
+
+.ps-code-collapsed pre {
+  max-height: calc(20 * 23.1px);
+  overflow: hidden;
+}
+
+.ps-code-wrapped pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .code-block-lines {
@@ -288,4 +348,565 @@
 
 .ps-block-error-message {
   color: var(--ps-color-danger);
+}
+
+/* ---------------------------------------------------------------------------
+ * wp-24: welcome/recents (UI00)
+ * ------------------------------------------------------------------------- */
+
+.ps-welcome {
+  max-width: var(--ps-content-max);
+  margin: 0 auto;
+  padding: var(--ps-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ps-space-5);
+}
+
+.ps-welcome-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--ps-space-3);
+}
+
+.ps-welcome-note {
+  margin: 0;
+  color: var(--ps-color-muted);
+}
+
+.ps-welcome-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ps-space-2);
+}
+
+.ps-welcome-recents h2 {
+  font-size: 19px;
+  margin: 0 0 var(--ps-space-2);
+}
+
+.ps-recent-scroll {
+  /* First screen shows at most 6 rows; further records scroll (ui-spec §3.1). */
+  max-height: calc(6 * 56px);
+  overflow-y: auto;
+  border: 1px solid var(--ps-color-border);
+  border-radius: var(--ps-radius-sm);
+  scrollbar-width: thin;
+  scrollbar-color: var(--ps-color-border) transparent;
+}
+
+.ps-recent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ps-recent-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ps-space-2);
+  min-height: 56px;
+  padding: 0 var(--ps-space-2) 0 0;
+  border-bottom: 1px solid var(--ps-color-border);
+}
+
+.ps-recent-item:last-child {
+  border-bottom: none;
+}
+
+.ps-recent-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--ps-space-2);
+  min-height: 56px;
+  padding: 0 var(--ps-space-3);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ps-recent-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ps-recent-parent,
+.ps-recent-time {
+  color: var(--ps-color-muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ps-recent-time {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.ps-sample-card {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ps-space-2);
+  padding: var(--ps-space-3);
+  border: 1px dashed var(--ps-color-border);
+  border-radius: var(--ps-radius-sm);
+  color: var(--ps-color-muted);
+}
+
+.ps-sample-card p {
+  margin: 0;
+}
+
+.ps-sample-badge {
+  color: var(--ps-color-accent);
+  font-weight: 600;
+}
+
+.ps-welcome-storage {
+  display: flex;
+  align-items: center;
+  gap: var(--ps-space-2);
+  color: var(--ps-color-warn);
+}
+
+.ps-welcome-loading {
+  color: var(--ps-color-muted);
+}
+
+/* ---------------------------------------------------------------------------
+ * wp-24: navigation panel (UI02)
+ * ------------------------------------------------------------------------- */
+
+.ps-nav {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.ps-nav-overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  box-shadow: var(--ps-focus-ring);
+}
+
+.ps-nav-full {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+}
+
+.ps-nav-header {
+  display: flex;
+  align-items: center;
+  gap: var(--ps-space-2);
+  padding: var(--ps-space-2);
+  border-bottom: 1px solid var(--ps-color-border);
+}
+
+.ps-nav-tabs {
+  display: flex;
+  gap: var(--ps-space-1);
+  flex: 1;
+}
+
+.ps-nav-tab {
+  padding: var(--ps-space-1) var(--ps-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--ps-radius-sm);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ps-nav-tab[aria-selected='true'] {
+  border-color: var(--ps-color-accent);
+  color: var(--ps-color-accent);
+  font-weight: 600;
+}
+
+.ps-nav-tab:disabled {
+  color: var(--ps-color-muted);
+  opacity: 0.6;
+  cursor: default;
+}
+
+.ps-nav-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ps-nav-empty {
+  padding: var(--ps-space-3);
+  color: var(--ps-color-muted);
+}
+
+.ps-tree,
+.ps-outline {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--ps-space-2) var(--ps-space-1);
+  scrollbar-width: thin;
+  scrollbar-color: var(--ps-color-border) transparent;
+}
+
+.ps-tree-item,
+.ps-outline-item {
+  padding-top: var(--ps-space-1);
+  padding-bottom: var(--ps-space-1);
+  padding-right: var(--ps-space-2);
+  cursor: pointer;
+  border-radius: var(--ps-radius-sm);
+}
+
+.ps-tree-row,
+.ps-outline-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ps-space-1);
+  min-width: 0;
+}
+
+.ps-tree-name,
+.ps-outline-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ps-tree-status {
+  margin-left: auto;
+  color: var(--ps-color-warn);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.ps-tree-note {
+  display: block;
+  color: var(--ps-color-muted);
+  font-size: 13px;
+  padding-left: var(--ps-space-4);
+}
+
+.ps-tree-retry {
+  border: 0;
+  background: transparent;
+  color: var(--ps-color-accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ps-tree-notice {
+  margin: var(--ps-space-2);
+  color: var(--ps-color-muted);
+  font-size: 13px;
+}
+
+.ps-tree-others {
+  border-top: 1px solid var(--ps-color-border);
+  padding: var(--ps-space-2);
+}
+
+.ps-tree-others-toggle {
+  width: 100%;
+  padding: var(--ps-space-1);
+  border: 0;
+  background: transparent;
+  color: var(--ps-color-accent);
+  text-align: left;
+  cursor: pointer;
+}
+
+.ps-tree-others-list {
+  list-style: none;
+  margin: var(--ps-space-1) 0 0;
+  padding: 0;
+}
+
+.ps-tree-others-list button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--ps-space-1);
+  padding: var(--ps-space-1);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ps-outline-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ps-color-muted);
+  cursor: pointer;
+}
+
+.ps-outline-dot {
+  width: var(--ps-icon);
+  display: inline-block;
+}
+
+.ps-outline-current {
+  background: var(--ps-color-selection);
+}
+
+.ps-outline-item[data-current-subtree='true'] {
+  outline: 1px dashed var(--ps-color-border);
+}
+
+.ps-outline-empty {
+  padding: var(--ps-space-3);
+  color: var(--ps-color-muted);
+}
+
+/* ---------------------------------------------------------------------------
+ * wp-24: read-only source view (UI04)
+ * ------------------------------------------------------------------------- */
+
+.ps-source-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.ps-source-header {
+  display: flex;
+  align-items: center;
+  gap: var(--ps-space-2);
+  padding: var(--ps-space-2) var(--ps-space-3);
+  border-bottom: 1px solid var(--ps-color-border);
+  background: var(--ps-color-surface);
+}
+
+.ps-source-header h2 {
+  font-size: 17px;
+  margin: 0;
+}
+
+.ps-source-window {
+  color: var(--ps-color-muted);
+  font-size: 13px;
+}
+
+.ps-source-notice {
+  margin: var(--ps-space-3);
+  color: var(--ps-color-warn);
+}
+
+.ps-source-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  align-items: flex-start;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ps-color-border) transparent;
+}
+
+.ps-source-lines {
+  flex: 0 0 auto;
+  padding: var(--ps-space-3) var(--ps-space-2);
+  background: var(--ps-color-bg);
+  color: var(--ps-color-muted);
+  font-family: var(--ps-font-mono);
+  font-size: 14px;
+  line-height: 1.65;
+  text-align: right;
+  white-space: pre;
+  user-select: none;
+}
+
+.ps-source-pre {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: var(--ps-space-3);
+  font-size: 14px;
+  line-height: 1.65;
+  white-space: pre;
+  user-select: text;
+}
+
+/* ---------------------------------------------------------------------------
+ * wp-24: inspect drawer, formula panel, math/diagram/image tools (UI05)
+ * ------------------------------------------------------------------------- */
+
+.ps-inspect-header {
+  display: flex;
+  align-items: center;
+  gap: var(--ps-space-2);
+  padding: var(--ps-space-2);
+  border-bottom: 1px solid var(--ps-color-border);
+}
+
+.ps-inspect-title {
+  margin: 0;
+  font-size: 15px;
+}
+
+.ps-inspect-notice {
+  margin: var(--ps-space-2) var(--ps-space-3) 0;
+  color: var(--ps-color-warn);
+}
+
+.ps-inspect-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--ps-space-3);
+  scrollbar-width: thin;
+  scrollbar-color: var(--ps-color-border) transparent;
+}
+
+.ps-formula-preview {
+  overflow: auto;
+  padding: var(--ps-space-3);
+  border: 1px solid var(--ps-color-border);
+  border-radius: var(--ps-radius-sm);
+  margin-bottom: var(--ps-space-3);
+  text-align: center;
+}
+
+.ps-formula-section {
+  margin-bottom: var(--ps-space-3);
+}
+
+.ps-formula-section h4 {
+  margin: 0 0 var(--ps-space-1);
+  font-size: 13px;
+  color: var(--ps-color-muted);
+}
+
+.ps-inspect-source {
+  margin: 0;
+  padding: var(--ps-space-2);
+  border: 1px solid var(--ps-color-border);
+  border-radius: var(--ps-radius-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.ps-formula-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ps-space-2);
+  margin-top: var(--ps-space-3);
+}
+
+.ps-inspect-code {
+  color: var(--ps-color-muted);
+  font-family: var(--ps-font-mono);
+  font-size: 13px;
+}
+
+/* Formula tools: transparent until hover/focus-within, always focusable. */
+.ps-math-tools {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ps-space-1);
+  opacity: 0;
+  transition: opacity var(--ps-transition-fast);
+}
+
+.katex-display:hover .ps-math-tools,
+.katex-display:focus-within .ps-math-tools,
+.katex:hover .ps-math-tools,
+.katex:focus-within .ps-math-tools,
+.ps-math-tools:focus-within {
+  opacity: 1;
+}
+
+.ps-math-tools-inline {
+  margin-left: var(--ps-space-1);
+}
+
+.ps-mermaid-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ps-space-2);
+  margin-bottom: var(--ps-space-2);
+}
+
+.ps-image {
+  display: inline-block;
+  position: relative;
+}
+
+.ps-image-zoom {
+  margin-top: var(--ps-space-1);
+  opacity: 0;
+  transition: opacity var(--ps-transition-fast);
+}
+
+.ps-image:hover .ps-image-zoom,
+.ps-image:focus-within .ps-image-zoom,
+.ps-image-zoom:focus-visible {
+  opacity: 1;
+}
+
+/* ---------------------------------------------------------------------------
+ * wp-24: zoom overlay (UI05)
+ * ------------------------------------------------------------------------- */
+
+.ps-zoom-label {
+  color: var(--ps-color-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 40%;
+}
+
+.ps-zoom-hint {
+  margin: 0;
+  padding: var(--ps-space-1) var(--ps-space-3);
+  color: var(--ps-color-muted);
+  font-size: 13px;
+}
+
+.ps-zoom-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  cursor: grab;
+  background: var(--ps-color-bg);
+  touch-action: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ps-color-border) transparent;
+}
+
+.ps-zoom-viewport:active {
+  cursor: grabbing;
+}
+
+.ps-zoom-content {
+  display: inline-block;
+  min-width: 100%;
+  padding: var(--ps-space-4);
+}
+
+.ps-zoom-content img,
+.ps-zoom-content svg {
+  max-width: none;
+  height: auto;
 }
