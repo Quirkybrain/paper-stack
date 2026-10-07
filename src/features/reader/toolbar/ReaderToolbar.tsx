@@ -27,11 +27,18 @@ export interface ReaderToolbarProps {
   /** True when the outline or a directory tree can be shown. */
   navAvailable: boolean
   navOpen: boolean
+  canGoBack: boolean
+  canGoForward: boolean
+  searchAvailable: boolean
+  searchOpen: boolean
   onOpenFile(): void
   onOpenDirectory(): void
   onCloseDocument(): void
   onToggleNav(): void
   onToggleSource(): void
+  onBack(): void
+  onForward(): void
+  onToggleSearch(): void
 }
 
 export function ReaderToolbar({
@@ -42,11 +49,18 @@ export function ReaderToolbar({
   viewMode,
   navAvailable,
   navOpen,
+  canGoBack,
+  canGoForward,
+  searchAvailable,
+  searchOpen,
   onOpenFile,
   onOpenDirectory,
   onCloseDocument,
   onToggleNav,
   onToggleSource,
+  onBack,
+  onForward,
+  onToggleSearch,
 }: ReaderToolbarProps) {
   const openAnchor = useRef<HTMLSpanElement>(null)
   const moreAnchor = useRef<HTMLSpanElement>(null)
@@ -97,14 +111,16 @@ export function ReaderToolbar({
       <IconButton
         icon="arrowLeft"
         label={t('toolbar.back')}
-        disabled
-        disabledReason={t('toolbar.disabled.noBack')}
+        onClick={onBack}
+        disabled={!canGoBack}
+        {...(!canGoBack ? { disabledReason: t('toolbar.disabled.noBack') } : {})}
       />
       <IconButton
         icon="arrowRight"
         label={t('toolbar.forward')}
-        disabled
-        disabledReason={t('toolbar.disabled.noForward')}
+        onClick={onForward}
+        disabled={!canGoForward}
+        {...(!canGoForward ? { disabledReason: t('toolbar.disabled.noForward') } : {})}
       />
 
       <span className="ps-toolbar-filename" title={canonicalPath ?? undefined}>
@@ -124,8 +140,16 @@ export function ReaderToolbar({
       <IconButton
         icon="search"
         label={t('toolbar.find')}
-        disabled
-        disabledReason={hasDocument ? t('common.unavailable') : t('toolbar.disabled.noDocument')}
+        onClick={onToggleSearch}
+        aria-pressed={searchOpen}
+        disabled={!searchAvailable}
+        {...(!searchAvailable
+          ? {
+              disabledReason: hasDocument
+                ? t('common.unavailable')
+                : t('toolbar.disabled.noDocument'),
+            }
+          : {})}
       />
       <Button
         variant="secondary"

@@ -35,6 +35,7 @@ import {
   tabActivate,
   tabBanner,
   tabClose,
+  tabDocReplace,
   tabOpen,
   tabPhase,
   tabSessionAction,
@@ -63,6 +64,12 @@ export interface OpenFailure {
   error: ErrorPayload
 }
 
+/** Result of an in-tab document-link navigation (models §5.2). */
+export interface NavigateDocumentResult {
+  docId: string
+  anchorId: string | null
+}
+
 export interface ReaderControls {
   state: ReaderState
   openErrors: OpenFailure[]
@@ -77,6 +84,17 @@ export interface ReaderControls {
   pickAndOpen(): Promise<void>
   pickDirectory(): Promise<void>
   openPaths(paths: readonly string[], entry: OpenEntry): Promise<void>
+  /**
+   * Cross-file link navigation in the current tab (models §5.2; R15/R16): the
+   * target replaces this tab's document, never opening a new tab. Returns null
+   * (and records the failure) when the target is rejected/cancelled, so the
+   * caller can leave the history stack untouched.
+   */
+  navigateDocument(
+    tabId: string,
+    canonicalPath: string,
+    anchorId: string | null,
+  ): Promise<NavigateDocumentResult | null>
   openRequest(request: OpenRequest): Promise<void>
   relinkRecent(entry: RecentEntry): Promise<void>
   activateTab(tabId: string): void
@@ -308,6 +326,59 @@ export function useReader(): ReaderControls {
     [openPaths],
   )
 
+  /**
+   * Current-tab document navigation for relative links and history restore
+   * (models §5.2; "跨文档相对链接：默认当前标签导航"). The target is validated
+   * through the same `open_documents` entry point as every other open; a
+   * rejected target consumes no history and changes nothing.
+   */
+  const navigateDocument = useCallback(
+    async (
+      tabId: string,
+      canonicalPath: string,
+      anchorId: string | null,
+    ): Promise<NavigateDocumentResult | null> => {
+      let result
+      try {
+        result = await files.openDocuments({ paths: [canonicalPath], entry: 'system' })
+      } catch (error) {
+        setOpenErrors([{ path: canonicalPath, error: toErrorPayload(error) }])
+        return null
+      }
+      const outcome = result.items[0]
+      if (!outcome || outcome.status === 'rejected') {
+        if (outcome?.error) setOpenErrors([{ path: canonicalPath, error: outcome.error }])
+        return null
+      }
+      const docId = outcome.docId ?? outcome.duplicateOfDocId
+      if (!docId) return null
+      const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+      if (!tab) return null
+      if (tab.docId === docId) return { docId, anchorId }
+
+      // A duplicate outcome omits the identity; the already-open tab holds it.
+      const existing = stateRef.current.tabs.find((candidate) => candidate.docId === docId)
+      const identity =
+        outcome.identity ??
+        (existing
+          ? { canonicalPath: existing.canonicalPath, displayName: existing.displayName }
+          : null)
+      if (!identity) return null
+
+      const generation = tab.session.generation + 1 // session/opened advances §6.1
+      send(
+        tabDocReplace(tabId, {
+          docId,
+          canonicalPath: identity.canonicalPath,
+          displayName: identity.displayName,
+        }),
+      )
+      void startRead(tabId, docId, 'initial', generation)
+      return { docId, anchorId }
+    },
+    [send, startRead],
+  )
+
   // Startup queue: drained exactly once; later requests arrive as events.
   useEffect(() => {
     let cancelled = false
@@ -455,6 +526,7 @@ export function useReader(): ReaderControls {
     pickAndOpen,
     pickDirectory,
     openPaths,
+    navigateDocument,
     openRequest,
     relinkRecent,
     activateTab,

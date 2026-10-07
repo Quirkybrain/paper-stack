@@ -103,6 +103,12 @@ export interface MountShardOptions {
   firstShard?: number
   /** Blocks appended per following shard. */
   shardSize?: number
+  /**
+   * 0-based block index that must be visible immediately (search/focus
+   * reveal). The progressive pump keeps appending to that point, so a
+   * revealed block stays mounted. Ignored when negative/absent.
+   */
+  revealIndex?: number
 }
 
 /**
@@ -131,9 +137,10 @@ export function useProgressiveMount(
   total: number,
   options: MountShardOptions & { generation?: number } = {},
 ): number {
-  const { generation = 0, firstShard = 24, shardSize = 24 } = options
+  const { generation = 0, firstShard = 24, shardSize = 24, revealIndex = -1 } = options
   const safeTotal = Math.max(0, total)
   const initial = Math.min(Math.max(1, firstShard), safeTotal)
+  const reveal = revealIndex >= 0 ? Math.min(revealIndex + 1, safeTotal) : 0
   const [state, setState] = useState({ generation, visible: initial })
 
   useEffect(() => {
@@ -176,5 +183,5 @@ export function useProgressiveMount(
   // A generation change invalidates previous mount progress without an effect:
   // stale shards stop rendering immediately (rendering-pipeline §2.12).
   const visible = state.generation === generation ? state.visible : initial
-  return Math.min(visible, safeTotal)
+  return Math.min(Math.max(visible, reveal), safeTotal)
 }
