@@ -910,3 +910,52 @@
   max-width: none;
   height: auto;
 }
+
+/* ---------------------------------------------------------------------------
+ * wp-30/wp-31: resource authorization (UI07/IX10)
+ * ------------------------------------------------------------------------- */
+
+.ps-image-placeholder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ps-space-2);
+  margin-top: var(--ps-space-1);
+}
+
+.ps-auth-dialog h2 {
+  margin-top: 0;
+}
+
+.ps-auth-scope,
+.ps-auth-count {
+  margin: var(--ps-space-1) 0;
+}
+
+.ps-auth-hint {
+  margin: var(--ps-space-1) 0 var(--ps-space-2);
+  color: var(--ps-color-muted);
+  font-size: 13px;
+}
+
+.ps-auth-remember {
+  display: flex;
+  align-items: center;
+  gap: var(--ps-space-2);
+  margin-top: var(--ps-space-2);
+}
+
+.ps-auth-domains {
+  list-style: none;
+  margin: var(--ps-space-1) 0 var(--ps-space-2);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ps-space-1);
+}
+
+.ps-auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ps-space-2);
+  margin-top: var(--ps-space-3);
+}

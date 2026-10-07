@@ -41,6 +41,8 @@ import ReaderScreen from './ReaderScreen'
 import { documentModelCache } from '../../app/session'
 import { AppStoreProvider } from '../../app/store'
 import { t } from '../../app/i18n'
+import { resourceAuth } from './resources/resource-auth'
+import { resourceInvalidation } from './view/resource-invalidation'
 import type {
   AccessDecision,
   DirectoryNode,
@@ -95,6 +97,15 @@ let settingsResult: GlobalSettings = { ...DEFAULTS }
 let sizeByPath = new Map<string, number>()
 let relinkStatus: 'reassociated' | 'new-version' = 'reassociated'
 let relinkText: string | null = null
+let rejectPath: string | null = null
+let duplicatePath: string | null = null
+
+const REJECTED_OPEN_ERROR: ErrorPayload = {
+  code: 'PS_FMT_UNSUPPORTED',
+  category: 'io',
+  messageKey: 'error.encoding.formatUnsupported',
+  retryable: false,
+}
 
 function identityFor(path: string): DocIdentity {
   const name = path.split('/').pop() ?? 'doc.md'
@@ -137,6 +148,12 @@ function installRouter(): void {
         const req = (args?.req ?? { paths: [] }) as { paths: string[] }
         return Promise.resolve({
           items: req.paths.map((path) => {
+            if (path === rejectPath) {
+              return { path, status: 'rejected', error: REJECTED_OPEN_ERROR }
+            }
+            if (path === duplicatePath) {
+              return { path, status: 'duplicate', duplicateOfDocId: identityFor(path).docId }
+            }
             const identity = identityFor(path)
             return { path, status: 'opened', docId: identity.docId, identity }
           }),
@@ -213,6 +230,30 @@ function installRouter(): void {
         return Promise.resolve(undefined)
       case 'check_resource_access':
         return Promise.resolve(checkAccess)
+      case 'grant_remote_session': {
+        const req = (args?.req ?? {}) as { docId: string; origins: string[] }
+        return Promise.resolve({
+          grantId: 'g-remote',
+          kind: 'remote',
+          scope: 'session',
+          docId: req.docId,
+          origins: req.origins,
+          grantedAtMs: 1,
+        })
+      }
+      case 'fetch_remote_image': {
+        const req = (args?.req ?? {}) as { docId: string; url: string }
+        return Promise.resolve({
+          assetUrl: `asset://remote/image?v=1`,
+          mime: 'image/png',
+          sizeBytes: 10,
+          finalUrl: req.url,
+          cacheKey: 'k1',
+          fromCache: false,
+        })
+      }
+      case 'revoke_remote_session':
+        return Promise.resolve({ revoked: true, cancelledRequests: 0, removedCacheEntries: 1 })
       case 'save_session':
         return Promise.resolve(saveResult)
       default:
@@ -238,11 +279,15 @@ beforeEach(() => {
   sizeByPath = new Map()
   relinkStatus = 'reassociated'
   relinkText = null
+  rejectPath = null
+  duplicatePath = null
   listeners.clear()
   windowHandlers.focus = undefined
   windowHandlers.close = undefined
   windowHandlers.drag = undefined
   documentModelCache.clear()
+  resourceAuth.reset()
+  resourceInvalidation.reset()
   invokeMock.mockReset()
   installRouter()
 })
@@ -669,6 +714,105 @@ describe('ReaderScreen (ui-spec §3.2)', () => {
       }),
     )
     await screen.findByRole('heading', { level: 1, name: 'drop.md' })
+  })
+
+  it('routes a single-instance open request through entry="system"', async () => {
+    renderReader()
+    await screen.findByRole('heading', { level: 1, name: t('welcome.title') })
+    await act(async () => {
+      listeners.get('paperstack://open-requested')?.({
+        payload: { paths: ['/docs/sys.md'], cwd: '/docs', source: 'second-instance' },
+      })
+    })
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith('open_documents', {
+        req: { paths: ['/docs/sys.md'], entry: 'system' },
+      }),
+    )
+    await screen.findByRole('heading', { level: 1, name: 'sys.md' })
+  })
+
+  it('summarizes a rejected drop item without clearing the successful tab', async () => {
+    rejectPath = '/bin/tool'
+    renderReader()
+    await screen.findByRole('heading', { level: 1, name: t('welcome.title') })
+    await act(async () => {
+      windowHandlers.drag?.({
+        payload: { type: 'drop', paths: ['/bin/tool', '/docs/good.md'] },
+      })
+    })
+    // The first item is rejected, so the first success (second in order) is
+    // the tab that gets focus; the failure is summarized next to it.
+    await screen.findByRole('heading', { level: 1, name: 'good.md' })
+    const banner = await screen.findByText(/PS_FMT_UNSUPPORTED/)
+    expect(banner.textContent).toContain(t('error.encoding.formatUnsupported'))
+    expect(invokeMock).toHaveBeenCalledWith('open_documents', {
+      req: { paths: ['/bin/tool', '/docs/good.md'], entry: 'drop' },
+    })
+  })
+
+  it('reuses the canonical-path tab when a duplicate open arrives (R05)', async () => {
+    pendingRequests = [{ paths: ['/docs/a.md', '/docs/b.md'], cwd: null, source: 'cli' }]
+    renderReader()
+    await screen.findByRole('heading', { level: 1, name: 'a.md' })
+    expect(screen.getAllByRole('tab')).toHaveLength(2)
+
+    fireEvent.click(screen.getByRole('tab', { name: /b\.md/ }))
+    await screen.findByRole('heading', { level: 1, name: 'b.md' })
+
+    duplicatePath = '/docs/a.md'
+    await act(async () => {
+      windowHandlers.drag?.({ payload: { type: 'drop', paths: ['/docs/a.md'] } })
+    })
+    // The duplicate activates the existing tab instead of opening a third.
+    await screen.findByRole('heading', { level: 1, name: 'a.md' })
+    expect(screen.getAllByRole('tab')).toHaveLength(2)
+    const reads = invokeMock.mock.calls.filter(
+      ([command, args]) =>
+        command === 'read_document' &&
+        (args as { req?: { docId?: string } } | undefined)?.req?.docId === 'd-a.md',
+    )
+    expect(reads).toHaveLength(1)
+  })
+
+  it('allows a remote origin for the document session, revokes on close and blocks a new session', async () => {
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md', '# 标题\n\n![远程](https://img.example.com/a.png)\n')
+    checkAccess = {
+      status: 'remote-blocked',
+      kind: 'remote',
+      origin: 'https://img.example.com',
+    }
+    const fetchCalls = () =>
+      invokeMock.mock.calls.filter(([command]) => command === 'fetch_remote_image').length
+    renderReader()
+    await screen.findByText(t('image.remoteBlocked'))
+    expect(fetchCalls()).toBe(0)
+
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: t('dialog.authRemote.allow') }))
+    await screen.findByRole('img', { name: '远程' })
+    await waitFor(() => expect(fetchCalls()).toBe(1))
+    expect(invokeMock).toHaveBeenCalledWith('grant_remote_session', {
+      req: { docId: 'd-a.md', origins: ['https://img.example.com'] },
+    })
+
+    // Leaving the document session revokes it (session cache purge in Rust).
+    fireEvent.keyDown(window, { key: 'w', ctrlKey: true })
+    await screen.findByRole('heading', { level: 1, name: t('welcome.title') })
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith('revoke_remote_session', { docId: 'd-a.md' }),
+    )
+
+    // A new document session starts blocked again: no grant, no new request.
+    await act(async () => {
+      windowHandlers.drag?.({ payload: { type: 'drop', paths: ['/docs/a.md'] } })
+    })
+    await screen.findByText(t('image.remoteBlocked'))
+    expect(screen.queryByRole('img')).toBeNull()
+    expect(fetchCalls()).toBe(1)
+    // The fresh session offers the confirmation again (explicit, never silent).
+    expect(await screen.findByRole('dialog')).toBeTruthy()
   })
 
   it('surfaces a failed quit-time save once and lets the next close proceed', async () => {
