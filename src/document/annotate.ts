@@ -32,7 +32,8 @@ export interface AnnotateInput {
 const TEXT_SEGMENT_KINDS: ReadonlySet<SegmentKind> = new Set(['text', 'html-text'])
 
 export function annotateTree(tree: Root, input: AnnotateInput): Root {
-  const groups = groupChildren(tree.children, input.blocks)
+  const groups = groupChildren(tree.children, input.blocks, input.blockLimit)
+  const segmentsByBlock = buildSegmentIndex(input.segments)
   const children: RootContent[] = []
   let emittedBlocks = 0
 
@@ -43,7 +44,7 @@ export function annotateTree(tree: Root, input: AnnotateInput): Root {
     }
     if (input.blockLimit !== undefined && emittedBlocks >= input.blockLimit) break
     emittedBlocks += 1
-    const annotated = annotateChildren(group.children, group.block, input.segments)
+    const annotated = annotateChildren(group.children, group.block, segmentsByBlock)
     children.push({
       type: 'element',
       tagName: 'section',
@@ -69,12 +70,47 @@ interface SegmentCursor {
   used: Set<string>
 }
 
-function groupChildren(children: readonly RootContent[], blocks: readonly BlockRecord[]): Group[] {
+const EMPTY_SEGMENTS: readonly SearchSegment[] = []
+
+/**
+ * Segments bucketed by block once per annotate call. A per-block `filter`
+ * over the flat segment list made the transform O(blocks × segments)
+ * (D-IT-3 profiling), which dominated the main thread on large documents.
+ */
+function buildSegmentIndex(
+  segments: readonly SearchSegment[],
+): Map<string, SearchSegment[]> {
+  const byBlock = new Map<string, SearchSegment[]>()
+  for (const segment of segments) {
+    const bucket = byBlock.get(segment.blockId)
+    if (bucket === undefined) byBlock.set(segment.blockId, [segment])
+    else bucket.push(segment)
+  }
+  return byBlock
+}
+
+/**
+ * Groups top-level hast children by the block whose source range contains
+ * their start offset. Blocks and children are in document order, so the block
+ * lookup is a binary search; the previous linear scan per child made the
+ * grouping O(children × blocks). With `blockLimit` the scan stops after the
+ * prefix the annotate loop would emit.
+ */
+function groupChildren(
+  children: readonly RootContent[],
+  blocks: readonly BlockRecord[],
+  blockLimit?: number,
+): Group[] {
   const groups: Group[] = []
+  let emittedBlocks = 0
 
   for (const child of children) {
     const range = positionToUtf16Range(child.position)
     const block = range ? findBlock(blocks, range.startUtf16) : null
+    if (block !== null && (groups.length === 0 || groups[groups.length - 1].block !== block)) {
+      if (blockLimit !== undefined && emittedBlocks >= blockLimit) break
+      emittedBlocks += 1
+    }
     const last = groups[groups.length - 1]
     if (last && last.block === block) last.children.push(child)
     else groups.push({ block, children: [child] })
@@ -84,19 +120,30 @@ function groupChildren(children: readonly RootContent[], blocks: readonly BlockR
 }
 
 function findBlock(blocks: readonly BlockRecord[], offset: number): BlockRecord | null {
-  for (const block of blocks) {
-    if (offset >= block.sourceRange.startUtf16 && offset < block.sourceRange.endUtf16) return block
+  let low = 0
+  let high = blocks.length - 1
+  let candidate = -1
+  while (low <= high) {
+    const middle = (low + high) >> 1
+    if (blocks[middle].sourceRange.startUtf16 <= offset) {
+      candidate = middle
+      low = middle + 1
+    } else {
+      high = middle - 1
+    }
   }
-  return null
+  if (candidate === -1) return null
+  const block = blocks[candidate]
+  return offset < block.sourceRange.endUtf16 ? block : null
 }
 
 function annotateChildren(
   children: readonly RootContent[],
   block: BlockRecord,
-  segments: readonly SearchSegment[],
+  segmentsByBlock: ReadonlyMap<string, SearchSegment[]>,
 ): RootContent[] {
   const cursor: SegmentCursor = {
-    segments: segments.filter((segment) => segment.blockId === block.blockId),
+    segments: segmentsByBlock.get(block.blockId) ?? EMPTY_SEGMENTS,
     used: new Set<string>(),
   }
   return children.map((child) => annotateNode(child, cursor, false))

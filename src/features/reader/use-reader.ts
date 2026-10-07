@@ -1561,6 +1561,69 @@ export function useReader(): ReaderControls {
   )
 
   /**
+   * Verifies a `removed` watch hint before trusting it (models §3.2 W3;
+   * contracts §7.2 "notify events are hints only"; D-IT-2). A replacement
+   * save can leave a stale removal hint in flight, so the hint never flips the
+   * tab to source-unavailable on its own: one stable refresh read decides.
+   *
+   * - readable again / still readable → the normal refresh flow (same hash
+   *   clears a candidate, a new hash stages the update banner; follow mode
+   *   re-evaluates) and no manual retry is needed;
+   * - stable read fails with `PS_IO_NOT_FOUND` → `unavailable` (retained
+   *   content + 重新定位/重试, INV-DS-06);
+   * - any other read failure (e.g. `PS_IO_CHANGED` from a still-unsettled
+   *   save) keeps the displayed version and surfaces the error instead.
+   *
+   * The >50MiB source-window mode owns its version checks (`read_document`
+   * refresh is rejected with `PS_LIMIT_SIZE` there) and keeps the direct
+   * unavailable transition.
+   */
+  const verifyRemovedSource = useCallback(
+    async (tabId: string) => {
+      const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+      if (!tab) return
+      const displayHash = tab.session.displayVersion?.contentHash
+      if (
+        tab.largeDocMode === 'sourceWindow' &&
+        (displayHash === undefined ||
+          documentModelCache.get(tab.docId, displayHash)?.rawText == null)
+      ) {
+        dispatchSession(tabId, sessionUnavailable())
+        return
+      }
+      if (refreshingRef.current.has(tabId)) return
+      refreshingRef.current.add(tabId)
+      const generation = tab.session.generation
+      const token: TaskToken = {
+        docId: tab.docId,
+        version: null,
+        generation,
+        taskId: nextTaskId('verify'),
+      }
+      try {
+        const snapshot = await files.readDocument({ docId: tab.docId, purpose: 'refresh' })
+        const current = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+        if (!current || current.session.generation !== generation) return
+        dispatchSession(tabId, sessionReadSucceeded(token, snapshot.version, snapshot.text))
+        maybeAutoCommitRef.current(tabId)
+      } catch (error) {
+        if (PaperStackError.is(error) && error.isCancelled) return
+        const current = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+        if (!current || current.session.generation !== generation) return
+        const payload = toErrorPayload(error)
+        if (payload.code === 'PS_IO_NOT_FOUND') {
+          dispatchSession(tabId, sessionUnavailable())
+        } else {
+          dispatchSession(tabId, sessionTaskFailed(token, payload))
+        }
+      } finally {
+        refreshingRef.current.delete(tabId)
+      }
+    },
+    [dispatchSession],
+  )
+
+  /**
    * Retry for a failed/unavailable tab (ui-spec §3.8; models §1.2 T8). A tab
    * whose document never registered (file missing at startup) re-runs the open
    * validation first; a tab with loaded content retries through a stable
@@ -1626,12 +1689,15 @@ export function useReader(): ReaderControls {
         return
       }
       if (payload.kind === 'removed') {
-        dispatchSession(tab.tabId, sessionUnavailable())
+        // The hint is verified with a stable read before any unavailable
+        // transition (models §3.2 W3; D-IT-2): a replacement save must reach
+        // the normal pending/update flow, not a manual-retry dead end.
+        void verifyRemovedSource(tab.tabId)
         return
       }
       refreshTab(tab.tabId)
     },
-    [dispatchSession, refreshTab],
+    [refreshTab, verifyRemovedSource],
   )
 
   const recheckOpenTabs = useCallback(() => {

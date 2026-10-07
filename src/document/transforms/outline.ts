@@ -67,16 +67,25 @@ export function slugifyHeading(text: string): string {
 export function extractOutline(tree: Root): OutlineEntry[] {
   const entries: OutlineEntry[] = []
   const used = new Set<string>()
+  // Next free suffix per base slug: re-scanning from `-1` for every duplicate
+  // heading is quadratic on documents with many repeated titles (D-IT-3
+  // profiling). Output sequence is unchanged (`base`, `base-1`, `base-2`, …).
+  const nextSuffix = new Map<string, number>()
 
   visit(tree, 'heading', (node: Heading) => {
     const text = headingText(node)
     const base = slugifyHeading(text)
+    let next = nextSuffix.get(base) ?? 1
     let slug = base
-    let suffix = 0
-    while (used.has(slug)) {
-      suffix += 1
-      slug = `${base}-${suffix}`
+    if (used.has(base)) {
+      slug = `${base}-${next}`
+      while (used.has(slug)) {
+        next += 1
+        slug = `${base}-${next}`
+      }
+      next += 1
     }
+    nextSuffix.set(base, next)
     used.add(slug)
 
     entries.push({
