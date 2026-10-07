@@ -54,6 +54,7 @@ import type {
   OpenRequest,
   PositionRecord,
   RecentEntry,
+  RelinkResult,
   SessionSnapshot,
 } from '../../services/types'
 
@@ -100,6 +101,8 @@ let settingsResult: GlobalSettings = { ...DEFAULTS }
 let sizeByPath = new Map<string, number>()
 let relinkStatus: 'reassociated' | 'new-version' = 'reassociated'
 let relinkText: string | null = null
+let holdRelink = false
+let resolveRelink: ((value: RelinkResult) => void) | null = null
 let rejectPath: string | null = null
 let duplicatePath: string | null = null
 let sessionSnapshot: SessionSnapshot | null = null
@@ -220,12 +223,20 @@ function installRouter(): void {
       }
       case 'relink_document': {
         const req = (args?.req ?? {}) as { docId: string; newPath: string }
-        const snapshot = snapshotFor(req.docId)
-        if (relinkText !== null) snapshot.text = relinkText
-        if (relinkStatus === 'new-version') {
-          snapshot.version = { contentHash: 'v9', sizeBytes: 128, modifiedAtMs: 9, observedAtMs: 9 }
+        const build = (): RelinkResult => {
+          const snapshot = snapshotFor(req.docId)
+          if (relinkText !== null) snapshot.text = relinkText
+          if (relinkStatus === 'new-version') {
+            snapshot.version = { contentHash: 'v9', sizeBytes: 128, modifiedAtMs: 9, observedAtMs: 9 }
+          }
+          return { status: relinkStatus, snapshot }
         }
-        return Promise.resolve({ status: relinkStatus, snapshot })
+        if (holdRelink) {
+          return new Promise<RelinkResult>((resolve) => {
+            resolveRelink = (value) => resolve(value)
+          })
+        }
+        return Promise.resolve(build())
       }
       case 'get_source_info': {
         const requested = ((args ?? {}) as { docId?: string }).docId ?? 'd-a.md'
@@ -303,6 +314,8 @@ beforeEach(() => {
   sizeByPath = new Map()
   relinkStatus = 'reassociated'
   relinkText = null
+  holdRelink = false
+  resolveRelink = null
   rejectPath = null
   duplicatePath = null
   sessionSnapshot = null
@@ -1591,5 +1604,132 @@ describe('ReaderScreen (ui-spec §3.2)', () => {
         req: { paths: ['/docs/gone.md'], entry: 'restore' },
       }),
     )
+  })
+})
+
+describe('wp-36a Review-B fixes (B-02/B-04/B-05/B-06/B-07)', () => {
+  it('returns to the exact reference through footnote back-references (B-02)', async () => {
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md', '# a.md\n\nFirst[^1] and second[^1].\n\n[^1]: note body\n')
+    const { container } = renderReader()
+    await screen.findByText('note body')
+
+    const first = container.querySelector('a[href="#ps-fnref-1"]')
+    const second = container.querySelector('a[href="#ps-fnref-1-2"]')
+    expect(first).not.toBeNull()
+    expect(second).not.toBeNull()
+
+    fireEvent.click(first as HTMLElement)
+    expect(scrollCalls.at(-1)).toBe(container.querySelector('#ps-fnref-1'))
+    expect(screen.queryByText(t('nav.fragment.notFound'))).toBeNull()
+
+    fireEvent.click(second as HTMLElement)
+    expect(scrollCalls.at(-1)).toBe(container.querySelector('#ps-fnref-1-2'))
+    expect(screen.queryByText(t('nav.fragment.notFound'))).toBeNull()
+  })
+
+  it('opens and closes the document info panel from the toolbar filename (B-04/UI01)', async () => {
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    renderReader()
+    await screen.findByRole('heading', { level: 1, name: 'a.md' })
+
+    const trigger = screen.getByRole('button', { name: 'a.md' })
+    fireEvent.click(trigger)
+    const panel = await screen.findByRole('dialog', { name: t('document.info.title') })
+    await within(panel).findByText(t('document.info.encoding', { value: 'utf-8' }))
+    expect(within(panel).getByText(t('document.info.path', { path: '/docs/a.md' }))).toBeTruthy()
+    expect(within(panel).getByText(t('document.info.version', { value: 'v1' }))).toBeTruthy()
+    expect(within(panel).getByText(t('document.info.issues.none'))).toBeTruthy()
+    expect(within(panel).getByText(t('document.info.readonly'))).toBeTruthy()
+
+    fireEvent.click(within(panel).getByRole('button', { name: t('document.info.close') }))
+    expect(screen.queryByRole('dialog', { name: t('document.info.title') })).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+  })
+
+  it('disables the filename trigger with an explanation when no document is open (B-04)', async () => {
+    const { container } = renderReader()
+    await screen.findByRole('heading', { level: 1, name: t('welcome.title') })
+    const trigger = container.querySelector<HTMLButtonElement>('.ps-toolbar-filename')
+    expect(trigger).not.toBeNull()
+    expect(trigger?.disabled).toBe(true)
+    expect(trigger?.getAttribute('title')).toBe(t('document.info.disabled'))
+    expect(screen.getByText(t('document.info.disabled'))).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: t('document.info.title') })).toBeNull()
+  })
+
+  it('opens the update-behavior settings category from the more menu (B-05)', async () => {
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    renderReader()
+    await screen.findByRole('heading', { level: 1, name: 'a.md' })
+
+    fireEvent.click(screen.getByRole('button', { name: t('toolbar.more') }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('menu.updateBehavior') }))
+    const dialog = await screen.findByRole('dialog', { name: t('settings.title') })
+    expect(within(dialog).getByText(t('settings.fileUpdate.defaultLabel'))).toBeTruthy()
+  })
+
+  it('drops a relink adoption when the tab moved to another document in flight (B-06)', async () => {
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md', '# a.md\n\n[go](/docs/b.md)\n')
+    renderReader()
+    await screen.findByRole('heading', { level: 1, name: 'a.md' })
+
+    await act(async () => {
+      listeners.get('paperstack://watch-changed')?.({
+        payload: { docId: 'd-a.md', kind: 'removed', observedAtMs: 5 },
+      })
+    })
+    pickFilesResult = { cancelled: false, paths: ['/docs/a.md'] }
+    holdRelink = true
+    relinkStatus = 'new-version'
+    relinkText = '# STALE-RELINK\n\nstale\n'
+    fireEvent.click(screen.getByRole('button', { name: t('document.unavailable.relink') }))
+    await waitFor(() => expect(resolveRelink).not.toBeNull())
+
+    // The same tab navigates to another document while the relink is in flight.
+    fireEvent.click(screen.getByRole('link', { name: 'go' }))
+    await screen.findByRole('heading', { level: 1, name: 'b.md' })
+
+    await act(async () => {
+      const stale = snapshotFor('d-a.md')
+      stale.text = '# STALE-RELINK\n\nstale\n'
+      stale.version = { contentHash: 'v9', sizeBytes: 128, modifiedAtMs: 9, observedAtMs: 9 }
+      resolveRelink?.({ status: 'new-version', snapshot: stale })
+    })
+    // Zero visible effect on the new document session: no notice, no stale text.
+    await waitFor(() =>
+      expect(screen.queryByText(t('document.relink.newVersion'))).toBeNull(),
+    )
+    expect(screen.queryByText('STALE-RELINK')).toBeNull()
+    await screen.findByRole('heading', { level: 1, name: 'b.md' })
+  })
+
+  it('rechecks every open tab on window focus and only stages background candidates (B-07/INV-UM-04)', async () => {
+    pendingRequests = [{ paths: ['/docs/a.md', '/docs/b.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md@v1', '# a.md\n\nA-OLD\n')
+    texts.set('d-b.md@v1', '# b.md\n\nB-OLD\n')
+    texts.set('d-b.md@v2', '# b.md\n\nB-NEW\n')
+    renderReader()
+    await screen.findByText('A-OLD')
+
+    refreshHash = 'v2'
+    await act(async () => {
+      windowHandlers.focus?.({ payload: true })
+    })
+    await waitFor(
+      () =>
+        expect(invokeMock).toHaveBeenCalledWith('read_document', {
+          req: { docId: 'd-b.md', purpose: 'refresh' },
+        }),
+      { timeout: 2000 },
+    )
+
+    // The background candidate is staged only: after activation B still shows
+    // its display version and keep mode never auto-commits it (INV-UM-04).
+    fireEvent.click(screen.getByRole('tab', { name: /b\.md/ }))
+    await screen.findByText('B-OLD')
+    expect(screen.queryByText('B-NEW')).toBeNull()
+    await screen.findByText(t('update.banner'))
   })
 })

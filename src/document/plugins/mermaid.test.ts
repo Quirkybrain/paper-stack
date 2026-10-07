@@ -123,6 +123,32 @@ describe('Mermaid render policy', () => {
     if (!result.ok) expect(result.failure.kind).toBe('limit')
   })
 
+  it('counts SVG nodes through an inert parse without live-DOM side effects (B-08)', async () => {
+    const createElementSpy = vi.spyOn(document, 'createElement')
+    const onloadSpy = vi.fn()
+    const scope = window as unknown as { __psMermaidStubLoad?: () => void }
+    scope.__psMermaidStubLoad = onloadSpy
+    try {
+      const svg =
+        '<svg onload="window.__psMermaidStubLoad()">' +
+        '<image href="https://example.com/never-loaded.png"/>' +
+        '<g><rect/></g></svg>'
+      const result = await renderMermaidDiagram(SOURCE, {
+        loadRenderer: async () => renderer(async () => ({ svg })),
+        maxNodes: 10,
+      })
+      expect(result.ok).toBe(true)
+      // The default counter parses into an inert document: no live element is
+      // created, no handler runs, no <image> reaches the page.
+      expect(createElementSpy).not.toHaveBeenCalled()
+      expect(onloadSpy).not.toHaveBeenCalled()
+      expect(document.querySelector('image')).toBeNull()
+    } finally {
+      createElementSpy.mockRestore()
+      delete scope.__psMermaidStubLoad
+    }
+  })
+
   it('reports load failures and syntax errors as local failures', async () => {
     const loadFailure = await renderMermaidDiagram(SOURCE, {
       loadRenderer: async () => {

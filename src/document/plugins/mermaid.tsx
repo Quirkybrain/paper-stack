@@ -10,7 +10,8 @@ import type { EngineContext, PipelineEngine } from '../engines'
  * with a placeholder node carrying the source. The React `MermaidBlock`
  * (features/reader) renders it later, only when visible and after the mermaid
  * module is dynamically imported. This module stays worker-safe (no DOM/React
- * imports) and exports the frozen render policy + an injectable render helper
+ * imports; the node counter uses `DOMParser` when present and a string fallback
+ * otherwise) and exports the frozen render policy + an injectable render helper
  * so the timeout/node caps are testable without the real renderer.
  *
  * Security posture (security-model §5.2): `securityLevel:'strict'` and
@@ -69,7 +70,7 @@ export interface MermaidRenderDeps {
   timeoutMs?: number
   maxNodes?: number
   maxSourceChars?: number
-  /** Counts SVG elements; injected in tests (DOM parser in the real path). */
+  /** Counts SVG elements; the default is an inert `DOMParser` pass (B-08). */
   countSvgNodes?: (svg: string) => number
 }
 
@@ -84,11 +85,18 @@ export function nextMermaidRenderId(): string {
   return `ps-mermaid-${renderSequence}`
 }
 
-function countSvgNodesInDom(svg: string): number {
-  if (typeof document === 'undefined') return 0
-  const container = document.createElement('div')
-  container.innerHTML = svg
-  return container.querySelectorAll('*').length
+/**
+ * Counts SVG elements without ever inserting engine output into the live DOM
+ * (B-08; security-model §5.1/§5.2): `DOMParser` builds an inert document —
+ * no resource loading, no event handlers, no live nodes. In environments
+ * without `DOMParser` (worker-like), a string tag count is the safe fallback.
+ */
+export function countSvgNodesLazy(svg: string): number {
+  if (typeof DOMParser !== 'undefined') {
+    const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml')
+    return parsed.querySelectorAll('*').length
+  }
+  return (svg.match(/<[A-Za-z][^>]*>/g) ?? []).length
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | 'timeout'> {
@@ -154,7 +162,7 @@ export async function renderMermaidDiagram(
         failure: { kind: 'timeout', messageKey: 'mermaid.timeout', diagramType },
       }
     }
-    const countNodes = deps.countSvgNodes ?? countSvgNodesInDom
+    const countNodes = deps.countSvgNodes ?? countSvgNodesLazy
     if (countNodes(outcome.svg) > maxNodes) {
       return {
         ok: false,

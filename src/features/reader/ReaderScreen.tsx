@@ -328,6 +328,13 @@ export default function ReaderScreen() {
   const activeResult = activeModel?.parseResult as ParseDocumentResult | undefined
   const activeHasPending = activeTab ? selectHasPendingUpdate(activeTab.session) : false
   const activeDiagnostics = activeResult?.diagnostics ?? EMPTY_DIAGNOSTICS
+  // Document-info resource issues (B-04): the resource-category slice of the
+  // displayed version's diagnostics; B-04 requires the panel to reuse them
+  // rather than inventing a second issue store. The filter is trivial and the
+  // panel has no effect keyed on the array identity.
+  const resourceIssues = activeDiagnostics.filter(
+    (diagnostic) => diagnostic.category === 'resource',
+  )
 
   const currentDocumentSettings: CurrentDocumentSettings | null = activeTab
     ? {
@@ -1104,7 +1111,7 @@ export default function ReaderScreen() {
       onFocusChanged: (focused) => {
         if (!focused) return
         if (focusTimer.current) clearTimeout(focusTimer.current)
-        focusTimer.current = setTimeout(() => controlsRef.current.recheckActive(), 300)
+        focusTimer.current = setTimeout(() => controlsRef.current.recheckOpenTabs(), 300)
       },
       onCloseRequested: (event) => controlsRef.current.handleCloseRequested(event),
       onDragDrop: (paths) => void controlsRef.current.openDrop(paths),
@@ -1226,7 +1233,13 @@ export default function ReaderScreen() {
               <ReaderToolbar
                 hasDocument={activeTab !== null}
                 {...(activeTab
-                  ? { displayName: activeTab.displayName, canonicalPath: activeTab.canonicalPath }
+                  ? {
+                      displayName: activeTab.displayName,
+                      canonicalPath: activeTab.canonicalPath,
+                      docId: activeTab.docId,
+                      docVersion: activeTab.session.displayVersion,
+                      resourceIssues,
+                    }
                   : {})}
                 hasPendingUpdate={activeHasPending}
                 modeBadge={modeBadge}
@@ -1240,6 +1253,7 @@ export default function ReaderScreen() {
                 onOpenFile={() => void reader.pickAndOpen()}
                 onOpenDirectory={() => void reader.pickDirectory()}
                 onOpenSettings={() => openSettings('reading')}
+                onOpenUpdateBehavior={() => openSettings('fileUpdate')}
                 onOpenAbout={() => openSettings('about')}
                 onCloseDocument={reader.closeActiveTab}
                 onToggleNav={toggleNav}

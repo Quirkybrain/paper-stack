@@ -5,9 +5,9 @@ import type { Element, Root } from 'hast'
 import { parseDocument } from '../pipeline'
 
 /**
- * Math engine slot ⑧ (rendering-pipeline §2.8/§4; R10) + the D-3 sanitize
- * delta. End-to-end through `parseDocument`, which is the same code the
- * Worker runs.
+ * Math engine slot ⑧ (rendering-pipeline §2.8/§4; R10) under the strict
+ * §5.2 code-class schema (B-10). End-to-end through `parseDocument`, which is
+ * the same code the Worker runs.
  */
 
 function classList(element: Element): string[] {
@@ -117,13 +117,18 @@ describe('KaTeX engine (rendering-pipeline §2.8)', () => {
     expect(hrefs.filter((href) => href.startsWith('javascript:'))).toEqual([])
   })
 
-  it('admits only the math marker classes through sanitize (D-3 delta)', async () => {
+  it('renders math under the strict §5.2 code-class schema (B-10: no D-3 delta)', async () => {
     const result = await parseDocument(
-      '<code class="language-math evil">x</code>\n\n<span class="evil">t</span>\n',
+      '<code class="language-math evil">x</code>\n\n<span class="evil">t</span>\n\ninline $x^2$\n\n$$\ny\n$$\n',
     )
-    // `evil` is stripped everywhere; the math marker survives and renders.
+    // `evil` and the remark-math marker tokens are stripped; only the
+    // `language-*` pattern survives, and `language-math` alone is enough for
+    // this engine and `rehype-katex` to render both inline and display math.
     const classes = elements(result.hast).flatMap((element) => classList(element))
     expect(classes).not.toContain('evil')
+    expect(classes).not.toContain('math-inline')
+    expect(classes).not.toContain('math-display')
     expect(withClass(result.hast, 'katex').length).toBeGreaterThan(0)
+    expect(withClass(result.hast, 'katex-display').length).toBe(1)
   })
 })

@@ -5,9 +5,13 @@ import { Button } from '../../../components/Button'
 import { Icon } from '../../../components/Icon'
 import { IconButton } from '../../../components/IconButton'
 import { Menu } from '../../../components/Menu'
+import { Popover } from '../../../components/Popover'
 import { StatusBadge } from '../../../components/StatusBadge'
 import { Toolbar } from '../../../components/Toolbar'
+import type { DocumentDiagnostic } from '../../../document/types'
+import type { VersionInfo } from '../../../services/types'
 import { TypographyPopover } from '../../settings/TypographyPopover'
+import { DocumentInfoPanel } from '../info/DocumentInfoPanel'
 import type { ReaderViewMode } from '../reader-state'
 
 /**
@@ -16,15 +20,21 @@ import type { ReaderViewMode } from '../reader-state'
  * Open file/directory, navigation toggle (Ctrl+B) and the view switch
  * (view source / back to reading) are wired; history, find and the wp-25
  * search are wired too. The Aa button hosts the display popover (UI06) and
- * the more menu carries the full settings dialog and about entry; the update
- * flow (wp-29) is still absent until its task lands. Nothing here fakes a
- * success state.
+ * the more menu carries the update-behavior entry (B-05), the full settings
+ * dialog and the about entry. The filename is a button that expands the
+ * document-info layer (UI01; B-04): encoding, full path, content version and
+ * resource issues. Nothing here fakes a success state.
  */
 
 export interface ReaderToolbarProps {
   hasDocument: boolean
   displayName?: string
   canonicalPath?: string
+  /** Displayed document identity for the info layer (B-04). */
+  docId?: string
+  docVersion?: VersionInfo | null
+  /** Resource-category diagnostics of the displayed version. */
+  resourceIssues?: readonly DocumentDiagnostic[]
   hasPendingUpdate: boolean
   /** D5 large-document mode label (simplified / source window), VC-18. */
   modeBadge?: 'simplified' | 'sourceOnly' | null
@@ -39,6 +49,8 @@ export interface ReaderToolbarProps {
   onOpenFile(): void
   onOpenDirectory(): void
   onOpenSettings(): void
+  /** B-05: more-menu “更新行为” opens the settings file/update category. */
+  onOpenUpdateBehavior(): void
   onOpenAbout(): void
   onCloseDocument(): void
   onToggleNav(): void
@@ -48,10 +60,15 @@ export interface ReaderToolbarProps {
   onToggleSearch(): void
 }
 
+const EMPTY_RESOURCE_ISSUES: readonly DocumentDiagnostic[] = []
+
 export function ReaderToolbar({
   hasDocument,
   displayName,
   canonicalPath,
+  docId,
+  docVersion,
+  resourceIssues = EMPTY_RESOURCE_ISSUES,
   hasPendingUpdate,
   modeBadge = null,
   viewMode,
@@ -64,6 +81,7 @@ export function ReaderToolbar({
   onOpenFile,
   onOpenDirectory,
   onOpenSettings,
+  onOpenUpdateBehavior,
   onOpenAbout,
   onCloseDocument,
   onToggleNav,
@@ -75,8 +93,17 @@ export function ReaderToolbar({
   const openAnchor = useRef<HTMLSpanElement>(null)
   const moreAnchor = useRef<HTMLSpanElement>(null)
   const typographyAnchor = useRef<HTMLSpanElement>(null)
+  const infoAnchor = useRef<HTMLSpanElement>(null)
   const [openMenu, setOpenMenu] = useState<'open' | 'more' | null>(null)
   const [typographyOpen, setTypographyOpen] = useState(false)
+  const [infoOpen, setInfoOpen] = useState(false)
+
+  const closeInfo = () => setInfoOpen(false)
+  /** Explicit close (button/Esc path): return focus to the trigger. */
+  const closeInfoReturnFocus = () => {
+    setInfoOpen(false)
+    infoAnchor.current?.querySelector('button')?.focus()
+  }
 
   return (
     <Toolbar className="ps-reader-toolbar">
@@ -135,9 +162,37 @@ export function ReaderToolbar({
         {...(!canGoForward ? { disabledReason: t('toolbar.disabled.noForward') } : {})}
       />
 
-      <span className="ps-toolbar-filename" title={canonicalPath ?? undefined}>
-        {displayName ?? ''}
+      <span ref={infoAnchor} className="ps-toolbar-anchor">
+        <Button
+          variant="secondary"
+          className="ps-toolbar-filename"
+          title={canonicalPath ?? undefined}
+          aria-haspopup="dialog"
+          aria-expanded={infoOpen}
+          disabled={!hasDocument}
+          {...(!hasDocument ? { disabledReason: t('document.info.disabled') } : {})}
+          onClick={() => setInfoOpen((open) => !open)}
+        >
+          {displayName ?? ''}
+        </Button>
       </span>
+      {infoOpen && hasDocument && docId !== undefined ? (
+        <Popover
+          anchor={infoAnchor}
+          label={t('document.info.title')}
+          width={360}
+          className="ps-document-info-popover"
+          onClose={closeInfo}
+        >
+          <DocumentInfoPanel
+            docId={docId}
+            canonicalPath={canonicalPath ?? ''}
+            version={docVersion ?? null}
+            issues={resourceIssues}
+            onClose={closeInfoReturnFocus}
+          />
+        </Popover>
+      ) : null}
       {hasPendingUpdate ? <StatusBadge kind="newVersion" /> : null}
       {modeBadge === 'simplified' ? <StatusBadge kind="simplified" /> : null}
       {modeBadge === 'sourceOnly' ? <StatusBadge kind="sourceOnly" /> : null}
@@ -205,6 +260,15 @@ export function ReaderToolbar({
               onSelect: () => {
                 setOpenMenu(null)
                 onToggleSource()
+              },
+            },
+            {
+              id: 'update-behavior',
+              label: t('menu.updateBehavior'),
+              icon: 'refresh',
+              onSelect: () => {
+                setOpenMenu(null)
+                onOpenUpdateBehavior()
               },
             },
             {

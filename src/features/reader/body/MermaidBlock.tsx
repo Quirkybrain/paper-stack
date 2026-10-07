@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { t } from '../../../app/i18n'
 import { Button } from '../../../components/Button'
+import { SanitizedNode } from '../../../document/SanitizedNode'
 import {
   MERMAID_HTML_LABELS,
   MERMAID_SECURITY_LEVEL,
@@ -22,9 +23,10 @@ import { useReaderUi } from '../ui-context'
  * family, timeout, node cap) show a localized in-block error plus the source;
  * there is no automatic retry.
  *
- * `dangerouslySetInnerHTML` is confined to this single trusted-engine wrapper
- * (security-model §5.2: post-sanitize engine output). The SVG comes from
- * Mermaid strict mode, never from raw document HTML.
+ * Trusted engine SVG is injected only through the single
+ * `document/SanitizedNode` wrapper (security-model §5.2: post-sanitize engine
+ * output; B-01). The SVG comes from Mermaid strict mode, never from raw
+ * document HTML.
  */
 
 export interface MermaidBlockDeps {
@@ -132,12 +134,7 @@ export function MermaidBlock({ source, deps }: MermaidBlockProps) {
               onClick={() =>
                 ui.openZoom({
                   label: t('mermaid.action.zoom'),
-                  content: (
-                    <div
-                      className="ps-mermaid-svg"
-                      dangerouslySetInnerHTML={{ __html: state.svg }}
-                    />
-                  ),
+                  content: <SanitizedNode as="div" className="ps-mermaid-svg" html={state.svg} />,
                 })
               }
             >
@@ -147,7 +144,7 @@ export function MermaidBlock({ source, deps }: MermaidBlockProps) {
         </div>
       ) : null}
       {state.status === 'ready' ? (
-        <div className="ps-mermaid-svg" dangerouslySetInnerHTML={{ __html: state.svg }} />
+        <SanitizedNode as="div" className="ps-mermaid-svg" html={state.svg} />
       ) : (
         <div className="ps-mermaid-source-view">
           <p className="ps-mermaid-error-title" role="note">

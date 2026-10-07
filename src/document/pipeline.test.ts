@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { visit } from 'unist-util-visit'
 
 import { clearEngines, registerEngine } from './engines'
-import { parseDocument, resolvePipelineOptions } from './pipeline'
+import { BLANK_FOOTNOTE_LABEL, parseDocument, resolvePipelineOptions } from './pipeline'
 import type { DocumentDiagnostic } from './types'
 
 afterEach(() => {
@@ -48,16 +48,25 @@ describe('resolvePipelineOptions', () => {
       mode: 'technical',
       inlineMath: true,
       simplified: false,
+      footnoteLabel: BLANK_FOOTNOTE_LABEL,
     })
     expect(resolvePipelineOptions({ mode: 'standard' })).toEqual({
       mode: 'standard',
       inlineMath: true,
       simplified: false,
+      footnoteLabel: BLANK_FOOTNOTE_LABEL,
     })
     expect(resolvePipelineOptions({ simplified: true })).toEqual({
       mode: 'technical',
       inlineMath: true,
       simplified: true,
+      footnoteLabel: BLANK_FOOTNOTE_LABEL,
+    })
+    expect(resolvePipelineOptions({ footnoteLabel: '脚注' })).toEqual({
+      mode: 'technical',
+      inlineMath: true,
+      simplified: false,
+      footnoteLabel: '脚注',
     })
   })
 })
@@ -290,6 +299,51 @@ describe('mode combinations', () => {
     expect(section?.properties.className).toEqual(['footnotes'])
     const item = collectElements(tree, 'li').find((element) => element.properties.id !== undefined)
     expect(String(item?.properties.id)).toMatch(/^ps-fn-[A-Za-z0-9-]+$/)
+  })
+
+  it('keeps every fragment href resolving to an existing id (B-02 footnote round-trip)', async () => {
+    const result = await parseDocument('First[^1] and second[^1].\n\n[^1]: note body')
+    const tree = result.hast as Root
+    const ids = new Set<string>()
+    const targets: string[] = []
+    visit(tree, 'element', (node) => {
+      const id = node.properties.id
+      if (typeof id === 'string') ids.add(id)
+      const href = node.properties.href
+      if (node.tagName === 'a' && typeof href === 'string' && href.startsWith('#')) {
+        targets.push(decodeURIComponent(href.slice(1)))
+      }
+    })
+    expect(targets).toHaveLength(4)
+    expect(targets.filter((target) => !ids.has(target))).toEqual([])
+    // Both reference anchors keep their ids so each note back-reference
+    // reaches the exact reference, including the second reference of the
+    // same note (R16; models §5.2).
+    expect(ids.has('ps-fn-1')).toBe(true)
+    expect(ids.has('ps-fnref-1')).toBe(true)
+    expect(ids.has('ps-fnref-1-2')).toBe(true)
+  })
+
+  it('admits only footnote-shaped ids on links', async () => {
+    const result = await parseDocument('<a href="#safe" id="evil">x</a>')
+    const link = collectElements(result.hast as Root, 'a')[0]
+    expect(link?.properties.id).toBeUndefined()
+    expect(link?.properties.href).toBe('#safe')
+  })
+
+  it('localizes the generated footnote label and never ships the English default (B-03)', async () => {
+    const localized = await parseDocument('ref[^a]\n\n[^a]: note body', { footnoteLabel: '脚注' })
+    const headingTexts = collectElements(localized.hast as Root, 'h2').map((element) => {
+      let text = ''
+      visit(element, 'text', (node) => {
+        text += node.value
+      })
+      return text
+    })
+    expect(headingTexts).toContain('脚注')
+    // Without an injected label the pipeline emits no untranslated heading.
+    const bare = await parseDocument('ref[^a]\n\n[^a]: note body')
+    expect(collectText(bare.hast as Root)).not.toContain('Footnotes')
   })
 
   it('standard mode leaves footnote syntax as plain text', async () => {

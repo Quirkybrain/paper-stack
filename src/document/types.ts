@@ -114,12 +114,21 @@ export interface ParseDocumentOptions {
    * blocks then show their source, exactly like the frozen mode table says.
    */
   simplified?: boolean
+  /**
+   * Localized label for the GFM-generated footnote section heading (B-03;
+   * rendering-pipeline §2.2 footnotes). Injected by the app layer through
+   * `t()`; without it the pipeline uses a non-linguistic blank fallback so
+   * direct runs never emit the upstream English heading (the app never runs
+   * without the injected label).
+   */
+  footnoteLabel?: string
 }
 
 export interface ResolvedPipelineOptions {
   mode: PipelineMode
   inlineMath: boolean
   simplified: boolean
+  footnoteLabel: string
 }
 
 /**
