@@ -1,0 +1,61 @@
+{
+  "metric": "NF05",
+  "note": "CALIBRATION on this machine (non-reference); viewable/index proxies documented in tests/perf/README.md",
+  "corpus": "/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/generated/corpus-1MiB.md",
+  "corpus_bytes": 1048576,
+  "query": "段落",
+  "iterations": 5,
+  "parse_and_index": {
+    "n": 5,
+    "min": 15380.907187000004,
+    "p50": 16038.264461,
+    "p95": 18013.034222,
+    "max": 23015.73509399999,
+    "mean": 17579.0244016
+  },
+  "first_query": {
+    "n": 5,
+    "min": 12419.036930000002,
+    "p50": 12886.45336700001,
+    "p95": 14468.838784,
+    "max": 24878.40214000002,
+    "mean": 15492.502438200007
+  },
+  "samples": [
+    {
+      "iteration": 0,
+      "parse_and_index_ms": 16038.264461,
+      "first_query_ms": 14468.838784,
+      "source_hits": 2333,
+      "body_hits": 2333
+    },
+    {
+      "iteration": 1,
+      "parse_and_index_ms": 18013.034222,
+      "first_query_ms": 12809.78097,
+      "source_hits": 2333,
+      "body_hits": 2333
+    },
+    {
+      "iteration": 2,
+      "parse_and_index_ms": 15380.907187000004,
+      "first_query_ms": 12419.036930000002,
+      "source_hits": 2333,
+      "body_hits": 2333
+    },
+    {
+      "iteration": 3,
+      "parse_and_index_ms": 15447.181043999997,
+      "first_query_ms": 12886.45336700001,
+      "source_hits": 2333,
+      "body_hits": 2333
+    },
+    {
+      "iteration": 4,
+      "parse_and_index_ms": 23015.73509399999,
+      "first_query_ms": 24878.40214000002,
+      "source_hits": 2333,
+      "body_hits": 2333
+    }
+  ]
+}

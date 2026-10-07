@@ -1,0 +1,236 @@
+{
+  "metric": "NF05",
+  "note": "CALIBRATION on this machine (non-reference); viewable/index proxies documented in tests/perf/README.md",
+  "corpus": "/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/generated/corpus-1MiB.md",
+  "corpus_bytes": 1048576,
+  "query": "needle-3",
+  "iterations": 30,
+  "parse_and_index": {
+    "n": 30,
+    "min": 12676.042404000007,
+    "p50": 13212.353470000031,
+    "p95": 18465.090091,
+    "max": 29408.812399999995,
+    "mean": 14782.078269300002
+  },
+  "first_query": {
+    "n": 30,
+    "min": 27.69488699999056,
+    "p50": 31.656621000001905,
+    "p95": 38.05946500000209,
+    "max": 66.89083099999698,
+    "mean": 33.9532210333285
+  },
+  "samples": [
+    {
+      "iteration": 0,
+      "parse_and_index_ms": 15966.575135,
+      "first_query_ms": 38.05946500000209,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 1,
+      "parse_and_index_ms": 16093.606144000001,
+      "first_query_ms": 38.02371399999902,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 2,
+      "parse_and_index_ms": 16279.417798999995,
+      "first_query_ms": 33.61766800000623,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 3,
+      "parse_and_index_ms": 18465.090091,
+      "first_query_ms": 66.89083099999698,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 4,
+      "parse_and_index_ms": 29408.812399999995,
+      "first_query_ms": 37.76191200000176,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 5,
+      "parse_and_index_ms": 16255.247875000001,
+      "first_query_ms": 35.682786999997916,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 6,
+      "parse_and_index_ms": 15885.986231000003,
+      "first_query_ms": 37.14544899998873,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 7,
+      "parse_and_index_ms": 19484.891874000008,
+      "first_query_ms": 35.11660700000357,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 8,
+      "parse_and_index_ms": 18228.273610000004,
+      "first_query_ms": 57.783568000013474,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 9,
+      "parse_and_index_ms": 15434.309188000014,
+      "first_query_ms": 33.05752899998333,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 10,
+      "parse_and_index_ms": 13233.298557000002,
+      "first_query_ms": 30.3889499999932,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 11,
+      "parse_and_index_ms": 13168.584688000003,
+      "first_query_ms": 30.352358000003733,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 12,
+      "parse_and_index_ms": 13049.807396999997,
+      "first_query_ms": 31.656621000001905,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 13,
+      "parse_and_index_ms": 13368.94098699998,
+      "first_query_ms": 31.712776000000304,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 14,
+      "parse_and_index_ms": 13248.686802000011,
+      "first_query_ms": 27.69488699999056,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 15,
+      "parse_and_index_ms": 13056.168101999996,
+      "first_query_ms": 30.07112400000915,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 16,
+      "parse_and_index_ms": 13024.915974000032,
+      "first_query_ms": 31.930616999976337,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 17,
+      "parse_and_index_ms": 13044.25398400001,
+      "first_query_ms": 28.620135999983177,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 18,
+      "parse_and_index_ms": 13104.877793000021,
+      "first_query_ms": 31.00601099996129,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 19,
+      "parse_and_index_ms": 13053.982097,
+      "first_query_ms": 32.726801999961026,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 20,
+      "parse_and_index_ms": 13212.353470000031,
+      "first_query_ms": 29.18556900002295,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 21,
+      "parse_and_index_ms": 13030.39880299999,
+      "first_query_ms": 29.59350600000471,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 22,
+      "parse_and_index_ms": 13066.478361000016,
+      "first_query_ms": 30.37313299998641,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 23,
+      "parse_and_index_ms": 13386.465655000007,
+      "first_query_ms": 29.276437999971677,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 24,
+      "parse_and_index_ms": 13293.269633999967,
+      "first_query_ms": 28.485780999995768,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 25,
+      "parse_and_index_ms": 13208.407423999975,
+      "first_query_ms": 29.87447099998826,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 26,
+      "parse_and_index_ms": 12972.78012000001,
+      "first_query_ms": 27.777203999983612,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 27,
+      "parse_and_index_ms": 12970.38723199995,
+      "first_query_ms": 31.85600000002887,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 28,
+      "parse_and_index_ms": 12790.038248000026,
+      "first_query_ms": 30.35281800001394,
+      "source_hits": 5,
+      "body_hits": 5
+    },
+    {
+      "iteration": 29,
+      "parse_and_index_ms": 12676.042404000007,
+      "first_query_ms": 32.52189899998484,
+      "source_hits": 5,
+      "body_hits": 5
+    }
+  ]
+}

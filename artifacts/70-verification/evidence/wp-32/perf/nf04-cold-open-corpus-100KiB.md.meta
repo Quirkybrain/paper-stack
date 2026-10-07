@@ -1,0 +1,11 @@
+date=2026-10-07T18:01:00+08:00
+host_kernel=7.0.0-34-generic
+cores=12
+memory=15333MiB
+display=:1
+binary=/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack
+binary_sha256=436f57521c4d00e15cfacfff07889131e1e1d1d72deb25051f4148480686c3b1
+binary_mtime=2026-10-07 17:03:01.717472450 +0800
+mode=cold-open
+timeout_ms=30000
+note=viewable-window proxy; OS page cache NOT dropped (no sudo); calibration only

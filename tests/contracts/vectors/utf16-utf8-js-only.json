@@ -1,0 +1,25 @@
+{
+  "note": "JS-only UTF-16/UTF-8 clamping vectors (source-map.ts doc comment; SRS §5.3). The Rust service only returns valid UTF-8 text, so a lone surrogate or an index inside a pair cannot arrive from IPC; these cases pin the front-end helper behavior used for DOM slicing. `direction` says which argument is the input: utf16-to-bytes -> utf16IndexToUtf8ByteOffset, bytes-to-utf16 -> utf8ByteOffsetToUtf16Index.",
+  "cases": [
+    {
+      "id": "index-inside-surrogate-pair-clamps-to-pair-start",
+      "text": "a🙂b",
+      "points": [
+        { "direction": "utf16-to-bytes", "utf16Index": 2, "byteOffset": 1 },
+        { "direction": "utf16-to-bytes", "utf16Index": 6, "byteOffset": 6 },
+        { "direction": "bytes-to-utf16", "utf16Index": 1, "byteOffset": 3 },
+        { "direction": "bytes-to-utf16", "utf16Index": 4, "byteOffset": 99 }
+      ]
+    },
+    {
+      "id": "lone-surrogate-counts-as-u-fffd",
+      "text": "a\ud800b",
+      "byteLength": 5,
+      "points": [
+        { "direction": "utf16-to-bytes", "utf16Index": 1, "byteOffset": 1 },
+        { "direction": "utf16-to-bytes", "utf16Index": 2, "byteOffset": 4 },
+        { "direction": "bytes-to-utf16", "utf16Index": 2, "byteOffset": 4 }
+      ]
+    }
+  ]
+}
