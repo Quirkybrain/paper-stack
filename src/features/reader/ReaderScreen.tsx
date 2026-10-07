@@ -3,13 +3,31 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createEventBridge } from '../../app/events'
 import { t } from '../../app/i18n'
 import { selectHasPendingUpdate } from '../../app/session'
-import { panelClosed, panelToggled, recentRemoved, useAppDispatch, useAppState } from '../../app/store'
+import {
+  panelClosed,
+  panelToggled,
+  recentRemoved,
+  useAppDispatch,
+  useAppState,
+} from '../../app/store'
 import { Banner } from '../../components/Banner'
 import { Button } from '../../components/Button'
 import { EmptyState } from '../../components/EmptyState'
 import { Placeholder, type PlaceholderStage } from '../../components/Placeholder'
 import { DOCUMENT_BODY_ID } from '../../components/SkipLink'
-import type { BlockRecord, OutlineEntry, ParseDocumentResult, SearchSegment } from '../../document/types'
+import type {
+  BlockRecord,
+  DocumentDiagnostic,
+  OutlineEntry,
+  ParseDocumentResult,
+  SearchSegment,
+} from '../../document/types'
+import type { SyntaxMode } from '../../services/types'
+import type { CurrentDocumentSettings } from '../settings/current-document'
+import { DiagnosticsProvider, useDiagnostics } from '../settings/diagnostics/diagnostics-context'
+import { DiagnosticsPanel } from '../settings/diagnostics/DiagnosticsPanel'
+import { SettingsProvider, useSettings } from '../settings/settings-context'
+import { SettingsDialog, type SettingsCategory } from '../settings/SettingsDialog'
 import { SearchBar } from '../search/SearchBar'
 import {
   openSearchSession,
@@ -46,7 +64,12 @@ import {
 import { TabBar } from './tabs/TabBar'
 import { ReaderToolbar } from './toolbar/ReaderToolbar'
 import { ReaderUiContext, type ReaderUi } from './ui-context'
-import { displayDocumentModel, useReader } from './use-reader'
+import {
+  displayDocumentModel,
+  useReader,
+  type OpenFailure,
+  type ReaderControls,
+} from './use-reader'
 import { WelcomePage } from './welcome/WelcomePage'
 import { ZoomOverlay, type ZoomTarget } from './zoom/ZoomOverlay'
 import './reader.css'
@@ -80,11 +103,7 @@ function ReaderLoading({ phase, onCancel }: { phase: 'reading' | 'parsing'; onCa
   const stage: PlaceholderStage | undefined =
     step === 'stage' ? (phase === 'reading' ? 'read' : 'parse') : undefined
   return (
-    <Placeholder
-      {...(stage ? { stage } : {})}
-      cancellable={step === 'stage'}
-      onCancel={onCancel}
-    />
+    <Placeholder {...(stage ? { stage } : {})} cancellable={step === 'stage'} onCancel={onCancel} />
   )
 }
 
@@ -167,6 +186,93 @@ function pointForSearchHit(
   }
 }
 
+/**
+ * Bridges the settings syntax mode into the reader pipeline: a change
+ * re-renders the displayed version in place (R08), never reloading disk.
+ */
+function ReaderSettingsBridge({ reader }: { reader: ReaderControls }) {
+  const { settings } = useSettings()
+  const readerRef = useRef(reader)
+  useEffect(() => {
+    readerRef.current = reader
+  })
+  const lastModeRef = useRef<SyntaxMode | null>(null)
+
+  useEffect(() => {
+    if (lastModeRef.current === settings.syntaxMode) return
+    lastModeRef.current = settings.syntaxMode
+    readerRef.current.applySyntaxMode(settings.syntaxMode)
+  }, [settings.syntaxMode])
+
+  return null
+}
+
+const EMPTY_DIAGNOSTICS: readonly DocumentDiagnostic[] = []
+
+/**
+ * Records every visible error surface into the diagnostics collector
+ * (ui-spec §3.8): open failures, the active tab's load/parse error and the
+ * pipeline's per-block diagnostics. Recording is a no-op when nothing new
+ * appeared, and identical entries merge by count.
+ */
+function DiagnosticsRecorder({
+  openErrors,
+  activeError,
+  activeDocVersion,
+  parseDiagnostics,
+}: {
+  openErrors: readonly OpenFailure[]
+  activeError: DocumentDiagnostic | null
+  activeDocVersion: string | null
+  parseDiagnostics: readonly DocumentDiagnostic[]
+}) {
+  const { recordMany } = useDiagnostics()
+
+  useEffect(() => {
+    recordMany(
+      openErrors.map((failure) => ({
+        messageKey: failure.error.messageKey,
+        code: failure.error.code,
+        category: failure.error.category,
+        ...(failure.error.sourceRange === undefined
+          ? {}
+          : { sourceRange: failure.error.sourceRange }),
+        ...(failure.error.details === undefined ? {} : { details: failure.error.details }),
+      })),
+    )
+  }, [openErrors, recordMany])
+
+  useEffect(() => {
+    if (activeError === null) return
+    recordMany([
+      {
+        messageKey: activeError.messageKey,
+        code: activeError.code,
+        category: activeError.category,
+        ...(activeDocVersion === null ? {} : { docVersion: activeDocVersion }),
+        ...(activeError.sourceRange === undefined ? {} : { sourceRange: activeError.sourceRange }),
+        ...(activeError.details === undefined ? {} : { details: activeError.details }),
+      },
+    ])
+  }, [activeError, activeDocVersion, recordMany])
+
+  useEffect(() => {
+    if (parseDiagnostics.length === 0) return
+    recordMany(
+      parseDiagnostics.map((diagnostic) => ({
+        messageKey: diagnostic.messageKey,
+        code: diagnostic.code,
+        category: diagnostic.category,
+        ...(activeDocVersion === null ? {} : { docVersion: activeDocVersion }),
+        ...(diagnostic.sourceRange === undefined ? {} : { sourceRange: diagnostic.sourceRange }),
+        ...(diagnostic.details === undefined ? {} : { details: diagnostic.details }),
+      })),
+    )
+  }, [parseDiagnostics, activeDocVersion, recordMany])
+
+  return null
+}
+
 export default function ReaderScreen() {
   const reader = useReader()
   const { state } = reader
@@ -177,9 +283,28 @@ export default function ReaderScreen() {
   const activeModel = activeTab ? displayDocumentModel(activeTab) : undefined
   const activeResult = activeModel?.parseResult as ParseDocumentResult | undefined
   const activeHasPending = activeTab ? selectHasPendingUpdate(activeTab.session) : false
+  const activeDiagnostics = activeResult?.diagnostics ?? EMPTY_DIAGNOSTICS
+
+  const currentDocumentSettings: CurrentDocumentSettings | null = activeTab
+    ? {
+        displayName: activeTab.displayName,
+        inlineMath: reader.inlineMathFor(activeTab.tabId),
+        updateModeOverride: reader.updateModeOverrideFor(activeTab.tabId),
+        onInlineMathChange: (enabled) => reader.setInlineMath(activeTab.tabId, enabled),
+        onUpdateModeChange: (mode) => reader.setUpdateModeOverride(activeTab.tabId, mode),
+      }
+    : null
+
+  const openSettings = (category: SettingsCategory) => {
+    setSettingsCategory(category)
+    setSettingsOpen(true)
+  }
 
   const [inspectTarget, setInspectTarget] = useState<InspectTarget | null>(null)
   const [zoomTarget, setZoomTarget] = useState<ZoomTarget | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>('reading')
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
   const [sourceEntry, setSourceEntry] = useState<Record<string, SourceEntry>>({})
   const [sourcePosition, setSourcePosition] = useState<Record<string, SourceBackInfo>>({})
   const [sourceNotice, setSourceNotice] = useState<string | null>(null)
@@ -238,7 +363,8 @@ export default function ReaderScreen() {
   const openInspect = (target: InspectTarget) => {
     setInspectTarget(target)
     if (activePanel !== 'inspect') {
-      if (activePanel === 'files' || activePanel === 'outline') lastNavPanelRef.current = activePanel
+      if (activePanel === 'files' || activePanel === 'outline')
+        lastNavPanelRef.current = activePanel
       dispatch(panelToggled('inspect'))
     }
   }
@@ -361,8 +487,7 @@ export default function ReaderScreen() {
         return 'exact'
       }
     }
-    const hadAnchor =
-      point.anchorId !== null || point.blockId !== null || point.sourceByte !== null
+    const hadAnchor = point.anchorId !== null || point.blockId !== null || point.sourceByte !== null
     // Never pick an arbitrary block: fall back to the document top and let the
     // caller label the restore as approximate (models §6.3).
     mainRef.current?.scrollIntoView?.()
@@ -438,9 +563,7 @@ export default function ReaderScreen() {
   }
 
   const blockIdForAnchor = (anchorId: string): string | null => {
-    const outlineEntry = activeResult?.outline.find(
-      (candidate) => candidate.anchorId === anchorId,
-    )
+    const outlineEntry = activeResult?.outline.find((candidate) => candidate.anchorId === anchorId)
     if (!outlineEntry) return null
     const block = activeResult?.blocks.find(
       (candidate) =>
@@ -694,6 +817,18 @@ export default function ReaderScreen() {
           return
         }
       }
+      // Ctrl+, opens settings (ui-spec §6.1); it works from inputs too, only
+      // IME composition suppresses shortcuts (EDGE-04).
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        !event.shiftKey &&
+        !event.isComposing &&
+        key === ','
+      ) {
+        event.preventDefault()
+        openSettings('reading')
+        return
+      }
       if (isEditableTarget(event.target)) return
       if (!(event.ctrlKey || event.metaKey)) return
       if (key === 'o' && event.shiftKey) {
@@ -786,11 +921,12 @@ export default function ReaderScreen() {
       return (
         <div className="ps-reader-notice" role="alert">
           <p>{t(messageKey)}</p>
-          {activeTab.error ? (
-            <p className="ps-reader-notice-code">{activeTab.error.code}</p>
-          ) : null}
+          {activeTab.error ? <p className="ps-reader-notice-code">{activeTab.error.code}</p> : null}
           <Button variant="secondary" onClick={() => reader.retryTab(activeTab.tabId)}>
             {t('common.retry')}
+          </Button>
+          <Button variant="secondary" onClick={() => setDiagnosticsOpen(true)}>
+            {t('diagnostics.title')}
           </Button>
         </div>
       )
@@ -819,160 +955,191 @@ export default function ReaderScreen() {
   })()
 
   return (
-    <RootErrorBoundary>
-      <ReaderUiContext.Provider value={ui}>
-        <div className="ps-reader">
-          <ReaderToolbar
-            hasDocument={activeTab !== null}
-            {...(activeTab
-              ? { displayName: activeTab.displayName, canonicalPath: activeTab.canonicalPath }
-              : {})}
-            hasPendingUpdate={activeHasPending}
-            viewMode={activeTab?.viewMode ?? 'reading'}
-            navAvailable={navAvailable}
-            navOpen={navPanelKind !== null}
-            canGoBack={activeTab !== null && canGoBack(history.state, activeTab.tabId)}
-            canGoForward={activeTab !== null && canGoForward(history.state, activeTab.tabId)}
-            searchAvailable={searchAvailable}
-            searchOpen={searchSession.state.open}
-            onOpenFile={() => void reader.pickAndOpen()}
-            onOpenDirectory={() => void reader.pickDirectory()}
-            onCloseDocument={reader.closeActiveTab}
-            onToggleNav={toggleNav}
-            onToggleSource={toggleSource}
-            onBack={handleBack}
-            onForward={handleForward}
-            onToggleSearch={handleSearchOpen}
-          />
-          <TabBar
-            items={state.tabs.map((tab) => ({
-              tabId: tab.tabId,
-              label: labels.get(tab.tabId) ?? tab.displayName,
-              fullPath: tab.canonicalPath,
-              hasPendingUpdate: selectHasPendingUpdate(tab.session),
-              isActive: tab.tabId === state.activeTabId,
-            }))}
-            onActivate={reader.activateTab}
-            onClose={reader.closeTab}
-          />
+    <SettingsProvider>
+      <DiagnosticsProvider>
+        <ReaderSettingsBridge reader={reader} />
+        <DiagnosticsRecorder
+          openErrors={reader.openErrors}
+          activeError={(activeTab?.error as DocumentDiagnostic | null) ?? null}
+          activeDocVersion={activeTab?.session.displayVersion?.contentHash ?? null}
+          parseDiagnostics={activeDiagnostics}
+        />
+        <RootErrorBoundary>
+          <ReaderUiContext.Provider value={ui}>
+            <div className="ps-reader">
+              <ReaderToolbar
+                hasDocument={activeTab !== null}
+                {...(activeTab
+                  ? { displayName: activeTab.displayName, canonicalPath: activeTab.canonicalPath }
+                  : {})}
+                hasPendingUpdate={activeHasPending}
+                viewMode={activeTab?.viewMode ?? 'reading'}
+                navAvailable={navAvailable}
+                navOpen={navPanelKind !== null}
+                canGoBack={activeTab !== null && canGoBack(history.state, activeTab.tabId)}
+                canGoForward={activeTab !== null && canGoForward(history.state, activeTab.tabId)}
+                searchAvailable={searchAvailable}
+                searchOpen={searchSession.state.open}
+                onOpenFile={() => void reader.pickAndOpen()}
+                onOpenDirectory={() => void reader.pickDirectory()}
+                onOpenSettings={() => openSettings('reading')}
+                onOpenAbout={() => openSettings('about')}
+                onCloseDocument={reader.closeActiveTab}
+                onToggleNav={toggleNav}
+                onToggleSource={toggleSource}
+                onBack={handleBack}
+                onForward={handleForward}
+                onToggleSearch={handleSearchOpen}
+              />
+              <TabBar
+                items={state.tabs.map((tab) => ({
+                  tabId: tab.tabId,
+                  label: labels.get(tab.tabId) ?? tab.displayName,
+                  fullPath: tab.canonicalPath,
+                  hasPendingUpdate: selectHasPendingUpdate(tab.session),
+                  isActive: tab.tabId === state.activeTabId,
+                }))}
+                onActivate={reader.activateTab}
+                onClose={reader.closeTab}
+              />
 
-          {activeTab ? (
-            <SearchBar
-              key={activeTab.tabId}
-              session={searchSession}
-              segments={activeResult?.segments ?? EMPTY_SEGMENTS}
-              rawText={activeModel?.rawText ?? null}
-              onClose={handleSearchClose}
-              onFormulaInspect={handleFormulaInspect}
-            />
-          ) : null}
+              {activeTab ? (
+                <SearchBar
+                  key={activeTab.tabId}
+                  session={searchSession}
+                  segments={activeResult?.segments ?? EMPTY_SEGMENTS}
+                  rawText={activeModel?.rawText ?? null}
+                  onClose={handleSearchClose}
+                  onFormulaInspect={handleFormulaInspect}
+                />
+              ) : null}
 
-          <div className="ps-reader-notices">
-            {reader.closeSaveFailed ? (
-              <Banner tone="warn">{t('document.state.notSaved')}</Banner>
-            ) : null}
-            {reader.openErrors.map((failure, index) => (
-              <Banner
-                key={`${failure.path}-${index}`}
-                tone="danger"
-                actions={
-                  <Button variant="secondary" onClick={reader.clearOpenErrors}>
-                    {t('common.close')}
-                  </Button>
-                }
-              >
-                {t(failure.error.messageKey)} ({failure.error.code})
-              </Banner>
-            ))}
-            {reader.relinkNotice !== null ? (
-              <Banner
-                tone="info"
-                actions={
-                  <Button variant="secondary" onClick={reader.clearRelinkNotice}>
-                    {t('common.close')}
-                  </Button>
-                }
-              >
-                {t(reader.relinkNotice)}
-              </Banner>
-            ) : null}
-            {sourceNotice !== null ? (
-              <Banner
-                tone="warn"
-                actions={
-                  <Button variant="secondary" onClick={() => setSourceNotice(null)}>
-                    {t('common.close')}
-                  </Button>
-                }
-              >
-                {t(sourceNotice)}
-              </Banner>
-            ) : null}
-            {historyNotice !== null ? (
-              <Banner
-                tone="info"
-                actions={
-                  <Button variant="secondary" onClick={() => setHistoryNotice(null)}>
-                    {t('common.close')}
-                  </Button>
-                }
-              >
-                {t(historyNotice)}
-              </Banner>
-            ) : null}
-            {activeTab && activeHasPending && !activeTab.bannerCollapsed ? (
-              <Banner
-                tone="warn"
-                label={t('aria.updateBanner')}
-                actions={
-                  <Button
-                    variant="secondary"
-                    onClick={() => reader.setBannerCollapsed(activeTab.tabId, true)}
+              <div className="ps-reader-notices">
+                {reader.closeSaveFailed ? (
+                  <Banner tone="warn">{t('document.state.notSaved')}</Banner>
+                ) : null}
+                {reader.openErrors.map((failure, index) => (
+                  <Banner
+                    key={`${failure.path}-${index}`}
+                    tone="danger"
+                    actions={
+                      <>
+                        <Button variant="secondary" onClick={() => setDiagnosticsOpen(true)}>
+                          {t('diagnostics.title')}
+                        </Button>
+                        <Button variant="secondary" onClick={reader.clearOpenErrors}>
+                          {t('common.close')}
+                        </Button>
+                      </>
+                    }
                   >
-                    {t('update.action.later')}
-                  </Button>
-                }
-              >
-                {t('update.banner')}
-              </Banner>
-            ) : null}
-          </div>
+                    {t(failure.error.messageKey)} ({failure.error.code})
+                  </Banner>
+                ))}
+                {reader.relinkNotice !== null ? (
+                  <Banner
+                    tone="info"
+                    actions={
+                      <Button variant="secondary" onClick={reader.clearRelinkNotice}>
+                        {t('common.close')}
+                      </Button>
+                    }
+                  >
+                    {t(reader.relinkNotice)}
+                  </Banner>
+                ) : null}
+                {sourceNotice !== null ? (
+                  <Banner
+                    tone="warn"
+                    actions={
+                      <Button variant="secondary" onClick={() => setSourceNotice(null)}>
+                        {t('common.close')}
+                      </Button>
+                    }
+                  >
+                    {t(sourceNotice)}
+                  </Banner>
+                ) : null}
+                {historyNotice !== null ? (
+                  <Banner
+                    tone="info"
+                    actions={
+                      <Button variant="secondary" onClick={() => setHistoryNotice(null)}>
+                        {t('common.close')}
+                      </Button>
+                    }
+                  >
+                    {t(historyNotice)}
+                  </Banner>
+                ) : null}
+                {activeTab && activeHasPending && !activeTab.bannerCollapsed ? (
+                  <Banner
+                    tone="warn"
+                    label={t('aria.updateBanner')}
+                    actions={
+                      <Button
+                        variant="secondary"
+                        onClick={() => reader.setBannerCollapsed(activeTab.tabId, true)}
+                      >
+                        {t('update.action.later')}
+                      </Button>
+                    }
+                  >
+                    {t('update.banner')}
+                  </Banner>
+                ) : null}
+              </div>
 
-          <div className="ps-reader-body">
-            {navPanelKind !== null ? (
-              <NavPanel
-                panel={navPanelKind}
-                root={reader.directory}
-                outline={outline}
-                docId={activeTab?.docId ?? null}
-                selectedPath={activeTab?.canonicalPath ?? null}
-                currentAnchorId={currentAnchorId}
-                onSelectPanel={showPanel}
-                onOpenFile={(path) => void reader.openPaths([path], 'tree')}
-                onOutlineNavigate={handleOutlineNavigate}
-                onClose={closePanel}
+              <div className="ps-reader-body">
+                {navPanelKind !== null ? (
+                  <NavPanel
+                    panel={navPanelKind}
+                    root={reader.directory}
+                    outline={outline}
+                    docId={activeTab?.docId ?? null}
+                    selectedPath={activeTab?.canonicalPath ?? null}
+                    currentAnchorId={currentAnchorId}
+                    onSelectPanel={showPanel}
+                    onOpenFile={(path) => void reader.openPaths([path], 'tree')}
+                    onOutlineNavigate={handleOutlineNavigate}
+                    onClose={closePanel}
+                  />
+                ) : null}
+
+                <main
+                  ref={mainRef}
+                  id={DOCUMENT_BODY_ID}
+                  className="ps-reader-main"
+                  aria-label={t('aria.documentBody')}
+                  {...(activeTab ? { role: 'tabpanel' } : {})}
+                >
+                  {body}
+                </main>
+
+                {activePanel === 'inspect' && inspectTarget !== null ? (
+                  <InspectDrawer target={inspectTarget} onClose={closeInspect} />
+                ) : null}
+              </div>
+            </div>
+            {zoomTarget !== null ? (
+              <ZoomOverlay target={zoomTarget} onClose={() => setZoomTarget(null)} />
+            ) : null}
+            {settingsOpen ? (
+              <SettingsDialog
+                onClose={() => setSettingsOpen(false)}
+                initialCategory={settingsCategory}
+                currentDocument={currentDocumentSettings}
               />
             ) : null}
-
-            <main
-              ref={mainRef}
-              id={DOCUMENT_BODY_ID}
-              className="ps-reader-main"
-              aria-label={t('aria.documentBody')}
-              {...(activeTab ? { role: 'tabpanel' } : {})}
-            >
-              {body}
-            </main>
-
-            {activePanel === 'inspect' && inspectTarget !== null ? (
-              <InspectDrawer target={inspectTarget} onClose={closeInspect} />
+            {diagnosticsOpen ? (
+              <DiagnosticsPanel
+                onClose={() => setDiagnosticsOpen(false)}
+                protectedPaths={state.tabs.map((tab) => tab.canonicalPath)}
+              />
             ) : null}
-          </div>
-        </div>
-        {zoomTarget !== null ? (
-          <ZoomOverlay target={zoomTarget} onClose={() => setZoomTarget(null)} />
-        ) : null}
-      </ReaderUiContext.Provider>
-    </RootErrorBoundary>
+          </ReaderUiContext.Provider>
+        </RootErrorBoundary>
+      </DiagnosticsProvider>
+    </SettingsProvider>
   )
 }

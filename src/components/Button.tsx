@@ -1,4 +1,10 @@
-import { useId, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from 'react'
+import {
+  useId,
+  type ButtonHTMLAttributes,
+  type CSSProperties,
+  type ReactNode,
+  type Ref,
+} from 'react'
 
 /**
  * Shared button (ui-spec §2.1): primary/secondary/danger, busy that prevents
@@ -45,6 +51,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   busy?: boolean
   /** Required explanation when the button is disabled (ui-spec §6.4). */
   disabledReason?: string
+  /** React 19 ref-as-prop: dialogs focus the safe default action on mount. */
+  ref?: Ref<HTMLButtonElement>
   children?: ReactNode
 }
 
@@ -54,6 +62,7 @@ export function Button({
   disabledReason,
   disabled,
   title,
+  ref,
   'aria-describedby': ariaDescribedBy,
   style,
   children,
@@ -61,12 +70,12 @@ export function Button({
 }: ButtonProps) {
   const reasonId = useId()
   const isDisabled = disabled === true || busy
-  const describedBy =
-    isDisabled && disabledReason !== undefined ? reasonId : ariaDescribedBy
+  const describedBy = isDisabled && disabledReason !== undefined ? reasonId : ariaDescribedBy
   return (
     <>
       <button
         {...rest}
+        ref={ref}
         disabled={isDisabled}
         aria-busy={busy || undefined}
         aria-describedby={describedBy}

@@ -7,15 +7,18 @@ import { IconButton } from '../../../components/IconButton'
 import { Menu } from '../../../components/Menu'
 import { StatusBadge } from '../../../components/StatusBadge'
 import { Toolbar } from '../../../components/Toolbar'
+import { TypographyPopover } from '../../settings/TypographyPopover'
 import type { ReaderViewMode } from '../reader-state'
 
 /**
  * Reader toolbar (ui-spec §3.2; §6.4 for disabled reasons).
  *
  * Open file/directory, navigation toggle (Ctrl+B) and the view switch
- * (view source / back to reading) are wired; history, find, typography and
- * settings stay present but disabled with an explicit reason until their
- * features land (wp-25/27/29). Nothing here fakes a success state.
+ * (view source / back to reading) are wired; history, find and the wp-25
+ * search are wired too. The Aa button hosts the display popover (UI06) and
+ * the more menu carries the full settings dialog and about entry; the update
+ * flow (wp-29) is still absent until its task lands. Nothing here fakes a
+ * success state.
  */
 
 export interface ReaderToolbarProps {
@@ -33,6 +36,8 @@ export interface ReaderToolbarProps {
   searchOpen: boolean
   onOpenFile(): void
   onOpenDirectory(): void
+  onOpenSettings(): void
+  onOpenAbout(): void
   onCloseDocument(): void
   onToggleNav(): void
   onToggleSource(): void
@@ -55,6 +60,8 @@ export function ReaderToolbar({
   searchOpen,
   onOpenFile,
   onOpenDirectory,
+  onOpenSettings,
+  onOpenAbout,
   onCloseDocument,
   onToggleNav,
   onToggleSource,
@@ -64,7 +71,9 @@ export function ReaderToolbar({
 }: ReaderToolbarProps) {
   const openAnchor = useRef<HTMLSpanElement>(null)
   const moreAnchor = useRef<HTMLSpanElement>(null)
+  const typographyAnchor = useRef<HTMLSpanElement>(null)
   const [openMenu, setOpenMenu] = useState<'open' | 'more' | null>(null)
+  const [typographyOpen, setTypographyOpen] = useState(false)
 
   return (
     <Toolbar className="ps-reader-toolbar">
@@ -151,16 +160,22 @@ export function ReaderToolbar({
             }
           : {})}
       />
-      <Button
-        variant="secondary"
-        disabled
-        disabledReason={t('common.unavailable')}
-        aria-label={t('toolbar.typography.aria')}
-        title={t('toolbar.typography')}
-        style={{ padding: '0 var(--ps-space-2)', fontWeight: 600 }}
-      >
-        Aa
-      </Button>
+      <span ref={typographyAnchor} className="ps-toolbar-anchor">
+        <Button
+          variant="secondary"
+          aria-haspopup="dialog"
+          aria-expanded={typographyOpen}
+          aria-label={t('toolbar.typography.aria')}
+          title={t('toolbar.typography')}
+          onClick={() => setTypographyOpen((open) => !open)}
+          style={{ padding: '0 var(--ps-space-2)', fontWeight: 600 }}
+        >
+          Aa
+        </Button>
+      </span>
+      {typographyOpen ? (
+        <TypographyPopover anchor={typographyAnchor} onClose={() => setTypographyOpen(false)} />
+      ) : null}
       <span ref={moreAnchor} className="ps-toolbar-anchor">
         <IconButton
           icon="more"
@@ -196,6 +211,24 @@ export function ReaderToolbar({
               onSelect: () => {
                 setOpenMenu(null)
                 onCloseDocument()
+              },
+            },
+            {
+              id: 'open-settings',
+              label: t('menu.settings'),
+              icon: 'settings',
+              onSelect: () => {
+                setOpenMenu(null)
+                onOpenSettings()
+              },
+            },
+            {
+              id: 'open-about',
+              label: t('menu.about'),
+              icon: 'info',
+              onSelect: () => {
+                setOpenMenu(null)
+                onOpenAbout()
               },
             },
           ]}

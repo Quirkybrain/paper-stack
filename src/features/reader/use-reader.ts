@@ -11,8 +11,18 @@ import {
   type TaskToken,
 } from '../../app/session'
 import { TaskAbortedError, parseDocumentWithFallback } from '../../document/worker/client'
-import type { PipelineMode } from '../../document/types'
-import { PaperStackError, app, files, settings, storage, toErrorPayload, tree, watch } from '../../services'
+import type { ParseDocumentOptions } from '../../document/types'
+import { isWriteBackSuppressed, resumeSuppressedWrites } from '../../app/write-suppression'
+import {
+  PaperStackError,
+  app,
+  files,
+  settings,
+  storage,
+  toErrorPayload,
+  tree,
+  watch,
+} from '../../services'
 import type {
   DirectoryRoot,
   ErrorPayload,
@@ -21,6 +31,8 @@ import type {
   OpenRequest,
   RecentEntry,
   SaveResult,
+  SyntaxMode,
+  UpdateMode,
   VersionInfo,
   WatchChangedPayload,
 } from '../../services/types'
@@ -105,6 +117,14 @@ export interface ReaderControls {
   retryTab(tabId: string): void
   setBannerCollapsed(tabId: string, collapsed: boolean): void
   setViewMode(tabId: string, mode: ReaderViewMode): void
+  /** Settings change: re-parse the displayed version in place (no disk read). */
+  applySyntaxMode(mode: SyntaxMode): void
+  /** Session-scoped inline-dollar switch (ui-spec §3.7), default true. */
+  inlineMathFor(tabId: string): boolean
+  setInlineMath(tabId: string, enabled: boolean): void
+  /** Session-scoped update-mode override; `null` = follow the global default. */
+  updateModeOverrideFor(tabId: string): UpdateMode | null
+  setUpdateModeOverride(tabId: string, mode: UpdateMode): void
   handleWatchChanged(payload: WatchChangedPayload): void
   recheckActive(): void
   saveSession(): Promise<SaveResult>
@@ -125,10 +145,7 @@ function nextTaskId(prefix: string): string {
 }
 
 /** Default syntax options until settings are loaded (contract §3.5 defaults). */
-const DEFAULT_SYNTAX: { mode: PipelineMode; inlineMath: boolean } = {
-  mode: 'technical',
-  inlineMath: true,
-}
+const DEFAULT_SYNTAX_MODE: SyntaxMode = 'technical'
 
 export function useReader(): ReaderControls {
   const [state, dispatch] = useReducer(readerReducer, INITIAL_READER_STATE)
@@ -146,9 +163,26 @@ export function useReader(): ReaderControls {
   const [closeSaveFailed, setCloseSaveFailed] = useState(false)
   const [directory, setDirectory] = useState<DirectoryRoot | null>(null)
   const [relinkNotice, setRelinkNotice] = useState<string | null>(null)
-  const syntaxRef = useRef(DEFAULT_SYNTAX)
+  const syntaxModeRef = useRef<SyntaxMode>(DEFAULT_SYNTAX_MODE)
+  const inlineMathRef = useRef(new Map<string, boolean>())
+  const [inlineMathByTab, setInlineMathByTab] = useState<Record<string, boolean>>({})
+  const [updateModeByTab, setUpdateModeByTab] = useState<Record<string, UpdateMode>>({})
   const refreshingRef = useRef(new Set<string>())
   const closeAttemptedRef = useRef(false)
+
+  /**
+   * Per-tab parse options for the single pipeline: the global syntax mode
+   * plus the current document's inline-dollar override (ui-spec §3.7). The
+   * inline map mirrors into the ref so async parse callbacks always read the
+   * latest value; the state copy drives the settings UI re-render.
+   */
+  const parseOptionsFor = useCallback(
+    (tabId: string): ParseDocumentOptions => ({
+      mode: syntaxModeRef.current,
+      inlineMath: inlineMathRef.current.get(tabId) ?? true,
+    }),
+    [],
+  )
 
   // Settings: syntax mode feeds the parse options; a failure keeps defaults.
   useEffect(() => {
@@ -157,10 +191,7 @@ export function useReader(): ReaderControls {
       .getSettings()
       .then((bundle) => {
         if (cancelled) return
-        syntaxRef.current = {
-          mode: bundle.global.syntaxMode,
-          inlineMath: true,
-        }
+        syntaxModeRef.current = bundle.global.syntaxMode
       })
       .catch(() => undefined)
     return () => {
@@ -176,22 +207,81 @@ export function useReader(): ReaderControls {
   )
 
   const startParse = useCallback(
-    async (tabId: string, docId: string, text: string, version: VersionInfo, generation: number) => {
+    async (
+      tabId: string,
+      docId: string,
+      text: string,
+      version: VersionInfo,
+      generation: number,
+    ) => {
       const taskId = nextTaskId('parse')
       const token = { docId, version: version.contentHash, generation, taskId }
       try {
         const { result } = await parseDocumentWithFallback(
           text,
           { taskId, generation, docId },
-          syntaxRef.current,
+          parseOptionsFor(tabId),
         )
-        dispatchSession(tabId, sessionTaskSucceeded(token, version, { text, data: { parseResult: result } }))
+        dispatchSession(
+          tabId,
+          sessionTaskSucceeded(token, version, { text, data: { parseResult: result } }),
+        )
       } catch (error) {
         if (error instanceof TaskAbortedError) return
         dispatchSession(tabId, sessionTaskFailed(token, toErrorPayload(error)))
       }
     },
-    [dispatchSession],
+    [dispatchSession, parseOptionsFor],
+  )
+
+  /**
+   * Re-renders the currently displayed version with the latest syntax
+   * options. It parses the cached in-memory text for the same
+   * `displayVersion`/generation, so no disk read happens and the commit rule
+   * (§6.3) treats it as a display-bound result of the same version.
+   */
+  const reparseTab = useCallback(
+    async (tabId: string) => {
+      const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+      const version = tab?.session.displayVersion ?? null
+      if (!tab || version === null) return
+      const rawText = documentModelCache.get(tab.docId, version.contentHash)?.rawText ?? null
+      if (rawText === null) return
+      const taskId = nextTaskId('reparse')
+      const token: TaskToken = {
+        docId: tab.docId,
+        version: version.contentHash,
+        generation: tab.session.generation,
+        taskId,
+      }
+      try {
+        const { result } = await parseDocumentWithFallback(
+          rawText,
+          { taskId, generation: tab.session.generation, docId: tab.docId },
+          parseOptionsFor(tabId),
+        )
+        dispatchSession(
+          tabId,
+          sessionTaskSucceeded(token, version, { text: rawText, data: { parseResult: result } }),
+        )
+      } catch (error) {
+        if (error instanceof TaskAbortedError) return
+        dispatchSession(tabId, sessionTaskFailed(token, toErrorPayload(error)))
+      }
+    },
+    [dispatchSession, parseOptionsFor],
+  )
+
+  /** Settings syntax change: re-render every displayed version in place (R08). */
+  const applySyntaxMode = useCallback(
+    (mode: SyntaxMode) => {
+      if (syntaxModeRef.current === mode) return
+      syntaxModeRef.current = mode
+      for (const tab of stateRef.current.tabs) {
+        if (tab.session.displayVersion !== null) void reparseTab(tab.tabId)
+      }
+    },
+    [reparseTab],
   )
 
   const startRead = useCallback(
@@ -227,6 +317,7 @@ export function useReader(): ReaderControls {
       }
       const failures: OpenFailure[] = []
       let activationUsed = false
+      let acceptedAny = false
       for (const outcome of result.items) {
         const docId = outcomeDocId(outcome)
         if (outcome.status === 'rejected') {
@@ -234,6 +325,7 @@ export function useReader(): ReaderControls {
           continue
         }
         if (!docId) continue
+        acceptedAny = true
         const existing = stateRef.current.tabs.find((tab) => tab.docId === docId)
         if (existing) {
           if (!activationUsed) {
@@ -254,6 +346,9 @@ export function useReader(): ReaderControls {
         send(tabOpen(tab, activate))
         void startRead(tab.tabId, docId, 'initial', tab.session.generation)
       }
+      // Explicit open (entry != restore) lifts the cleared-category write
+      // suppression, exactly like models §9.1 (`resume_recording` alternative).
+      if (acceptedAny && entry !== 'restore') resumeSuppressedWrites()
       setOpenErrors(failures)
     },
     [startRead, send],
@@ -403,21 +498,40 @@ export function useReader(): ReaderControls {
     [send],
   )
 
-  const closeTab = useCallback((tabId: string) => {
-    const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
-    send(tabClose(tabId))
-    if (tab) void watch.unwatchDocument(tab.docId).catch(() => undefined)
-  }, [send])
+  const closeTab = useCallback(
+    (tabId: string) => {
+      const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+      send(tabClose(tabId))
+      inlineMathRef.current.delete(tabId)
+      setInlineMathByTab((previous) => {
+        if (!(tabId in previous)) return previous
+        const next = { ...previous }
+        delete next[tabId]
+        return next
+      })
+      setUpdateModeByTab((previous) => {
+        if (!(tabId in previous)) return previous
+        const next = { ...previous }
+        delete next[tabId]
+        return next
+      })
+      if (tab) void watch.unwatchDocument(tab.docId).catch(() => undefined)
+    },
+    [send],
+  )
 
   const closeActiveTab = useCallback(() => {
     const active = selectActiveTab(stateRef.current)
     if (active) closeTab(active.tabId)
   }, [closeTab])
 
-  const cycleTab = useCallback((delta: number) => {
-    const tabId = selectCycleTabId(stateRef.current, delta)
-    if (tabId) send(tabActivate(tabId))
-  }, [send])
+  const cycleTab = useCallback(
+    (delta: number) => {
+      const tabId = selectCycleTabId(stateRef.current, delta)
+      if (tabId) send(tabActivate(tabId))
+    },
+    [send],
+  )
 
   const cancelTab = useCallback(
     (tabId: string) => {
@@ -449,6 +563,31 @@ export function useReader(): ReaderControls {
       send(tabView(tabId, mode))
     },
     [send],
+  )
+
+  /** Inline-dollar switch for the current document (session-scoped). */
+  const setInlineMath = useCallback(
+    (tabId: string, enabled: boolean) => {
+      inlineMathRef.current.set(tabId, enabled)
+      setInlineMathByTab((previous) => ({ ...previous, [tabId]: enabled }))
+      void reparseTab(tabId)
+    },
+    [reparseTab],
+  )
+
+  const inlineMathFor = useCallback(
+    (tabId: string): boolean => inlineMathByTab[tabId] ?? true,
+    [inlineMathByTab],
+  )
+
+  /** Update-mode override for the current document (session-scoped). */
+  const setUpdateModeOverride = useCallback((tabId: string, mode: UpdateMode) => {
+    setUpdateModeByTab((previous) => ({ ...previous, [tabId]: mode }))
+  }, [])
+
+  const updateModeOverrideFor = useCallback(
+    (tabId: string): UpdateMode | null => updateModeByTab[tabId] ?? null,
+    [updateModeByTab],
   )
 
   const clearRelinkNotice = useCallback(() => setRelinkNotice(null), [])
@@ -490,6 +629,9 @@ export function useReader(): ReaderControls {
   }, [refreshTab])
 
   const saveSession = useCallback(async (): Promise<SaveResult> => {
+    // Cleared-session suppression (models §9.1): no write, no error — the
+    // quit path must not rebuild what the user just cleared (INV-WB-02).
+    if (isWriteBackSuppressed('session')) return { saved: false }
     try {
       return await storage.saveSession({ tabs: buildSessionTabs(stateRef.current) })
     } catch (error) {
@@ -500,7 +642,7 @@ export function useReader(): ReaderControls {
   const handleCloseRequested = useCallback(
     async (event: { preventDefault(): void }) => {
       const result = await saveSession()
-      if (!result.saved && !closeAttemptedRef.current) {
+      if (!result.saved && result.error !== undefined && !closeAttemptedRef.current) {
         // Surface the failure honestly and keep the window open; the next
         // close request proceeds (records are best-effort, R27/NF08).
         closeAttemptedRef.current = true
@@ -537,6 +679,11 @@ export function useReader(): ReaderControls {
     retryTab,
     setBannerCollapsed,
     setViewMode,
+    applySyntaxMode,
+    inlineMathFor,
+    setInlineMath,
+    updateModeOverrideFor,
+    setUpdateModeOverride,
     handleWatchChanged,
     recheckActive,
     saveSession,
