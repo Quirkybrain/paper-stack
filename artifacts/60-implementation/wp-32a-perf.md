@@ -4,7 +4,7 @@
 - **Artifact ID**: ART-60-IMPL-WP32A
 - **Artifact Type**: Implementation Evidence Report（wp-32 校准发现 F-32-1–F-32-4 的整改：源映射索引、命中映射、折叠对齐、测试竞态）
 - **Status**: VALID
-- **Revision**: 1
+- **Revision**: 2
 - **Last Verified**: 2026-10-07
 - **Owner**: implementation-engineer
 - **Task**: `wp-32a-perf`（任务分支 `task/wp-32a-perf`；父分支 `feat/v0.1.0`；基线提交 `0e84c262db1bdcc74c063e280cb8811fc415cc62`；产出提交主题 `perf(document): optimize offset mapping and align search folding`）
@@ -138,3 +138,13 @@ PS_PERF_QUERY=段落     PS_PERF_N=10 tests/perf/measure-nf05-search.sh 1MiB
 ## 10. 追溯
 
 - **wp-32 报告 §8 F-32-1..F-32-4、§6.2（NF05 校准）**；**rendering-pipeline §2.4b–c/§3（源映射契约）**；**ADR-007 §Decision（字面 + 双方共享语义、toLowerCase 一致性）**；**contracts §2.1 命令 38**；**implementation-plan §4.4（T-59–T-62）、§5.4（校准口径）、§5.5（UNVERIFIED）**；**NF05/NF11**。
+
+## 11. Rev 2（wp-32b-parityclean）：Rust 侧边界清理
+
+- **范围**：`src-tauri/tests/contract_search_parity.rs` 与本报告。任务分支 `task/wp-32b-parityclean`；父分支 `feat/v0.1.0`；基线 `87d89956be872703a4838879694f1402af9c76bb`；产出提交主题 `test(contracts): clean resolved search parity divergence shell`。
+- **清理内容**：
+  - 删除已解决分歧的遗留期望：`boundary.len() == 2` 与 `kinds.contains("contract-divergence")`；测试更名为 `search_boundary_cases_pin_the_accepted_divergence`，只保留 ADR-007 接受的 İ 长度变化折叠钉子（逐查询 `rust` 断言与 `rust ≠ frontend` 断言原样保留、未弱化）。
+  - 希腊 Final_Sigma 用例改由常规 `cases` 机制显式断言：`cases.len() >= 12`，且 `greek-final-sigma-per-code-point` 必须出现在常规向量循环中并逐值断言（查询矩阵 ≥20 保持不变）；文件头注释同步更新。错误表与 UTF-16 向量测试未改动。
+- **偏差（须记录）**：修复前 `cargo fmt --check` **在基线即失败**——wp-32 新增的两个测试文件（本文件与 `src-tauri/tests/nf07_soak.rs`）入库时未 rustfmt 化（crate 其余文件干净）。为使本任务要求的 fmt 门禁真正通过，两文件均做 rustfmt 规范化并一并提交（`nf07_soak.rs` 纯格式、无语义变化）；这超出任务第 4 步"仅提交 parity 测试与报告"的字面清单，但仍在 handoff `writes`（`src-tauri/tests/`）内，且不在 `src-tauri/tests/` 留下未提交改动。
+- **验证（2026-10-07，本机）**：`cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` 退出 0；`cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` 退出 0；`cargo test --manifest-path src-tauri/Cargo.toml` 21 套件 **254 passed / 0 failed**（`contract_search_parity` 5/5，含更名后的边界测试与希腊共享用例）。本任务未改 `src/`、`tests/contracts/`，前端/契约套件不受影响。
+- **剩余**：向量文件中的 resolved 空壳（`boundaryCases.greek-final-sigma-context-fold`，`queries: []`）仍然存在，因其位于 `tests/contracts/`（本任务写范围外）；Rust 侧已不依赖它，删除只需一个 tests/contracts 范围的小改动（前端 resolved 边界检查在空壳删除后同样成立）。
