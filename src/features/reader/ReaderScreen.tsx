@@ -391,6 +391,16 @@ export default function ReaderScreen() {
   /** One-shot restart position restore awaiting a mounted target (AT19). */
   const [pendingPositionRestore, setPendingPositionRestore] = useState<RestoreResult | null>(null)
   const [revealBlockId, setRevealBlockId] = useState<string | null>(null)
+  /**
+   * Bumped on every locate request so a repeated request for the same block
+   * (re-clicked outline entry after scrolling away) still re-imposes the
+   * reader's windowed mount (D-IT-3).
+   */
+  const [revealNonce, setRevealNonce] = useState(0)
+  const requestReveal = (blockId: string | null) => {
+    setRevealBlockId(blockId)
+    setRevealNonce((value) => value + 1)
+  }
   const [pendingLocate, setPendingLocate] = useState<PendingLocate | null>(null)
   /** Dismissed per tab/mode coverage notice (honesty statement stays reachable). */
   const [modeNoticeDismissed, setModeNoticeDismissed] = useState<Record<string, boolean>>({})
@@ -548,7 +558,7 @@ export default function ReaderScreen() {
       // Reveal exact and approximate landing blocks alike: a heading/ancestor
       // fallback still carries a block id (models §6.2), and the consume
       // effect must find that block mounted before it scrolls (D-34b-1/AT19).
-      if (restore.blockId !== null) setRevealBlockId(restore.blockId)
+      if (restore.blockId !== null) requestReveal(restore.blockId)
     })
   }, [positionRestoreNonce, activeTab, activeResult, reader])
 
@@ -680,22 +690,50 @@ export default function ReaderScreen() {
    * lookup stays consistent with the rendered anchors and never resolves
    * arbitrary application DOM ids. Footnotes keep their sanitize-pattern ids.
    */
-  const resolveFragment = (rawFragment: string): { anchorId: string; element: HTMLElement } | null => {
+  const resolveFragment = (
+    rawFragment: string,
+  ): { anchorId: string; element: HTMLElement | null; blockId: string | null } | null => {
     const direct = activeResult?.outline.find((entry) => entry.anchorId === rawFragment)
     const headingId = direct?.anchorId ?? `ps-h-${slugifyHeading(rawFragment)}`
     const heading = document.getElementById(headingId)
-    if (heading !== null) return { anchorId: headingId, element: heading }
+    const blockId = blockIdForAnchor(headingId)
+    if (heading !== null) return { anchorId: headingId, element: heading, blockId }
     if (/^ps-fn(ref)?-[A-Za-z0-9-]+$/.test(rawFragment)) {
       const footnote = document.getElementById(rawFragment)
-      if (footnote !== null) return { anchorId: rawFragment, element: footnote }
+      if (footnote !== null) return { anchorId: rawFragment, element: footnote, blockId: null }
     }
+    if (blockId !== null) return { anchorId: headingId, element: null, blockId }
     return null
   }
 
+  /**
+   * Locates an anchor. Large windowed documents mount only a bounded block
+   * window, so a target whose element is not mounted yet is located through
+   * its block: the reader reveals the block (window jump) and the queued
+   * locate scrolls once it is mounted (D-IT-3).
+   */
   const scrollToAnchor = (anchorId: string) => {
     const resolved = resolveFragment(anchorId)
-    if (resolved !== null && typeof resolved.element.scrollIntoView === 'function') {
+    if (resolved === null) return
+    if (resolved.element !== null && typeof resolved.element.scrollIntoView === 'function') {
       resolved.element.scrollIntoView()
+      return
+    }
+    if (resolved.blockId !== null && activeTab) {
+      requestReveal(resolved.blockId)
+      setPendingLocate({
+        tabId: activeTab.tabId,
+        point: {
+          docId: activeTab.docId,
+          canonicalPath: activeTab.canonicalPath,
+          blockId: resolved.blockId,
+          anchorId: resolved.anchorId,
+          sourceByte: null,
+        },
+        notice: null,
+        focus: false,
+        segId: null,
+      })
     }
   }
 
@@ -797,7 +835,7 @@ export default function ReaderScreen() {
             setHistoryNotice('nav.return.approx')
             return
           }
-          setRevealBlockId(point.blockId)
+          requestReveal(point.blockId)
           setPendingLocate({
             tabId: activeTab.tabId,
             point,
@@ -808,7 +846,7 @@ export default function ReaderScreen() {
         })
       return
     }
-    setRevealBlockId(point.blockId)
+    requestReveal(point.blockId)
     setPendingLocate({
       tabId: activeTab.tabId,
       point,
@@ -888,7 +926,7 @@ export default function ReaderScreen() {
     const tab = activeTab
     const point = pointForSearchHit(hit, tab, activeResult?.blocks ?? [])
     searchCurrentHitRef.current.set(tab.tabId, hit)
-    setRevealBlockId(point.blockId)
+    requestReveal(point.blockId)
     setPendingLocate({
       tabId: tab.tabId,
       point,
@@ -951,12 +989,27 @@ export default function ReaderScreen() {
       const to: NavPoint = {
         docId: activeTab.docId,
         canonicalPath: activeTab.canonicalPath,
-        blockId: blockIdForAnchor(resolved.anchorId),
+        blockId: resolved.blockId,
         anchorId: resolved.anchorId,
         sourceByte: null,
       }
       history.commit(activeTab.tabId, anchorKind(resolved.anchorId), from, to)
-      resolved.element.scrollIntoView?.()
+      if (resolved.element !== null) {
+        resolved.element.scrollIntoView?.()
+        return
+      }
+      // Large windowed document: mount the heading's block window and locate
+      // it once committed (D-IT-3); no silent "not found" for a rendered doc.
+      if (resolved.blockId !== null) {
+        requestReveal(resolved.blockId)
+        setPendingLocate({
+          tabId: activeTab.tabId,
+          point: to,
+          notice: null,
+          focus: false,
+          segId: null,
+        })
+      }
       return
     }
     const resolved = resolveDocumentLink(activeTab.canonicalPath, href)
@@ -1232,6 +1285,7 @@ export default function ReaderScreen() {
           generation={activeTab.session.generation}
           simplified={activeMode === 'simplified'}
           revealBlockId={revealBlockId}
+          revealNonce={revealNonce}
           {...(searchHighlights ? { searchHighlights } : {})}
           onDocumentLink={handleDocumentLink}
         />

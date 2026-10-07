@@ -154,6 +154,24 @@ describe('SearchBar', () => {
     expect(onLocate).toHaveBeenCalledTimes(1)
   })
 
+  it('selects and locates a single match through Enter and the next button', () => {
+    const onLocate = vi.fn()
+    render(<Harness onLocate={onLocate} />)
+    act(() => openSearchSession('t1'))
+    const input = screen.getByRole('searchbox')
+
+    search(input, 'x^2')
+    expect(screen.getByText(t('search.counter', { current: 0, total: 1 }))).toBeTruthy()
+
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onLocate).toHaveBeenCalledTimes(1)
+    expect(screen.getByText(t('search.counter', { current: 1, total: 1 }))).toBeTruthy()
+
+    // 下一项 performs the same selection path.
+    fireEvent.click(screen.getByRole('button', { name: t('search.next') }))
+    expect(onLocate).toHaveBeenCalledTimes(2)
+  })
+
   it('EDGE-05: Enter next / Shift+Enter previous with the wrap notice', () => {
     const onLocate = vi.fn()
     render(<Harness onLocate={onLocate} />)

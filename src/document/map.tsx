@@ -24,6 +24,11 @@ export interface RenderDocumentInput {
   segments: readonly SearchSegment[]
   /** Progressive mounting: render at most this many block groups (§2.12). */
   blockLimit?: number
+  /**
+   * Windowed mounting (D-IT-3): skip this many leading block groups so the
+   * mounted groups form `[blockStart, blockStart + blockLimit)`.
+   */
+  blockStart?: number
 }
 
 export interface RenderDocumentOptions {
@@ -47,6 +52,7 @@ export function renderDocument(
     blocks: input.blocks,
     segments: input.segments,
     ...(input.blockLimit === undefined ? {} : { blockLimit: input.blockLimit }),
+    ...(input.blockStart === undefined ? {} : { blockStart: input.blockStart }),
   })
   const processor = unified().use(rehypeReact, {
     Fragment,

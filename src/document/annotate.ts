@@ -27,12 +27,19 @@ export interface AnnotateInput {
    * §2.12); omitted means a full render.
    */
   blockLimit?: number
+  /**
+   * Skip this many leading block groups before emitting (`blockStart`), so
+   * the emitted groups form a bounded window `[blockStart, blockStart +
+   * blockLimit)` (D-IT-3 windowed mounting for large simplified documents).
+   * Children before the window start are dropped; omitted means 0.
+   */
+  blockStart?: number
 }
 
 const TEXT_SEGMENT_KINDS: ReadonlySet<SegmentKind> = new Set(['text', 'html-text'])
 
 export function annotateTree(tree: Root, input: AnnotateInput): Root {
-  const groups = groupChildren(tree.children, input.blocks, input.blockLimit)
+  const groups = groupChildren(tree.children, input.blocks, input.blockLimit, input.blockStart ?? 0)
   const segmentsByBlock = buildSegmentIndex(input.segments)
   const children: RootContent[] = []
   let emittedBlocks = 0
@@ -93,21 +100,43 @@ function buildSegmentIndex(
  * Groups top-level hast children by the block whose source range contains
  * their start offset. Blocks and children are in document order, so the block
  * lookup is a binary search; the previous linear scan per child made the
- * grouping O(children × blocks). With `blockLimit` the scan stops after the
- * prefix the annotate loop would emit.
+ * grouping O(children × blocks). With `blockLimit`/`blockStart` the scan stops
+ * after the prefix the annotate loop would emit, and the first `blockStart`
+ * block groups (and all their children) are dropped before it.
  */
 function groupChildren(
   children: readonly RootContent[],
   blocks: readonly BlockRecord[],
   blockLimit?: number,
+  blockStart = 0,
 ): Group[] {
   const groups: Group[] = []
   let emittedBlocks = 0
+  let skippedBlocks = 0
+  let currentBlock: BlockRecord | null = null
+  let skipCurrentBlock = false
 
   for (const child of children) {
     const range = positionToUtf16Range(child.position)
     const block = range ? findBlock(blocks, range.startUtf16) : null
-    if (block !== null && (groups.length === 0 || groups[groups.length - 1].block !== block)) {
+    const isNewBlockGroup = block !== null && block !== currentBlock
+    currentBlock = block
+
+    if (isNewBlockGroup && skippedBlocks < blockStart) {
+      // Leading window groups (and every child belonging to them) are dropped
+      // whole; the window starts at the next block boundary.
+      skippedBlocks += 1
+      skipCurrentBlock = true
+      continue
+    }
+    if (skipCurrentBlock) {
+      // Remaining children of the last skipped block are still inside it;
+      // the next block boundary ends the skip.
+      if (!isNewBlockGroup) continue
+      skipCurrentBlock = false
+    }
+    if (block === null && skippedBlocks < blockStart) continue
+    if (isNewBlockGroup) {
       if (blockLimit !== undefined && emittedBlocks >= blockLimit) break
       emittedBlocks += 1
     }
