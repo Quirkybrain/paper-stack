@@ -70,9 +70,9 @@ function hitsFor(corpus: string, query: string, caseSensitive: boolean): Expecte
 }
 
 describe('shared literal-search parity vectors (front-end side)', () => {
-  it('vector file is structurally complete (12 parity + 2 boundary entries)', () => {
+  it('vector file is structurally complete (12 parity + 1 accepted boundary entry)', () => {
     expect(vectors.cases.length).toBeGreaterThanOrEqual(12)
-    expect(vectors.boundaryCases).toHaveLength(2)
+    expect(vectors.boundaryCases).toHaveLength(1)
     for (const item of vectors.cases) {
       // The explicit empty-corpus case is empty by design; every other case
       // has content.
@@ -106,7 +106,7 @@ describe('shared literal-search parity vectors (front-end side)', () => {
     }
   })
 
-  it('boundary cases pin every known divergence per side', () => {
+  it('the accepted İ length-changing fold stays pinned per side', () => {
     for (const item of vectors.boundaryCases) {
       for (const query of item.queries) {
         const frontend = hitsFor(item.corpus, query.query, query.caseSensitive)
@@ -114,27 +114,12 @@ describe('shared literal-search parity vectors (front-end side)', () => {
           frontend,
           `${item.id}: front-end behavior changed; revise the vector and the report before relaxing this`,
         ).toEqual(query.frontend)
-        // Both documented divergences mean the two implementations deliberately
-        // (or, for the tracked contract divergence, currently) differ. If the
-        // expectation sets become equal, the vector must be revised together
-        // with the report's finding list.
+        // The documented divergence means the two implementations deliberately
+        // differ (ADR-007 accepted length-changing fold). If the expectation
+        // sets become equal, the vector must be revised together with the
+        // report's finding list.
         expect(frontend).not.toEqual(query.rust)
       }
-    }
-  })
-
-  it('resolved boundary divergences point at the shared parity case', () => {
-    for (const item of vectors.boundaryCases) {
-      if (item.queries.length > 0) continue
-      // wp-32a closed the Final_Sigma divergence by aligning the front-end
-      // fold to the Rust per-code-point fold. The post-fix shared expectation
-      // lives in `cases` (asserted by both this suite and the Rust
-      // contract_search_parity suite); only a legacy shell remains here until
-      // the out-of-scope Rust test stops requiring two divergence pins.
-      expect(item.resolvedIn, `${item.id} must name the resolving task`).toBeTruthy()
-      const shared = vectors.cases.find((candidate) => candidate.corpus === item.corpus)
-      expect(shared, `${item.id}: shared parity case for the same corpus`).toBeDefined()
-      expect(shared?.queries.length ?? 0).toBeGreaterThan(0)
     }
   })
 })
