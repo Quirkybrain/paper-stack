@@ -6,7 +6,7 @@ import { t } from './app/i18n'
 import { DOCUMENT_BODY_ID } from './components/SkipLink'
 
 describe('App shell', () => {
-  it('renders the skip link, landmark and placeholder body from translations', () => {
+  it('renders the skip link, landmark and welcome body from translations', () => {
     render(<App />)
 
     const main = screen.getByRole('main', { name: t('aria.documentBody') })
@@ -15,7 +15,7 @@ describe('App shell', () => {
     const skipLink = screen.getByRole('link', { name: t('aria.skipToBody') })
     expect(skipLink.getAttribute('href')).toBe(`#${DOCUMENT_BODY_ID}`)
 
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(t('app.name'))
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe(t('welcome.title'))
     expect(screen.getByText(t('welcome.note'))).toBeTruthy()
   })
 })

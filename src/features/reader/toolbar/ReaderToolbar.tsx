@@ -7,14 +7,15 @@ import { IconButton } from '../../../components/IconButton'
 import { Menu } from '../../../components/Menu'
 import { StatusBadge } from '../../../components/StatusBadge'
 import { Toolbar } from '../../../components/Toolbar'
+import type { ReaderViewMode } from '../reader-state'
 
 /**
  * Reader toolbar (ui-spec §3.2; §6.4 for disabled reasons).
  *
- * wp-19 minimal: open-file and close-document work; history, navigation,
- * find, typography and source/settings/update entries are present but
- * disabled with an explicit reason because their features land in wp-24/25/26/
- * 29. Nothing here fakes a success state.
+ * Open file/directory, navigation toggle (Ctrl+B) and the view switch
+ * (view source / back to reading) are wired; history, find, typography and
+ * settings stay present but disabled with an explicit reason until their
+ * features land (wp-25/27/29). Nothing here fakes a success state.
  */
 
 export interface ReaderToolbarProps {
@@ -22,8 +23,15 @@ export interface ReaderToolbarProps {
   displayName?: string
   canonicalPath?: string
   hasPendingUpdate: boolean
+  viewMode: ReaderViewMode
+  /** True when the outline or a directory tree can be shown. */
+  navAvailable: boolean
+  navOpen: boolean
   onOpenFile(): void
+  onOpenDirectory(): void
   onCloseDocument(): void
+  onToggleNav(): void
+  onToggleSource(): void
 }
 
 export function ReaderToolbar({
@@ -31,8 +39,14 @@ export function ReaderToolbar({
   displayName,
   canonicalPath,
   hasPendingUpdate,
+  viewMode,
+  navAvailable,
+  navOpen,
   onOpenFile,
+  onOpenDirectory,
   onCloseDocument,
+  onToggleNav,
+  onToggleSource,
 }: ReaderToolbarProps) {
   const openAnchor = useRef<HTMLSpanElement>(null)
   const moreAnchor = useRef<HTMLSpanElement>(null)
@@ -71,8 +85,10 @@ export function ReaderToolbar({
               id: 'open-directory',
               label: t('toolbar.open.directory'),
               icon: 'folder',
-              disabled: true,
-              disabledReason: t('common.unavailable'),
+              onSelect: () => {
+                setOpenMenu(null)
+                onOpenDirectory()
+              },
             },
           ]}
         />
@@ -100,8 +116,9 @@ export function ReaderToolbar({
 
       <IconButton
         icon="folder"
-        label={t('toolbar.navToggle')}
-        disabled
+        label={navOpen ? t('toolbar.navToggle.hide') : t('toolbar.navToggle.show')}
+        onClick={onToggleNav}
+        disabled={!navAvailable}
         disabledReason={t('common.unavailable')}
       />
       <IconButton
@@ -135,6 +152,17 @@ export function ReaderToolbar({
           anchor={moreAnchor}
           onClose={() => setOpenMenu(null)}
           items={[
+            {
+              id: 'toggle-source',
+              label: viewMode === 'source' ? t('menu.backToReading') : t('menu.viewSource'),
+              icon: 'fileText',
+              disabled: !hasDocument,
+              ...(hasDocument ? {} : { disabledReason: t('common.unavailable') }),
+              onSelect: () => {
+                setOpenMenu(null)
+                onToggleSource()
+              },
+            },
             {
               id: 'close-document',
               label: t('menu.closeDocument'),

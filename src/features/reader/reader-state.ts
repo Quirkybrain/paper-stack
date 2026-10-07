@@ -26,6 +26,9 @@ import type { ErrorPayload } from '../../services/types'
 
 export type ReaderPhase = 'reading' | 'parsing' | 'ready' | 'failed' | 'cancelled'
 
+/** Per-tab main view (ui-spec §3.5): source view shares the display version. */
+export type ReaderViewMode = 'reading' | 'source'
+
 export interface ReaderTab {
   tabId: string
   docId: string
@@ -38,6 +41,8 @@ export interface ReaderTab {
   error: ErrorPayload | null
   /** "Later" only collapses the banner; the pending marker stays (INV-UM-05). */
   bannerCollapsed: boolean
+  /** Reading or read-only source; switching never updates or adds history. */
+  viewMode: ReaderViewMode
 }
 
 export interface ReaderState {
@@ -70,6 +75,7 @@ export function createReaderTab(input: NewTabInput): ReaderTab {
     phase: 'reading',
     error: null,
     bannerCollapsed: false,
+    viewMode: 'reading',
   }
 }
 
@@ -80,6 +86,7 @@ export type ReaderAction =
   | { type: 'tab/session'; tabId: string; action: SessionAction }
   | { type: 'tab/phase'; tabId: string; phase: ReaderPhase; error?: ErrorPayload | null }
   | { type: 'tab/banner'; tabId: string; collapsed: boolean }
+  | { type: 'tab/view'; tabId: string; mode: ReaderViewMode }
 
 export const tabOpen = (tab: ReaderTab, activate: boolean): ReaderAction => ({
   type: 'tab/open',
@@ -112,6 +119,12 @@ export const tabBanner = (tabId: string, collapsed: boolean): ReaderAction => ({
   type: 'tab/banner',
   tabId,
   collapsed,
+})
+
+export const tabView = (tabId: string, mode: ReaderViewMode): ReaderAction => ({
+  type: 'tab/view',
+  tabId,
+  mode,
 })
 
 function activateTab(state: ReaderState, tabId: string): ReaderState {
@@ -245,6 +258,17 @@ export function readerReducer(state: ReaderState, action: ReaderAction): ReaderS
         ...state,
         tabs: state.tabs.map((candidate) =>
           candidate.tabId === action.tabId ? { ...candidate, bannerCollapsed: action.collapsed } : candidate,
+        ),
+      }
+    }
+
+    case 'tab/view': {
+      const tab = state.tabs.find((candidate) => candidate.tabId === action.tabId)
+      if (!tab || tab.viewMode === action.mode) return state
+      return {
+        ...state,
+        tabs: state.tabs.map((candidate) =>
+          candidate.tabId === action.tabId ? { ...candidate, viewMode: action.mode } : candidate,
         ),
       }
     }

@@ -9,6 +9,9 @@ import { MERMAID_BLOCK_CLASS, extractMermaidSource } from '../../../document/plu
 import { utf8RangeToUtf16 } from '../../../document/source-map'
 import type { ParseDocumentResult } from '../../../document/types'
 import { opener } from '../../../services'
+import { BlockContext, type BlockContextValue } from '../inspect/block-context'
+import { CodeBlock, isCodeBlockNode } from '../inspect/CodeBlock'
+import { MathBlock, mathElementKind } from '../inspect/MathBlock'
 import { ContentBlock } from './ContentBlock'
 import { ImageBlock } from './ImageBlock'
 import { MathErrorBlock } from './MathErrorBlock'
@@ -46,20 +49,6 @@ function passthrough(tag: string, props: OverrideProps): ReactNode {
   const { node: _node, children, ...rest } = props
   void _node
   return createElement(tag, rest, children)
-}
-
-function MathOrPassthrough(tag: 'span' | 'div', props: OverrideProps): ReactNode {
-  if (classList(props.node).includes(MATH_ERROR_CLASS)) {
-    return createElement(MathErrorBlock, props as never)
-  }
-  return passthrough(tag, props)
-}
-
-function MermaidOrPassthrough(props: OverrideProps): ReactNode {
-  if (classList(props.node).includes(MERMAID_BLOCK_CLASS) && props.node) {
-    return createElement(MermaidBlock, { source: extractMermaidSource(props.node) })
-  }
-  return MathOrPassthrough('div', props)
 }
 
 function ImageOverride(props: OverrideProps & { docId: string }): ReactNode {
@@ -121,21 +110,73 @@ export function DocumentView({ docId, rawText, result, generation }: DocumentVie
   }, [result, rawText])
 
   const components = useMemo(() => {
+    const blockContextFor = (node: Element | undefined): BlockContextValue => {
+      const blockId = node?.properties?.dataBlockId
+      const block =
+        typeof blockId === 'string'
+          ? result.blocks.find((candidate) => candidate.blockId === blockId)
+          : undefined
+      const range = block?.sourceRangeBytes ?? null
+      return {
+        blockId: block?.blockId ?? (typeof blockId === 'string' ? blockId : null),
+        headingPath: block?.headingPath ?? [],
+        range,
+        rawText,
+        diagnostics:
+          range === null
+            ? []
+            : result.diagnostics.filter(
+                (issue) =>
+                  issue.sourceRange !== undefined &&
+                  issue.sourceRange.startByte >= range.startByte &&
+                  issue.sourceRange.startByte < range.endByte,
+              ),
+      }
+    }
     const overrides: Record<string, (props: OverrideProps) => ReactNode> = {
       section: (props) => {
         const blockId = props.node?.properties?.dataBlockId
-        return createElement(ContentBlock, {
-          ...(props as Record<string, unknown>),
-          sourceExcerpt: typeof blockId === 'string' ? sourceExcerptFor(blockId) : undefined,
-        } as never)
+        return createElement(
+          BlockContext.Provider,
+          { value: blockContextFor(props.node) },
+          createElement(ContentBlock, {
+            ...(props as Record<string, unknown>),
+            sourceExcerpt: typeof blockId === 'string' ? sourceExcerptFor(blockId) : undefined,
+          } as never),
+        )
       },
-      span: (props) => MathOrPassthrough('span', props),
-      div: (props) => MermaidOrPassthrough(props),
+      span: (props) => {
+        if (classList(props.node).includes(MATH_ERROR_CLASS)) {
+          return createElement(MathErrorBlock, props as never)
+        }
+        const kind = mathElementKind(props.node)
+        if (kind !== null) {
+          // Both inline and display KaTeX output are spans; the class marks
+          // the display wrapper (`span.katex-display`).
+          return createElement(MathBlock, { ...props, display: kind === 'display' } as never)
+        }
+        return passthrough('span', props)
+      },
+      div: (props) => {
+        if (classList(props.node).includes(MERMAID_BLOCK_CLASS) && props.node) {
+          return createElement(MermaidBlock, { source: extractMermaidSource(props.node) })
+        }
+        if (classList(props.node).includes(MATH_ERROR_CLASS)) {
+          return createElement(MathErrorBlock, props as never)
+        }
+        if (mathElementKind(props.node) === 'display') {
+          return createElement(MathBlock, { ...props, display: true } as never)
+        }
+        if (isCodeBlockNode(props.node)) {
+          return createElement(CodeBlock, { ...props } as never)
+        }
+        return passthrough('div', props)
+      },
       img: (props) => ImageOverride({ ...props, docId }),
       a: (props) => AnchorOverride(props),
     }
     return overrides as unknown as Partial<Components>
-  }, [docId, sourceExcerptFor])
+  }, [docId, rawText, result, sourceExcerptFor])
 
   const content = useMemo(() => {
     if (result.status !== 'ok' || !result.hast) return null

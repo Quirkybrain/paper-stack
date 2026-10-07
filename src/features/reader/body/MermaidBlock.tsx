@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { t } from '../../../app/i18n'
+import { Button } from '../../../components/Button'
 import {
   MERMAID_HTML_LABELS,
   MERMAID_SECURITY_LEVEL,
@@ -8,6 +9,8 @@ import {
   type MermaidRenderer,
   type MermaidRenderResult,
 } from '../../../document/plugins/mermaid'
+import { useBlockContext } from '../inspect/block-context'
+import { useReaderUi } from '../ui-context'
 
 /**
  * On-demand Mermaid rendering (rendering-pipeline §2.10; ui-spec §3.6, IX07).
@@ -71,6 +74,8 @@ export function MermaidBlock({ source, deps }: MermaidBlockProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [visible, setVisible] = useState(false)
   const [state, setState] = useState<RenderState>({ status: 'waiting' })
+  const context = useBlockContext()
+  const ui = useReaderUi()
 
   useEffect(() => {
     const node = containerRef.current
@@ -113,6 +118,34 @@ export function MermaidBlock({ source, deps }: MermaidBlockProps) {
 
   return (
     <div className="ps-mermaid-block" ref={containerRef} data-mermaid-state={status}>
+      {ui ? (
+        <div className="ps-mermaid-tools" role="group">
+          <Button
+            variant="secondary"
+            onClick={() => ui.enterSource(context?.range ?? null, context?.blockId ?? null)}
+          >
+            {t('mermaid.action.viewSource')}
+          </Button>
+          {state.status === 'ready' ? (
+            <Button
+              variant="secondary"
+              onClick={() =>
+                ui.openZoom({
+                  label: t('mermaid.action.zoom'),
+                  content: (
+                    <div
+                      className="ps-mermaid-svg"
+                      dangerouslySetInnerHTML={{ __html: state.svg }}
+                    />
+                  ),
+                })
+              }
+            >
+              {t('mermaid.action.zoom')}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       {state.status === 'ready' ? (
         <div className="ps-mermaid-svg" dangerouslySetInnerHTML={{ __html: state.svg }} />
       ) : (
