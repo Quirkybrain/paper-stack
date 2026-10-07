@@ -24,6 +24,7 @@
  *   key      <keyseq> [class]                verify focus, send XTEST key sequence
  *   resize   <w> <h> [class]                 resize window, wait for the request
  *   click    <x> <y> [button] [count] [class] XTEST click at window-relative coords
+ *   clickroot <x> <y> [button] [count]     XTEST click at absolute root coords
  *   close    [class]                         ask the WM to close (WM_DELETE_WINDOW)
  *   wait     [class]                         wait (up to 60s) for the window to appear
  *
@@ -260,6 +261,22 @@ static int cmd_click(int x, int y, int button, int count, const char *classname)
     return 0;
 }
 
+static int cmd_click_root(int x, int y, int button, int count)
+{
+    if (xdo_move_mouse(xdo, x, y, 0) != 0) {
+        fprintf(stderr, "xdo-helper: failed to move pointer\n");
+        return 4;
+    }
+    sleep_ms(50);
+    if (xdo_click_window_multiple(xdo, CURRENTWINDOW, button, count, 15000) != 0) {
+        fprintf(stderr, "xdo-helper: click failed\n");
+        return 4;
+    }
+    sleep_ms(150);
+    printf("clicked root (%d,%d) button %d count %d\n", x, y, button, count);
+    return 0;
+}
+
 static int cmd_close(const char *classname)
 {
     Window target = find_window(classname);
@@ -378,8 +395,9 @@ static void usage(const char *argv0)
             "       %s key <keyseq> [class]\n"
             "       %s resize <w> <h> [class]\n"
             "       %s click <x> <y> [button] [count] [class]\n"
+            "       %s clickroot <x> <y> [button] [count]\n"
             "class defaults to '%s'\n",
-            argv0, argv0, argv0, argv0, DEFAULT_CLASS);
+            argv0, argv0, argv0, argv0, argv0, DEFAULT_CLASS);
     exit(2);
 }
 
@@ -433,6 +451,13 @@ int main(int argc, char **argv)
             usage(argv[0]);
         return cmd_click(atoi(argv[2]), atoi(argv[3]), button, count,
                          arg_class(argc, argv, 6));
+    }
+    if (strcmp(cmd, "clickroot") == 0) {
+        int button = (argc > 4) ? atoi(argv[4]) : 1;
+        int count = (argc > 5) ? atoi(argv[5]) : 1;
+        if (argc < 4)
+            usage(argv[0]);
+        return cmd_click_root(atoi(argv[2]), atoi(argv[3]), button, count);
     }
     usage(argv[0]);
     return 2;

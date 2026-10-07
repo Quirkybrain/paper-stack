@@ -524,14 +524,6 @@
           ]
         }
       ]
-    },
-    {
-      "id": "greek-final-sigma-context-fold",
-      "kind": "contract-divergence",
-      "resolvedIn": "wp-32a-perf",
-      "note": "RESOLVED by wp-32a: the front-end now folds per code point with the single `foldLower` helper, matching the Rust service, so this divergence no longer exists. The post-fix shared expectation for this corpus is asserted by BOTH suites through cases.greek-final-sigma-per-code-point. This boundary entry is retained with an empty query list ONLY because src-tauri/tests/contract_search_parity.rs (outside wp-32a's write scope) asserts exactly two boundary cases and the presence of kind 'contract-divergence'; the follow-up must update that Rust test (assert the shared parity case, drop the divergence pin) and delete this shell.",
-      "corpus": "ΟΔΟΣ οδος\n",
-      "queries": []
     }
   ],
   "fileCases": [
