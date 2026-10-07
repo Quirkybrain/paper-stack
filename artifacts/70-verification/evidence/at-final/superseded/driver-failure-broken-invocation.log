@@ -1,0 +1,47 @@
+===== wp-42 at-final wrapper start 2026-10-07T23:47:33+08:00 =====
+HEAD 49f48baf336116a9ecc99545f6e02e11702c75b0 branch task/wp-42-atrefresh
+binary /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/src-tauri/target/release/paperstack
+binary sha256 054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e size=32318216
+display :1 evidence /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/at-final
+===== START core-a 2026-10-07T23:47:33+08:00 =====
+===== END core-a exit=126 2026-10-07T23:47:33+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START core-b 2026-10-07T23:47:33+08:00 =====
+===== END core-b exit=126 2026-10-07T23:47:33+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START core-c 2026-10-07T23:47:33+08:00 =====
+===== END core-c exit=126 2026-10-07T23:47:33+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START core-d 2026-10-07T23:47:33+08:00 =====
+===== END core-d exit=126 2026-10-07T23:47:33+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START core-e 2026-10-07T23:47:33+08:00 =====
+===== END core-e exit=126 2026-10-07T23:47:33+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START rerun2-at07 2026-10-07T23:47:33+08:00 =====
+===== END rerun2-at07 exit=126 2026-10-07T23:47:33+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START wp34d-at19 2026-10-07T23:47:34+08:00 =====
+===== END wp34d-at19 exit=126 2026-10-07T23:47:34+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START wp34d-at26 2026-10-07T23:47:34+08:00 =====
+===== END wp34d-at26 exit=126 2026-10-07T23:47:34+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START wp34d-at28 2026-10-07T23:47:34+08:00 =====
+===== END wp34d-at28 exit=126 2026-10-07T23:47:34+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START wp38-at02 2026-10-07T23:47:34+08:00 =====
+===== END wp38-at02 exit=126 2026-10-07T23:47:34+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START wp38-at06 2026-10-07T23:47:34+08:00 =====
+===== END wp38-at06 exit=126 2026-10-07T23:47:34+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START wp38-at06-revoke 2026-10-07T23:47:34+08:00 =====
+===== END wp38-at06-revoke exit=126 2026-10-07T23:47:34+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START wp38-at09 2026-10-07T23:47:34+08:00 =====
+===== END wp38-at09 exit=126 2026-10-07T23:47:34+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START wp38-at12 2026-10-07T23:47:34+08:00 =====
+===== END wp38-at12 exit=126 2026-10-07T23:47:34+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START wp38-at14 2026-10-07T23:47:34+08:00 =====
+===== END wp38-at14 exit=126 2026-10-07T23:47:34+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START wp38-at15 2026-10-07T23:47:34+08:00 =====
+===== END wp38-at15 exit=126 2026-10-07T23:47:34+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START wp38-at16 2026-10-07T23:47:34+08:00 =====
+===== END wp38-at16 exit=126 2026-10-07T23:47:34+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START wp38-at25 2026-10-07T23:47:34+08:00 =====
+===== END wp38-at25 exit=126 2026-10-07T23:47:34+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START wp38-at27 2026-10-07T23:47:34+08:00 =====
+===== END wp38-at27 exit=126 2026-10-07T23:47:34+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== START wp38-at30 2026-10-07T23:47:34+08:00 =====
+===== END wp38-at30 exit=126 2026-10-07T23:47:34+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+===== wrapper done 2026-10-07T23:47:34+08:00 binary_sha256=054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e =====
+pgrep -x paperstack: no process remains

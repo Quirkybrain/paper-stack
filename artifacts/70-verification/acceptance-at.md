@@ -4,18 +4,116 @@
 - **Artifact ID**: ART-70-VERIFY-ACCEPTANCE-AT
 - **Artifact Type**: Verification Report（真实 release 应用在 X11 `DISPLAY=:1` 上的 AT01–AT30 逐项验收；含原始证据、失败与明确 UNVERIFIED 清单）
 - **Status**: VALID
-- **Revision**: 4
+- **Revision**: 5
 - **Owner**: test-engineer
 - **Task**: `wp-34-desktop-at`（任务分支 `task/wp-34-desktop-at`；父分支 `feat/v0.1.0`；基线提交 `613b4658c63e112c40b6ce171771e6b31732c75f`；产出提交主题 `test(acceptance): run desktop at scenarios and fix parity vector shell`）
 - **Task (Rev 2)**: `wp-34b-atrerun`（任务分支 `task/wp-34b-atrerun`；父分支 `feat/v0.1.0`；基线提交 `33dd600fdf12c3a90b80e4589b856e9e348b8bd6`，已含 wp-34a 修正并入提交 `adf805b`；产出提交主题 `test(acceptance): re-run fixed at scenarios`）
 - **Task (Rev 3)**: `wp-34d-rerun`（任务分支 `task/wp-34d-rerun`；父分支 `feat/v0.1.0`；基线提交 `f6e560802e8c3964a60594a7cd020afc20f91a56`，已含 wp-34c 修正并入提交 `dba385a`；产出提交主题 `test(acceptance): re-run at19/26/28 on fixed revision`）
 - **Task (Rev 4)**: `wp-38-desktop-rerun`（任务分支 `task/wp-38-desktop-rerun`；父分支 `feat/v0.1.0`；基线提交 `5d977ea40c0d6bea353412f3b83f1cd0ee1e9b56`，已含 wp-35a（Rust 安全修正）与 wp-36a（前端/管线修正）并入；产出提交主题 `test(acceptance): post-fix desktop re-run`）
+- **Task (Rev 5)**: `wp-42-atrefresh`（任务分支 `task/wp-42-atrefresh`；父分支 `feat/v0.1.0`；基线提交 `49f48baf336116a9ecc99545f6e02e11702c75b0`；系统验证 §7.4 G-01 条件 C1：全量 AT01–AT30 在同一现行 release 二进制上刷新；产出提交主题 `test(acceptance): refresh full at matrix on current tree`）
 - **Components**: C-19 测试基础设施（`tests/desktop/` 新增验收驱动与工具）；被验证对象为桌面 release 二进制（M5 阶段全部已集成功能）
-- **Last Verified**: 2026-10-07（Rev 4 复跑：wp-35a/wp-36a 修正后 release 二进制 + `pnpm test -- --run`（547））
-- **Scope**: Rev 1：`tests/desktop/**`、`tests/contracts/**`、`artifacts/70-verification/**`；Rev 2：`tests/desktop/**`、`artifacts/70-verification/**`；Rev 3：`tests/desktop/**`、`artifacts/70-verification/**`；Rev 4：`tests/desktop/**`、`artifacts/70-verification/**`。未修改 `src/`、`src-tauri/`、`fixtures/`、锁文件、pinned 输入或框架文件；产品缺陷只记录、未修补。
+- **Last Verified**: 2026-10-08（Rev 5 全量刷新：AT01–AT30 全部在唯一 release 二进制 `054040ba…` 上重新执行并判定；前向套件 `pnpm test -- --run` = 71 文件 / 547 passed）
+- **Scope**: Rev 1：`tests/desktop/**`、`tests/contracts/**`、`artifacts/70-verification/**`；Rev 2：`tests/desktop/**`、`artifacts/70-verification/**`；Rev 3：`tests/desktop/**`、`artifacts/70-verification/**`；Rev 4：`tests/desktop/**`、`artifacts/70-verification/**`；Rev 5：`tests/desktop/**`、`artifacts/70-verification/**`。未修改 `src/`、`src-tauri/`、`fixtures/`、锁文件、pinned 输入或框架文件；产品缺陷只记录、未修补。
 
 > **证据纪律**：本报告的每条判定都对应实际执行的操作与检查过的截图/日志/数据库内容；截图存在本身不作数。
 > **FAIL 一律原样保留**（§5 发现）；未执行或不可执行的项在 §6 明确 UNVERIFIED，不计入 PASS。
+
+## Revision 5（2026-10-08，wp-42-atrefresh：全量 AT01–AT30 同树刷新）
+
+> 本节为 wp-42（系统验证 §7.4 G-01 条件 C1）的**全量同树刷新**：30/30 项均在**唯一记录的 release 二进制**上重新执行并判定，取代 Rev 1–4 的结转判定。判据口径同 §3（真实应用 + 脚本输入 + 截图/SQLite/哈希/字节级核对，不以脚本退出码代替核对）。本任务未修改任何产品代码：`git diff 5d977ea..HEAD -- src src-tauri`（排除 tests）为空，产品树与 Rev 4 二进制构建修订一致。
+> **Rev 5 对发布目的的效力：此前各修订的 AT 判定全部被 Rev 5 的 30 项现行判定替代**（Rev 1–4 章节原样保留，仅作历史与追溯）。
+
+### R5.1 构建与基线
+
+| 项 | 值 |
+|---|---|
+| 构建命令 | `pnpm tauri build --no-bundle`（`at-final/build.log`：`Finished release profile [optimized] target(s) in 1m 15s`，`build exit=0`，墙钟 100 s） |
+| 二进制 | `src-tauri/target/release/paperstack`；32,318,216 bytes；mtime 2026-10-07 23:47:18 +0800 |
+| 二进制 SHA-256 | `054040bae1d6b041e184cf545a55e70ba150894cb1caeba4cfacbeef89ce1d9e`（`at-final/app-binary.sha256`；与 Rev 4 二进制逐字节相同——5d977ea 后产品代码未变、前端构建确定，故同一构建产物；**本修订的全部 30 项判定均产生自该哈希**，`wrapper.log` 每段结束重复记录哈希） |
+| 修订 | `49f48baf336116a9ecc99545f6e02e11702c75b0`（`task/wp-42-atrefresh`；父分支 `feat/v0.1.0`）；`git diff 5d977ea..HEAD -- src src-tauri :!**/tests/**` = 空 |
+| Pinned 输入 | 4 份输入 SHA-256 与 `state/handoffs/wp-42-atrefresh.json` 逐一比对一致（`acceptance-at.md` Rev 4 `e096dad4…`、`system-verification.md` `bc655b13…`、`wp-36a` `89c769b5…`、`wp-35a` `f54c156b…`）；`config/git-policy.json` = `3b8ddffd…` 一致（只读未改） |
+| 会话/固定条件 | X11 `DISPLAY=:1`、2520×1680；浅色 `GTK_THEME=Adwaita:light` + `color-scheme=prefer-light`；`text-scaling-factor=1.25`；应用数据隔离于 `at-final/data`，各节缓存另行隔离于 `at-final/cache*`（`XDG_CACHE_HOME`） |
+| 驱动脚本 | `run-at-final.sh`（批驱动：core a–e → rerun2 → wp34d at19/26/28 → wp38 at02…at30）；`run-at-final-probes.sh`（AT11/21 补充）；`run-at-final-probes2.sh`（干净会话定向补测 AT01/04/05/08/11/17/29）——全部沿用 `acceptance-lib.sh`，分节可重跑 |
+| 证据目录 | `artifacts/70-verification/evidence/at-final/`：340 张 PNG + `runs.log`（5242 行）+ `build.log`、`app-binary.sha256`、`wrapper.log`、`unit-suite-r5.log`、`unit-suite-r5-retry.log`、`at30-r4-placeholder-scan.txt`、`inputs/`、`superseded/`（12 个归档文件，见 R5.5） |
+
+### R5.2 全量矩阵（Rev 5 判定，全部产生自 `054040ba…`）
+
+| AT | 判定 | 证据与要点（`at-final/` 内） |
+|---|---|---|
+| **AT01** | **PASS** | `at01-a`（无参数欢迎页）、`b`（CLI 打开）、`c`（第二实例新增并激活标签）、`d`（同路径复用标签）、`e`（大小写不敏感扩展名）、`f`（无效路径 `PS_IO_NOT_FOUND`、既有标签不变；整屏回退，见 R5.5）、`k/l`（批量 2 文件按序、首个获焦）；选择器链：`at01-fp-b`（**键盘确认打开 tables.md**）、`at01-fp-c/d`（再次打开→Escape 取消，状态不变） |
+| **AT02** | **PASS** | `at02-r4-a`（根 7 行，`link-broken`「已缺失」、`link-outside`「链接指向授权范围之外」行内标签）、`c`（sub→deep 展开）、`d`（打开 c.md）、`e/f`（符号链接状态行）、`h`（空目录「此目录为空。」）、`i`（不可读目录 `PS_IO_PERMISSION` 横幅）；core `at02-a…i` 备用 |
+| **AT03** | **PASS** | `at03-a`（BOM 无字形）、`b`（emoji/组合字符）、`c`（「文档为空」）、`d`（CRLF）、`e`（`.mdx`→`PS_FMT_UNSUPPORTED`）、`f`（Latin-1）、`g`（二进制）→ `PS_ENC_UNSUPPORTED`；错误态均保留原文档 |
+| **AT04** | **PASS** | `at04-hash-diff.txt` **四段 `IDENTICAL`**（fixtures/副本 哈希与文件清单，零写入）；`at04-a/b`（滚动、会话内搜索）；`at04-fp-a/b/c` + `at04-fp-source-diff.txt`（edge-cases 任务复选框点击前后一致、源文件 IDENTICAL——只读不可翻转） |
+| **AT05** | **PASS** | `at05-fp-a`（干净 3 标签 math/code/tables）、`b/c`（Ctrl+Tab 切换）、`d`（关闭第三个）；**MRU 决定性**：`at05-fp2-b`（math 激活）→ `at05-fp2-c`（关 math 后 **tables 激活**，右邻回退会得到 code） |
+| **AT06** | **PASS** | `at06-r4-a…g`（2 标签→激活 tables→干净退出→无参数重启恢复顺序/激活；偏好关→欢迎页 + 最近阅读列出两文档）；`at06-r4-h…l`（A-01 链：显式打开建 1 持久授权→撤销→退出→重启标签不可用 + `PS_AUTH_REVOKED`→重试仍拒）；`runs.log` DB：`session_tabs=2/recents=2`、grants `1→0→0`、`startup.restoreSession=false` |
+| **AT07** | **PASS** | `at07-r2-b`（「找不到原文件。保留了已加载内容…」+ 重新定位/重试/关闭标签）、`c`（重试仍缺→横幅保留）、`d`（重试恢复→横幅消失）、`g`（重新定位同字节→「已重新关联同一文件，恢复原文档身份。」）、`i`（关闭→欢迎页） |
+| **AT08** | **PASS** | `at08-fp-a`（技术文档模式：删除线/公式渲染）、`b`（语法设置）、`c`（**标准 Markdown：`~~删除线~~` 与 `$E=mc^2$`/`$x_{i+1}$` 按原文显示**）；core `at08-a…d` 备用 |
+| **AT09** | **PASS** | `at09-r4-b`（越界图片占位、style/javascript:/data:/vbscript: 惰性文本）、`d`（宏炸弹仅本公式回退；50 节点 Mermaid 上限；复选框禁用）、`g`（**D-3 移除后 KaTeX 数学实际渲染**、script 无痕）；core `at09-b…f` 备用；全程无弹窗/外部进程 |
+| **AT10** | **PASS** | `at10-a/b`（行内/块公式与宽公式渲染）、`c`（关闭行内美元公式）、`d`（`$…$` 按原文、`$$` 块公式不受影响） |
+| **AT11** | **PASS** | `at11-clipboard-c.txt` = `int main(void) { return 0; }\n`（29 B）；`at11-fp2-clip-c.txt` 29 B、`at11-fp2-clip-cpp.txt` = `auto answer = 42; // C++\n`（25 B）；`at11-fp3-clip-fold.txt` = **450 B / 45 行**（`# line 01…45`，折叠状态复制不截断）；`at11-c`（首块动作条）、`at11-d`（折叠块视图） |
+| **AT12** | **PASS** | `at12-r4-a/c`（flowchart/class 实际渲染 SVG）、`d`（语法错误局部回退 + pie 不支持说明）、`f`（放大覆盖层渲染、控件齐全）、`g`（关闭）；注入点均经唯一受信封装（`single-trusted-html-entry` 2/2） |
+| **AT13** | **PASS** | `at13-b`（缺失/越界/遍历/file:/remote 占位文案 + 相对路径）、`at13-d/e`（允许本次读取→**本地图片实际显示**）、`at13-g`（8 列宽表完整，单元格无损） |
+| **AT14** | **PASS** | `at14-r4-b`（大纲含「Duplicate 标题 (1)/(2)」）、`d`（点 (1) 滚动至第一处）、`e`（点 (2) 至第二处，两目标可区分） |
+| **AT15** | **PASS** | `at15-r4-b`（`#fragment` 跳转成功）、`c`（缺失 fragment→「未找到该标题。」、位置不动）；脚注链 `f/g`（引用¹→脚注区→第一个 ↩ 返回第一处引用）、`h/i`（第二引用→↩² 返回第二处引用）；`at15-r2-*` 补充 |
+| **AT16** | **PASS** | `at16-r4-b`（引用→脚注）、`c`（Alt+← 返回引用处 +「已恢复阅读位置」）、`d`（Alt+→ 前进回脚注）、`e/f`（第二引用→Alt+← 返回）；无错误横幅 |
+| **AT17** | **PASS** | `at17-fp-b`（「中文」命中）、`c`（「SECRET」不区分大小写 **3** 命中）、`d`（勾选区分大小写 **1** 命中）、`e`（折叠代码块「line 45」命中，预览 `# line 43 # line 44 # line 45`）；core `at17-e/f`（公式源码匹配、零结果提示） |
+| **AT18** | **PASS** | `at18-b`（源码·只读、行号、无可编辑态）、`at18-c`（返回阅读恢复正文） |
+| **AT19** | **PASS** | `at19-r3-e`（同版本恢复、静默、滚动到位）、`f`（跨版本精确→「已恢复阅读位置」）、`g`（标题/祖先回退→「文档已更新，已恢复到相近章节」+ 视口滚入改写区块）、`i`（top 回退近似）；`runs.log` DB：`positions=1`、`display.fontSizePx=22` |
+| **AT20** | **PASS** | `at20-a`（1600×900：面板并排、正文右移）、`b`（1024×640：面板覆盖层）、`c`（恢复）；面板互斥见 `at02-*`/`at14-*` |
+| **AT21** | **PASS** | `at21-a…d`（v1→外部写入→非模态横幅 +「有新版本」徽标→「现在更新」→内容更新、结构保留→再次写入再出横幅）；`at21-fp-b/c/e`（第二次横幅→「稍后」→**折叠为「有新版本」条、徽标保留**） |
+| **AT22** | **PASS** | `at22-a…c`（150 ms 连续写入合并为单候选；更新后「已更新，位置近似恢复」；t4 展示 **RAPID-B**、无回退） |
+| **AT23** | **PASS** | `at23-b`（字号 22/行距 2 即时生效）、`c`（越界 99→「数值超出范围，已保留上一个有效值。」）、`e`（退出重开持久） |
+| **AT24** | **PASS** | `at24-a`（未聚焦 skip link 不可见）、`b/c`（Tab 显示「跳到正文」焦点环、Enter 跳转）、`d`（指针点击后 Tab 焦点环仍可见）、`e`（键盘查找）、`f/h`（**200% 缩放**下阅读/搜索可用，随后恢复 1.25） |
+| **AT25** | **PASS** | `at25-r4-a`（聚合对话框：范围/1 资源/「记住此目录授权」默认不勾选）、`b`（拒绝→占位保留）、`d/e`（撤销持久文件授权 + notice）、`f0-f3`（清除类别对话框：授权行可勾选、「授权 已清除 2 项」）、`g2/h`（核销后展开新扫描→行内「授权已被撤销…」+ 重试仍拒）、`j`（显式重开→恢复扫描）；grants dump：重开后 1 条 session 目录授权 |
+| **AT26** | **PASS** | `at26-r3-a`（阻止对话框正确命名 `https://httpbin.org`）、`b`（占位保持）、`d/e`（允许后**图片真实渲染**）；`at26-r3-sockets-blocked.txt` **0 行**、`sockets-watch.txt` 5 行 ESTAB（→`54.159.186.149:443`）；隔离缓存 `remote-images/c-a2c48c6cdb4fc94f`（8090 B）；`at26-r3-app-log.txt` 0×`command_failed` |
+| **AT27** | **PASS** | `at27-r4-a`（隐私计数：最近阅读 2/位置与会话 4/授权 2）、`d/e`（对话框勾选最近阅读+位置与会话+授权）、`f`（结果逐类：2/0/4/2）、`g`（关闭归零）、`h`（重启=欢迎页、无最近记录）；DB dump：`session_tabs=0/recents=0/positions=0/authorizations=0`（写回抑制生效） |
+| **AT28** | **PASS** | `at28-r3-c`（预览默认脱敏、`已脱敏 0 处`）、`d`（错误态源目录→**「该位置是受保护的源文件或源目录，请另选位置。」**，0 写入）、`e1/e2/e3`（既存非源目标→覆盖确认→成功，427 B 字节副本）、`f`（新目标直接成功）、`h`（已注册文档场景同样专用拒绝，docs count=1） |
+| **AT29** | **PASS** | `at29-a`（11 MiB 对话框）、`c`（简化阅读徽标 + 范围说明）、`e`（52 MiB→源码分段视图「文件超过本版全量处理上限…」）；`runs.log` 启动到窗口 3070 ms、到截图 7317 ms、RSS 记录；`at29-fp-a/b`（简化模式搜索框可用；最终计数见 R5.6） |
+| **AT30** | **PASS** | `at30-r4-b`（关于页：名称/0.1.0/Quirkybrain/GPL-3.0-only/GPLv3+离线说明；「获取对应源码」显示**翻译后文案**「未配置对应源码入口；公开发行前必须补齐。」）；`c`（许可证查看器→见 R5.6）；`e/f`（B-04 文档信息面板：编码 utf-8/完整路径/内容版本哈希/资源问题空态/只读，显式关闭回阅读）；`at30-r4-placeholder-scan.txt` 生产源码 **0 命中** |
+
+### R5.3 汇总（Rev 5：全部 30 项现行判定）
+
+| 判定 | 数量 | AT |
+|---|---|---|
+| **PASS** | **30** | 01–30 |
+| **FAIL** | **0** | — |
+| **UNVERIFIED（整体）** | **0** | 无（环境受限子项见 R5.6） |
+
+- **G-01 / 条件 C1 达成**：30/30 判定均为现行二进制 `054040ba…`（构建于当前产品树 `49f48ba`，`5d977ea..HEAD` 产品差异为空）上的真实桌面执行，**无任何结转判定**；不复存在“10/30 现行、20/30 结转”的表述。
+- 前向套件：`pnpm test -- --run` 首跑（00:11，外部高负载：并行 Qt 编译 + 游戏进程，load ≈20）出现 **3 例 `Test timed out in 5000ms`**（`no-hardcoded-strings` 1 例、`ReaderScreen` AT19 相关 2 例；`unit-suite-r5.log` 原样保留）；**控制重跑**（00:22，load 2.5）→ **71 文件 / 547 passed / 0 failed，EXIT=0**（`unit-suite-r5-retry.log`）。失败归类为**环境性超时**（非断言失败、非产品缺陷），首跑日志保留以如实记录。
+- 追溯（Rev 5）：`tests/desktop/run-at-final.sh`、`run-at-final-probes.sh`、`run-at-final-probes2.sh`；`at-final/**`；wp-35a A-01/A-02/A-07/A-08、wp-36a B-02/B-04/B-10 的桌面闭合证据（AT06/25、AT26、AT28、AT09/15/30）。
+
+### R5.4 执行观察（不构成未通过项；判定已按证据取舍）
+
+| ID | 级别 | 说明 |
+|---|---|---|
+| O-42-1 | 观察（脚本口径） | 会话恢复修复（wp-34a）使经典 a–e 组脚本的“标签页算术”失效：跨 launch 的标签累积导致 AT04/05/08/17 等部分场景点击落点偏移。已由 `run-at-final-probes2.sh` 以 `reset_data` 干净会话逐项重取（AT01/04/05/08/11/17/29），判定采用重取证据。 |
+| O-42-2 | 观察（环境） | 桌面期间被并行占用（用户游戏/终端/编译）：`at01-f` 触发整屏回退（内容仍可读，保留）；AT17 首跑部分截图被终端窗口遮挡——已重取；00:10 的 AT11 重试点击被外部窗口拦截——归档 `superseded/at11fp-interference/`，00:20 以 fp2/fp3 重取（29 B/25 B/450 B 全部达成）。 |
+| O-42-3 | 观察（文档口径） | AT30 旧链路（`run-at-e` 键盘 Down×3）因 wp-36a B-05 菜单新增「更新行为」而落在「设置」页——旧截图归档 `superseded/legacy-at30-menu/`；判定采用 wp38 `at30-r4-*`（Down×5 至「关于」）。 |
+| O-42-4 | 观察（环境时序） | AT29 11 MiB 简化模式搜索：搜索框可用且已启动全文索引（「正在建立全文索引」），8 s 观察窗内未显示最终计数（大文档索引构建）。不构成 FAIL；列入 R5.6。 |
+| O-42-5 | 观察（机制交互） | AT25 的目录核销链同 Rev 4 O-38-1：目录「打开」建立 session-scope root（不进持久授权列表），核销经 `clear_records(["authorizations"])` 达成，显式重开作对照。 |
+| O-42-6 | 观察（构建） | 本构建与 Rev 4 二进制逐字节相同（`054040ba…`）且产品树自 `5d977ea` 未变——Rev 5 的价值在于**将 30/30 判定全部落在该单一二进制上**并补齐此前的结转缺口，而非新构建差异。 |
+
+### R5.5 证据卫生
+
+- 每次场景结束 `pgrep` 均无遗留 `paperstack`；最终复核 `pgrep -x paperstack`、`xclip` 均无匹配。
+- `color-scheme=prefer-dark`、`text-scaling-factor=1.25` 已恢复；`fixtures/` 零残留（`probe-out*`=0、baseline 后新文件=0）；产品路径 `git status` 仅含本任务脚本（未跟踪→已提交）。
+- `superseded/`（原始字节保留，避免与最终证据混淆）：`driver-failure-broken-invocation.log`（驱动误调用）、`at01-picker-race/`（AT01 首跑选择器竞态 2 图）、`at11fp-interference/`（AT11 受扰重试 8 文件）、`legacy-at30-menu/`（B-05 前菜单链路 2 图）。
+- 脚本：新增 3 个可复现驱动（`run-at-final.sh`、`run-at-final-probes.sh`、`run-at-final-probes2.sh`），分节可重跑；无一次性脚本残留。
+
+### R5.6 明确 UNVERIFIED 清单（Rev 5：仅环境/范围受限项）
+
+| 项 | 原因 / 状态 |
+|---|---|
+| Wayland 会话（NF10/R30/AT30/IT08 的 Wayland 侧） | 本机仅 X11 `:1`；XTEST/libxdo 不适用（沿用 §6） |
+| 抓包级零请求证据（AT26/NF02） | 无 sudo/tcpdump；以进程树 `ss`（阻止态 0 行 + ESTAB 采样 + 缓存/日志）替代（沿用 §6 口径；本轮证据在 `at26-r3-*`） |
+| 真正干净系统安装（AT30/IT08）、WebDriver/tauri-driver、拖放打开（AT01）、复制失败路径（AT11）、映射回退文案（AT18）、前进分支清除（AT16）、面板状态记忆（AT20）、2000 条截断/节点级状态（AT02）、横滚实际触发（AT13）、GIF/WebP（AT13）、替换保存/只改图片/关闭标签期间完成任务（AT22）、深色主题/真实输入/IME、200% 完整任务链、NF04–06/NF09 达标结论 | 沿用 §6，不变（组件/集成层覆盖或本机不可执行） |
+| AT30 许可证/第三方声明内容查看 | 查看器打开即「找不到文件或资源。」（入口与说明存在；属 wp-41/45 打包范围） |
+| AT29 11 MiB 简化模式搜索的最终命中计数 | 观察窗内处于「正在建立全文索引」；搜索框可用、无错误（环境时序；搜索语义由组件/集成层覆盖） |
+
+### R5.7 结论（Rev 5）
+
+AT01–AT30 在唯一记录二进制 `054040ba…`（当前产品树 `49f48ba`）上全量重新执行：**30 PASS / 0 FAIL / 0 整体 UNVERIFIED**；系统验证 §7.4 G-01 的 C1（同树全新桌面判定）达成，Rev 5 取代此前各修订的 AT 判定用于发布判断。本任务未修改任何产品代码；环境受限项与执行观察均如实列明。
 
 ## Revision 4（2026-10-07，wp-38-desktop-rerun：wp-35a/wp-36a 评审修正后的桌面复跑）
 
