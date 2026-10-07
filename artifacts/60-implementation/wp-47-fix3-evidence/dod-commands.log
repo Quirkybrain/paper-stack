@@ -1,0 +1,13 @@
+== typecheck
+> tsc --noEmit
+
+== lint
+> eslint .
+
+== test
+ Test Files  73 passed (73)
+      Tests  588 passed (588)
+== build
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 1.38s

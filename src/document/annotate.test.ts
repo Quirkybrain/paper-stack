@@ -83,6 +83,32 @@ describe('annotateTree (stage ⑫)', () => {
     expect(footnoteSection?.properties.dataBlockId).toBeUndefined()
   })
 
+  it('emits only the [blockStart, blockStart + blockLimit) window (D-IT-3)', async () => {
+    const parsed = await parseDocument('alpha\n\nbeta\n\ngamma\n\ndelta')
+    const tree = annotateTree(parsed.hast as HastRoot, {
+      blocks: parsed.blocks,
+      segments: parsed.segments,
+      blockStart: 1,
+      blockLimit: 2,
+    })
+    const sections = collectElements(tree, 'section')
+    expect(sections.map((section) => section.properties.dataBlockId)).toEqual(['b2', 'b3'])
+    const text = JSON.stringify(tree)
+    expect(text).not.toContain('alpha')
+    expect(text).not.toContain('delta')
+  })
+
+  it('supports an open-ended tail window (blockStart without blockLimit)', async () => {
+    const parsed = await parseDocument('alpha\n\nbeta\n\ngamma\n\ndelta')
+    const tree = annotateTree(parsed.hast as HastRoot, {
+      blocks: parsed.blocks,
+      segments: parsed.segments,
+      blockStart: 2,
+    })
+    const sections = collectElements(tree, 'section')
+    expect(sections.map((section) => section.properties.dataBlockId)).toEqual(['b3', 'b4'])
+  })
+
   it('does not mutate the input tree', async () => {
     const parsed = await parseDocument('alpha')
     const original = JSON.stringify(parsed.hast)
