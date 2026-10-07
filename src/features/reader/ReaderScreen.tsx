@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import { createEventBridge } from '../../app/events'
 import { t } from '../../app/i18n'
@@ -15,6 +15,8 @@ import { Button } from '../../components/Button'
 import { EmptyState } from '../../components/EmptyState'
 import { Placeholder, type PlaceholderStage } from '../../components/Placeholder'
 import { DOCUMENT_BODY_ID } from '../../components/SkipLink'
+import { Toast } from '../../components/Toast'
+import { HARD_LIMIT_BYTES, largeDocHonesty } from '../../document/modes/modes'
 import type {
   BlockRecord,
   DocumentDiagnostic,
@@ -50,8 +52,10 @@ import {
 import { useReaderHistory } from './history/use-reader-history'
 import { InspectDrawer } from './inspect/InspectDrawer'
 import type { InspectTarget } from './inspect/types'
+import { LargeDocDialog } from './largeDoc/LargeDocDialog'
 import { NavPanel, type NavPanelKind } from './nav/NavPanel'
 import { useOutlineTracking } from './nav/use-outline-tracking'
+import { buildAnchorRecord } from './position/position'
 import { RootErrorBoundary } from './RootErrorBoundary'
 import { tabDisplayLabels } from './reader-state'
 import { SourceView, type SourceBackInfo } from './source/SourceView'
@@ -64,6 +68,8 @@ import {
 import { TabBar } from './tabs/TabBar'
 import { ReaderToolbar } from './toolbar/ReaderToolbar'
 import { ReaderUiContext, type ReaderUi } from './ui-context'
+import { UpdateBanner } from './update/UpdateBanner'
+import { selectUpdateBanner } from './update/update-model'
 import {
   displayDocumentModel,
   useReader,
@@ -162,6 +168,20 @@ export function resolveDocumentLink(
   return { path: `/${resolved.filter(Boolean).join('/')}`, anchorId }
 }
 
+/**
+ * In-block ratio of the current reading position (0..1) for the anchor record;
+ * layout-dependent, deterministic fallback 0 without real layout (jsdom).
+ */
+function blockOffsetRatio(container: HTMLElement | null, blockId: string): number {
+  if (!container) return 0
+  const element = container.querySelector<HTMLElement>(`[data-block-id="${blockId}"]`)
+  if (!element) return 0
+  const rect = element.getBoundingClientRect()
+  if (!Number.isFinite(rect.height) || rect.height <= 0) return 0
+  const containerTop = container.getBoundingClientRect().top
+  return Math.min(1, Math.max(0, (containerTop - rect.top) / rect.height))
+}
+
 function pointForSearchHit(
   hit: SearchHit,
   tab: { docId: string; canonicalPath: string },
@@ -187,8 +207,11 @@ function pointForSearchHit(
 }
 
 /**
- * Bridges the settings syntax mode into the reader pipeline: a change
- * re-renders the displayed version in place (R08), never reloading disk.
+ * Bridges the settings host into the reader controller: a syntax change
+ * re-renders the displayed version in place (R08), never reloading disk; the
+ * update-mode default and records preference feed the update/anchor flows; a
+ * typography change (font size / line height / content width) requests the
+ * single layout-stabilization correction (INV-AR-05).
  */
 function ReaderSettingsBridge({ reader }: { reader: ReaderControls }) {
   const { settings } = useSettings()
@@ -197,12 +220,31 @@ function ReaderSettingsBridge({ reader }: { reader: ReaderControls }) {
     readerRef.current = reader
   })
   const lastModeRef = useRef<SyntaxMode | null>(null)
+  const lastTypographyRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (lastModeRef.current === settings.syntaxMode) return
     lastModeRef.current = settings.syntaxMode
     readerRef.current.applySyntaxMode(settings.syntaxMode)
   }, [settings.syntaxMode])
+
+  useEffect(() => {
+    readerRef.current.syncGlobalSettings({
+      updateModeDefault: settings.updateModeDefault,
+      rememberRecords: settings.rememberRecords,
+    })
+  }, [settings.updateModeDefault, settings.rememberRecords])
+
+  useEffect(() => {
+    const key = `${settings.fontSizePx}:${settings.lineHeight}:${settings.maxContentWidthPx}`
+    if (lastTypographyRef.current === null) {
+      lastTypographyRef.current = key
+      return
+    }
+    if (lastTypographyRef.current === key) return
+    lastTypographyRef.current = key
+    readerRef.current.notifyLayoutChange()
+  }, [settings.fontSizePx, settings.lineHeight, settings.maxContentWidthPx])
 
   return null
 }
@@ -311,6 +353,8 @@ export default function ReaderScreen() {
   const [historyNotice, setHistoryNotice] = useState<string | null>(null)
   const [revealBlockId, setRevealBlockId] = useState<string | null>(null)
   const [pendingLocate, setPendingLocate] = useState<PendingLocate | null>(null)
+  /** Dismissed per tab/mode coverage notice (honesty statement stays reachable). */
+  const [modeNoticeDismissed, setModeNoticeDismissed] = useState<Record<string, boolean>>({})
   const lastNavPanelRef = useRef<NavPanelKind | null>(null)
   const mainRef = useRef<HTMLElement>(null)
   const history = useReaderHistory()
@@ -332,6 +376,122 @@ export default function ReaderScreen() {
   const navPanelKind: NavPanelKind | null =
     activePanel === 'files' || activePanel === 'outline' ? activePanel : null
   const navAvailable = reader.directory !== null || activeTab !== null
+
+  // -------------------------------------------------------------------------
+  // wp-28 modes / update surface (T-51..T-55)
+  // -------------------------------------------------------------------------
+
+  const activeMode = activeTab?.largeDocMode ?? 'full'
+  // >50MiB never reads full text; a user-chosen source window keeps it in
+  // memory. The VersionInfo size tells the two apart (rendering-pipeline §5).
+  const activeHardLimit =
+    activeMode === 'sourceWindow' &&
+    (activeTab?.session.displayVersion?.sizeBytes ?? 0) > HARD_LIMIT_BYTES
+  const modeHonesty = largeDocHonesty(activeMode, { hardLimit: activeHardLimit })
+  const modeBadge: 'simplified' | 'sourceOnly' | null =
+    modeHonesty.badgeKey === 'document.badge.simplified'
+      ? 'simplified'
+      : modeHonesty.badgeKey === 'document.badge.sourceOnly'
+        ? 'sourceOnly'
+        : null
+  const modeNoticeKey = activeTab ? `${activeTab.tabId}:${activeMode}` : null
+
+  const updateBannerState = activeTab
+    ? selectUpdateBanner({
+        hasPending: activeHasPending,
+        mode: reader.updateModeFor(activeTab.tabId),
+        isActiveTab: true,
+        hasSelection: reader.selectionPresent,
+        hasInspectLayer: reader.inspectLayerActiveFor(activeTab.tabId),
+        collapsed: activeTab.bannerCollapsed,
+        pauseDismissed: reader.isPauseDismissed(activeTab.tabId),
+      })
+    : ({ kind: 'hidden' } as const)
+
+  const commitNotice = activeTab ? reader.commitNoticeFor(activeTab.tabId) : null
+  const largeDocPrompt = activeTab ? reader.largeDocPromptFor(activeTab.tabId) : null
+
+  const updateBannerHandlers = {
+    onUpdate: () => {
+      if (!activeTab) return
+      void reader.commitUpdate(activeTab.tabId, { clearSelection: reader.selectionPresent })
+    },
+    onLater: () => {
+      if (activeTab) reader.setBannerCollapsed(activeTab.tabId, true)
+    },
+    onReopen: () => {
+      if (activeTab) reader.setBannerCollapsed(activeTab.tabId, false)
+    },
+    onContinue: () => {
+      if (activeTab) reader.dismissUpdatePause(activeTab.tabId)
+    },
+  }
+
+  // Stable dismiss target for the success toast (VC-13): the tab currently
+  // showing the commit result.
+  const commitNoticeTabId = activeTab?.tabId ?? null
+
+  /** Committed-boundary anchor observation for the current reading position. */
+  const observeCurrentPosition = () => {
+    if (!activeTab || activeTab.phase !== 'ready' || !activeModel || !activeResult) return
+    const versionHash = activeTab.session.displayVersion?.contentHash
+    if (!versionHash) return
+    const blockId = findVisibleBlockId(mainRef.current)
+    if (blockId === null) return
+    const block = activeResult.blocks.find((candidate) => candidate.blockId === blockId)
+    if (!block) return
+    reader.observePosition(
+      activeTab.tabId,
+      buildAnchorRecord({
+        versionHash,
+        block,
+        offsetRatio: blockOffsetRatio(mainRef.current, blockId),
+      }),
+    )
+  }
+
+  // The inspect drawer is one of the two follow-mode pause conditions
+  // (models §4.1/INV-UM-02); opening/closing it re-evaluates the decision.
+  const activeTabId = activeTab?.tabId ?? null
+  const setInspectLayerActive = reader.setInspectLayerActive
+  useEffect(() => {
+    if (activeTabId === null) return
+    const open = activePanel === 'inspect' && inspectTarget !== null
+    setInspectLayerActive(activeTabId, open)
+    return () => setInspectLayerActive(activeTabId, false)
+  }, [activeTabId, activePanel, inspectTarget, setInspectLayerActive])
+
+  // Paired update-result handling: scroll once to the restored block (exact or
+  // approximate landing point) when a commit lands (INV-VC-11 / INV-UM-08).
+  useEffect(() => {
+    if (!commitNotice) return
+    if (commitNotice.blockId !== null) {
+      const element = mainRef.current?.querySelector<HTMLElement>(
+        `[data-block-id="${commitNotice.blockId}"]`,
+      )
+      if (element && typeof element.scrollIntoView === 'function') element.scrollIntoView()
+    } else if (mainRef.current && typeof mainRef.current.scrollIntoView === 'function') {
+      mainRef.current.scrollIntoView()
+    }
+  }, [commitNotice])
+
+  // Single layout-stabilization correction: at most one per layout change,
+  // landing on the last recorded anchor block (INV-AR-05).
+  useEffect(() => {
+    if (reader.layoutCorrectionTick === 0 || !activeTab || !activeResult) return
+    const anchor = reader.positionAnchorFor(activeTab.tabId)
+    if (!anchor) return
+    const block = activeResult.blocks.find(
+      (candidate) =>
+        anchor.sourceRange.startByte >= candidate.sourceRangeBytes.startByte &&
+        anchor.sourceRange.startByte < candidate.sourceRangeBytes.endByte,
+    )
+    if (!block) return
+    const element = mainRef.current?.querySelector<HTMLElement>(
+      `[data-block-id="${block.blockId}"]`,
+    )
+    if (element && typeof element.scrollIntoView === 'function') element.scrollIntoView()
+  }, [reader.layoutCorrectionTick, activeTab, activeResult, reader])
 
   /**
    * Auxiliary-area mutual exclusion (EDGE-06): at most one of files/outline/
@@ -771,6 +931,7 @@ export default function ReaderScreen() {
     enterSource,
     openInspect,
     openZoom: (target) => setZoomTarget(target),
+    notifyLayoutChange: reader.notifyLayoutChange,
   }
 
   const outline = activeResult?.outline ?? null
@@ -782,8 +943,10 @@ export default function ReaderScreen() {
 
   // Global shortcuts owned by wp-19 (ui-spec §6.1): Ctrl+O/Ctrl+W/Ctrl+Tab;
   // wp-24 adds Ctrl+B (navigation) and Ctrl+Shift+O (directory). Inputs and
-  // IME never swallow shortcuts (EDGE-04).
-  useEffect(() => {
+  // IME never swallow shortcuts (EDGE-04). Layout effects register the global
+  // listeners during commit, so they are live the moment interactive content
+  // is on screen (a passive effect could miss an immediate keystroke).
+  useLayoutEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (isEditableTarget(event.target)) return
       const ctrl = event.ctrlKey || event.metaKey
@@ -804,7 +967,10 @@ export default function ReaderScreen() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  useEffect(() => {
+  // Same eager registration for the second shortcut group (Alt history,
+  // Ctrl+, / Ctrl+Shift+O / Ctrl+B / Ctrl+F); deps are absent on purpose so
+  // each commit rebinds the closure to the current handlers.
+  useLayoutEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase()
       // Alt+←/→ active-tab history (ui-spec §6.1); works from inputs too,
@@ -847,8 +1013,10 @@ export default function ReaderScreen() {
   })
 
   // Tauri event bridge (contracts §4): watch/open/focus/close/drag-drop.
+  // Layout effect: the transport subscriptions exist as soon as the reader is
+  // mounted, so an event arriving immediately after mount is never lost.
   const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => {
+  useLayoutEffect(() => {
     const bridge = createEventBridge({
       onWatchChanged: (payload) => controlsRef.current.handleWatchChanged(payload),
       onOpenRequested: (request) => void controlsRef.current.openRequest(request),
@@ -893,6 +1061,12 @@ export default function ReaderScreen() {
           }
         />
       )
+    }
+
+    if (activeTab.phase === 'largeDoc') {
+      // Open-time large-document prompt: nothing is read until the user
+      // chooses; the dialog carries the decision (rendering-pipeline §5).
+      return null
     }
 
     if (activeTab.phase === 'reading' || activeTab.phase === 'parsing') {
@@ -942,6 +1116,7 @@ export default function ReaderScreen() {
           rawText={activeModel.rawText}
           result={activeResult}
           generation={activeTab.session.generation}
+          simplified={activeMode === 'simplified'}
           revealBlockId={revealBlockId}
           {...(searchHighlights ? { searchHighlights } : {})}
           onDocumentLink={handleDocumentLink}
@@ -973,6 +1148,7 @@ export default function ReaderScreen() {
                   ? { displayName: activeTab.displayName, canonicalPath: activeTab.canonicalPath }
                   : {})}
                 hasPendingUpdate={activeHasPending}
+                modeBadge={modeBadge}
                 viewMode={activeTab?.viewMode ?? 'reading'}
                 navAvailable={navAvailable}
                 navOpen={navPanelKind !== null}
@@ -1072,20 +1248,58 @@ export default function ReaderScreen() {
                     {t(historyNotice)}
                   </Banner>
                 ) : null}
-                {activeTab && activeHasPending && !activeTab.bannerCollapsed ? (
+                {activeTab && modeBadge !== null && modeHonesty.coverageKey !== null &&
+                modeNoticeKey !== null &&
+                modeNoticeDismissed[modeNoticeKey] !== true ? (
                   <Banner
-                    tone="warn"
-                    label={t('aria.updateBanner')}
+                    tone={activeHardLimit ? 'warn' : 'info'}
                     actions={
                       <Button
                         variant="secondary"
-                        onClick={() => reader.setBannerCollapsed(activeTab.tabId, true)}
+                        onClick={() =>
+                          setModeNoticeDismissed((previous) => ({
+                            ...previous,
+                            [modeNoticeKey]: true,
+                          }))
+                        }
                       >
-                        {t('update.action.later')}
+                        {t('common.close')}
                       </Button>
                     }
                   >
-                    {t('update.banner')}
+                    {t(modeHonesty.coverageKey)}
+                  </Banner>
+                ) : null}
+                <UpdateBanner variant={updateBannerState} {...updateBannerHandlers} />
+                {commitNotice !== null ? (
+                  <Toast
+                    tone="success"
+                    message={t(commitNotice.messageKey)}
+                    onDismiss={() => {
+                      if (commitNoticeTabId !== null) reader.dismissCommitNotice(commitNoticeTabId)
+                    }}
+                  />
+                ) : null}
+                {reader.positionError !== null ? (
+                  <Banner
+                    tone="danger"
+                    actions={
+                      <>
+                        <Button
+                          variant="secondary"
+                          onClick={() =>
+                            activeTab ? reader.retryPositionSave(activeTab.tabId) : undefined
+                          }
+                        >
+                          {t('common.retry')}
+                        </Button>
+                        <Button variant="secondary" onClick={reader.clearPositionError}>
+                          {t('common.close')}
+                        </Button>
+                      </>
+                    }
+                  >
+                    {t('document.position.notSaved')}
                   </Banner>
                 ) : null}
               </div>
@@ -1111,6 +1325,7 @@ export default function ReaderScreen() {
                   id={DOCUMENT_BODY_ID}
                   className="ps-reader-main"
                   aria-label={t('aria.documentBody')}
+                  onScroll={observeCurrentPosition}
                   {...(activeTab ? { role: 'tabpanel' } : {})}
                 >
                   {body}
@@ -1135,6 +1350,13 @@ export default function ReaderScreen() {
               <DiagnosticsPanel
                 onClose={() => setDiagnosticsOpen(false)}
                 protectedPaths={state.tabs.map((tab) => tab.canonicalPath)}
+              />
+            ) : null}
+            {largeDocPrompt !== null && activeTab !== null ? (
+              <LargeDocDialog
+                sizeBytes={largeDocPrompt.sizeBytes}
+                reason={largeDocPrompt.reason}
+                onChoose={(choice) => reader.chooseLargeDoc(activeTab.tabId, choice)}
               />
             ) : null}
           </ReaderUiContext.Provider>

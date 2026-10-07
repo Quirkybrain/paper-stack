@@ -91,6 +91,10 @@ let recentsResult: RecentEntry[] = []
 let pickFilesResult: { cancelled: boolean; paths: string[] } = { cancelled: true, paths: [] }
 let pickDirectoryResult: { cancelled: boolean; paths: string[] } = { cancelled: true, paths: [] }
 let directoryNodes: DirectoryNode[] = []
+let settingsResult: GlobalSettings = { ...DEFAULTS }
+let sizeByPath = new Map<string, number>()
+let relinkStatus: 'reassociated' | 'new-version' = 'reassociated'
+let relinkText: string | null = null
 
 function identityFor(path: string): DocIdentity {
   const name = path.split('/').pop() ?? 'doc.md'
@@ -101,7 +105,7 @@ function identityFor(path: string): DocIdentity {
     format: 'markdown',
     encoding: 'utf-8',
     contentHash: 'v1',
-    sizeBytes: 128,
+    sizeBytes: sizeByPath.get(path) ?? 128,
     lastSeenAtMs: 1,
   }
 }
@@ -110,9 +114,9 @@ function snapshotFor(docId: string, hash = 'v1'): DocumentSnapshot {
   const name = docId.slice(2)
   return {
     docId,
-    identity: identityFor(`/docs/${name}`),
+    identity: { ...identityFor(`/docs/${name}`), contentHash: hash },
     version: { contentHash: hash, sizeBytes: 128, modifiedAtMs: 1, observedAtMs: 2 },
-    text: texts.get(docId) ?? `# ${name}\n\nhello ${name}\n`,
+    text: texts.get(`${docId}@${hash}`) ?? texts.get(docId) ?? `# ${name}\n\nhello ${name}\n`,
     lineCount: 3,
   }
 }
@@ -124,7 +128,7 @@ function installRouter(): void {
         return Promise.resolve(pendingRequests)
       case 'get_settings':
         return Promise.resolve({
-          global: DEFAULTS,
+          global: settingsResult,
           defaults: DEFAULTS,
           limits: { recentLimit: 100, cacheMaxBytes: 268435456, logMaxBytes: 10485760 },
           revision: 0,
@@ -175,18 +179,27 @@ function installRouter(): void {
       }
       case 'relink_document': {
         const req = (args?.req ?? {}) as { docId: string; newPath: string }
-        return Promise.resolve({
-          status: 'reassociated',
-          snapshot: snapshotFor(req.docId),
-        })
+        const snapshot = snapshotFor(req.docId)
+        if (relinkText !== null) snapshot.text = relinkText
+        if (relinkStatus === 'new-version') {
+          snapshot.version = { contentHash: 'v9', sizeBytes: 128, modifiedAtMs: 9, observedAtMs: 9 }
+        }
+        return Promise.resolve({ status: relinkStatus, snapshot })
       }
-      case 'get_source_info':
+      case 'get_source_info': {
+        const requested = ((args ?? {}) as { docId?: string }).docId ?? 'd-a.md'
         return Promise.resolve({
-          docId: 'd-a.md',
-          version: { contentHash: 'v1', sizeBytes: 128, modifiedAtMs: 1, observedAtMs: 2 },
+          docId: requested,
+          version: {
+            contentHash: 'v1',
+            sizeBytes: sizeByPath.get(`/docs/${requested.slice(2)}`) ?? 128,
+            modifiedAtMs: 1,
+            observedAtMs: 2,
+          },
           encoding: 'utf-8',
           totalLines: 3,
         })
+      }
       case 'read_source_window':
         return Promise.resolve({
           docId: 'd-a.md',
@@ -221,6 +234,10 @@ beforeEach(() => {
   pickFilesResult = { cancelled: true, paths: [] }
   pickDirectoryResult = { cancelled: true, paths: [] }
   directoryNodes = []
+  settingsResult = { ...DEFAULTS }
+  sizeByPath = new Map()
+  relinkStatus = 'reassociated'
+  relinkText = null
   listeners.clear()
   windowHandlers.focus = undefined
   windowHandlers.close = undefined
@@ -290,7 +307,33 @@ describe('ReaderScreen (ui-spec §3.2)', () => {
     expect(screen.queryAllByRole('tab')).toHaveLength(0)
   })
 
-  it('records a pending version from watch-changed as a keep-mode banner only', async () => {
+  it('offers 现在更新 in keep mode and commits with the paired position result', async () => {
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md@v1', '# 标题\n\nOLD\n')
+    texts.set('d-a.md@v2', '# 标题\n\nNEW\n')
+    renderReader()
+    await screen.findByText('OLD')
+
+    refreshHash = 'v2'
+    await act(async () => {
+      listeners.get('paperstack://watch-changed')?.({
+        payload: { docId: 'd-a.md', kind: 'modified', observedAtMs: 5 },
+      })
+    })
+    await screen.findByText(t('update.banner'))
+    expect(screen.getByRole('button', { name: t('update.action.now') })).toBeTruthy()
+    expect(screen.getAllByText(t('update.badge')).length).toBeGreaterThan(0)
+
+    fireEvent.click(screen.getByRole('button', { name: t('update.action.now') }))
+    // No saved anchor exists yet: the commit must report the approximate
+    // landing point, never a fake exact restore (INV-UM-08/INV-AR-03).
+    await screen.findByText(t('update.position.approx'))
+    await screen.findByText('NEW')
+    expect(screen.queryByText(t('update.banner'))).toBeNull()
+    expect(screen.queryByText('OLD')).toBeNull()
+  })
+
+  it('collapses the banner with 稍后 and reopens it from the textual marker (INV-UM-05)', async () => {
     pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
     renderReader()
     await screen.findByRole('heading', { level: 1, name: 'a.md' })
@@ -302,14 +345,298 @@ describe('ReaderScreen (ui-spec §3.2)', () => {
       })
     })
     await screen.findByText(t('update.banner'))
-    // Submitting an update belongs to wp-29; no fake action is offered.
-    expect(screen.queryByText(t('update.action.now'))).toBeNull()
-    expect(screen.getAllByText(t('update.badge')).length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getByRole('button', { name: t('update.action.later') }))
     await waitFor(() => expect(screen.queryByText(t('update.banner'))).toBeNull())
+    const marker = screen.getByRole('button', { name: t('update.badge') })
+    fireEvent.click(marker)
+    await screen.findByText(t('update.banner'))
+  })
+
+  it('commits automatically only in follow mode on the active tab without selection or inspect', async () => {
+    settingsResult = { ...DEFAULTS, updateModeDefault: 'follow' }
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md@v1', '# 标题\n\nOLD\n')
+    texts.set('d-a.md@v2', '# 标题\n\nNEW\n')
+    renderReader()
+    await screen.findByText('OLD')
+
+    refreshHash = 'v2'
+    await act(async () => {
+      listeners.get('paperstack://watch-changed')?.({
+        payload: { docId: 'd-a.md', kind: 'modified', observedAtMs: 5 },
+      })
+    })
+    // No click: follow commits and pairs the position result (INV-UM-02/08).
+    await screen.findByText('NEW')
+    await screen.findByText(t('update.position.approx'))
+    expect(screen.queryByText(t('update.banner'))).toBeNull()
+  })
+
+  it('defers a follow commit for a background tab and re-evaluates on activation (INV-UM-04)', async () => {
+    settingsResult = { ...DEFAULTS, updateModeDefault: 'follow' }
+    pendingRequests = [{ paths: ['/docs/a.md', '/docs/b.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md@v1', '# 标题\n\nA-OLD\n')
+    texts.set('d-b.md@v1', '# 标题\n\nB-OLD\n')
+    texts.set('d-b.md@v2', '# 标题\n\nB-NEW\n')
+    renderReader()
+    await screen.findByText('A-OLD')
+
+    refreshHash = 'v2'
+    await act(async () => {
+      listeners.get('paperstack://watch-changed')?.({
+        payload: { docId: 'd-b.md', kind: 'modified', observedAtMs: 5 },
+      })
+    })
+    // Background: the candidate is stored but never committed off-screen.
+    expect(screen.queryByText('B-NEW')).toBeNull()
+    expect(screen.queryByText('B-OLD')).toBeNull()
+
+    fireEvent.click(screen.getByRole('tab', { name: /b\.md/ }))
+    await screen.findByText('B-NEW')
+    await screen.findByText(t('update.position.approx'))
+  })
+
+  it('pauses follow updates under a selection and commits only on 更新并清除选区 (INV-UM-03)', async () => {
+    settingsResult = { ...DEFAULTS, updateModeDefault: 'follow' }
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md@v1', '# 标题\n\nOLD\n')
+    texts.set('d-a.md@v2', '# 标题\n\nNEW\n')
+    renderReader()
+    const old = await screen.findByText('OLD')
+
+    const range = document.createRange()
+    range.selectNodeContents(old)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+    await act(async () => {
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+
+    refreshHash = 'v2'
+    await act(async () => {
+      listeners.get('paperstack://watch-changed')?.({
+        payload: { docId: 'd-a.md', kind: 'modified', observedAtMs: 5 },
+      })
+    })
+    await screen.findByText(t('update.paused.selection'))
+    expect(screen.queryByText('NEW')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: t('update.action.continueReading') }))
+    fireEvent.click(screen.getByRole('button', { name: t('update.action.updateAndClearSelection') }))
+    await screen.findByText('NEW')
+    await screen.findByText(t('update.position.approx'))
+    expect(window.getSelection()?.toString() ?? '').toBe('')
+  })
+
+  it('pauses follow updates while the inspect drawer is open and commits on close (INV-UM-02)', async () => {
+    settingsResult = { ...DEFAULTS, updateModeDefault: 'follow' }
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md@v1', '# 标题\n\n$$\nx^2\n$$\n')
+    texts.set('d-a.md@v2', '# 标题\n\n$$\nx^3\n$$\n')
+    renderReader()
+    await screen.findByRole('heading', { level: 1, name: '标题' })
+
+    fireEvent.click(screen.getByRole('button', { name: t('formula.drawer.title') }))
+    const inspect = await screen.findByRole('complementary', { name: t('inspect.aria') })
+
+    refreshHash = 'v2'
+    await act(async () => {
+      listeners.get('paperstack://watch-changed')?.({
+        payload: { docId: 'd-a.md', kind: 'modified', observedAtMs: 5 },
+      })
+    })
+    await screen.findByText(t('update.paused.inspect'))
+
+    fireEvent.click(within(inspect).getByRole('button', { name: t('inspect.close') }))
+    await waitFor(() => expect(screen.queryByText(t('update.paused.inspect'))).toBeNull())
+    await screen.findByText(t('update.position.approx'))
+  })
+
+  it('observes the reading position on scroll and persists an AnchorRecord (INV-AR-01)', async () => {
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md', '# 标题\n\n第一段\n\n第二段\n')
+    renderReader()
+    await screen.findByText('第一段')
+
+    const main = document.querySelector('.ps-reader-main') as HTMLElement
+    await act(async () => {
+      fireEvent.scroll(main)
+    })
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith('save_position', {
+        req: {
+          docId: 'd-a.md',
+          anchor: expect.objectContaining({
+            versionHash: 'v1',
+            sourceRange: expect.objectContaining({ startByte: expect.any(Number) }),
+            blockFingerprint: expect.stringMatching(/^fp1:/),
+          }),
+        },
+      }),
+    )
+  })
+
+  it('merges consecutive candidates into one banner and commits the latest (INV-UM-06)', async () => {
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md@v1', '# 标题\n\nOLD\n')
+    texts.set('d-a.md@v2', '# 标题\n\nMIDDLE\n')
+    texts.set('d-a.md@v3', '# 标题\n\nNEWEST\n')
+    renderReader()
+    await screen.findByText('OLD')
+
+    refreshHash = 'v2'
+    await act(async () => {
+      listeners.get('paperstack://watch-changed')?.({
+        payload: { docId: 'd-a.md', kind: 'modified', observedAtMs: 5 },
+      })
+    })
+    await screen.findByText(t('update.banner'))
+
+    refreshHash = 'v3'
+    await act(async () => {
+      listeners.get('paperstack://watch-changed')?.({
+        payload: { docId: 'd-a.md', kind: 'modified', observedAtMs: 6 },
+      })
+    })
+    // Exactly one banner for the merged candidate; no stacking.
+    expect(screen.getAllByText(t('update.banner'))).toHaveLength(1)
+
+    fireEvent.click(screen.getByRole('button', { name: t('update.action.now') }))
+    await screen.findByText('NEWEST')
+    expect(screen.queryByText('MIDDLE')).toBeNull()
+    await screen.findByText(t('update.position.approx'))
+  })
+
+  it('re-resolves a resource event without a document banner or version change (INV-VC-07)', async () => {
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md', '# 标题\n\n![图](pic.png)\n')
+    checkAccess = {
+      status: 'allowed',
+      kind: 'local',
+      canonicalPath: '/docs/pic.png',
+      assetUrl: 'asset://docs/pic.png?v=1',
+    }
+    renderReader()
+    await screen.findByRole('img', { name: '图' })
+
+    checkAccess = {
+      status: 'allowed',
+      kind: 'local',
+      canonicalPath: '/docs/pic.png',
+      assetUrl: 'asset://docs/pic.png?v=2',
+    }
+    await act(async () => {
+      listeners.get('paperstack://watch-changed')?.({
+        payload: {
+          docId: 'd-a.md',
+          kind: 'resource',
+          resourcePath: '/docs/pic.png',
+          observedAtMs: 6,
+        },
+      })
+    })
+    await waitFor(() =>
+      expect(screen.getByRole('img', { name: '图' }).getAttribute('src')).toBe(
+        'asset://docs/pic.png?v=2',
+      ),
+    )
+    expect(screen.queryByText(t('update.banner'))).toBeNull()
+    expect(
+      invokeMock.mock.calls.some(
+        ([command, args]) =>
+          command === 'read_document' &&
+          (args as { req?: { purpose?: string } } | undefined)?.req?.purpose === 'refresh',
+      ),
+    ).toBe(false)
+  })
+
+  it('ignores a late read result after the tab was closed (INV-VC-06)', async () => {
+    vi.useFakeTimers()
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    holdRead = true
+    renderReader()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+
+    fireEvent.keyDown(window, { key: 'w', ctrlKey: true })
+    await act(async () => {
+      resolveRead?.(snapshotFor('d-a.md'))
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    expect(screen.getByRole('heading', { level: 1, name: t('welcome.title') })).toBeTruthy()
+    expect(documentModelCache.sizeFor('d-a.md')).toBe(0)
+    expect(screen.queryAllByRole('tab')).toHaveLength(0)
+  })
+
+  it('keeps the source view on the display version while a newer candidate exists (INV-VC-08)', async () => {
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md@v1', '# 标题\n\nOLD\n')
+    texts.set('d-a.md@v2', '# 标题\n\nNEW\n')
+    renderReader()
+    await screen.findByText('OLD')
+
+    refreshHash = 'v2'
+    await act(async () => {
+      listeners.get('paperstack://watch-changed')?.({
+        payload: { docId: 'd-a.md', kind: 'modified', observedAtMs: 5 },
+      })
+    })
+    await screen.findByText(t('update.banner'))
+
+    fireEvent.click(screen.getByRole('button', { name: t('toolbar.more') }))
+    fireEvent.click(screen.getByRole('menuitem', { name: t('menu.viewSource') }))
+    await screen.findByRole('heading', { name: t('source.title') })
+    expect(screen.getByText(/OLD/)).toBeTruthy()
+    expect(screen.queryByText(/NEW/)).toBeNull()
     expect(screen.getAllByText(t('update.badge')).length).toBeGreaterThan(0)
   })
+
+  it('prompts for >10MiB documents and reads the simplified subset on choice (T-51)', async () => {
+    sizeByPath.set('/docs/big.md', 11 * 1024 * 1024)
+    pendingRequests = [{ paths: ['/docs/big.md'], cwd: null, source: 'cli' }]
+    texts.set('d-big.md', '# 大文档\n\n正文 $x^2$\n')
+    renderReader()
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(t('largeDoc.title'))).toBeTruthy()
+    // Nothing is read before the choice.
+    expect(invokeMock).not.toHaveBeenCalledWith('read_document', expect.anything())
+
+    fireEvent.click(within(dialog).getByRole('button', { name: t('largeDoc.simplified') }))
+    await screen.findByText('大文档')
+    expect(screen.getByText(t('document.badge.simplified'))).toBeTruthy()
+    expect(screen.getByText(t('largeDoc.coverage'))).toBeTruthy()
+    // Heavy engines stay off: the formula renders as its source, not KaTeX.
+    expect(document.querySelector('.katex')).toBeNull()
+    expect(screen.getByText(/x\^2/)).toBeTruthy()
+  })
+
+  it('cancelling the large-document prompt leaves no ghost tab or background read', async () => {
+    sizeByPath.set('/docs/big.md', 11 * 1024 * 1024)
+    pendingRequests = [{ paths: ['/docs/big.md'], cwd: null, source: 'cli' }]
+    renderReader()
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: t('largeDoc.cancel') }))
+    await screen.findByRole('heading', { level: 1, name: t('welcome.title') })
+    expect(screen.queryAllByRole('tab')).toHaveLength(0)
+    expect(invokeMock).not.toHaveBeenCalledWith('read_document', expect.anything())
+  })
+
+  it('routes >50MiB straight to the labeled source-window mode (T-52)', async () => {
+    sizeByPath.set('/docs/huge.md', 51 * 1024 * 1024)
+    pendingRequests = [{ paths: ['/docs/huge.md'], cwd: null, source: 'cli' }]
+    renderReader()
+
+    await screen.findByText(t('document.badge.sourceOnly'))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByText(t('error.limit.size'))).toBeTruthy()
+    await screen.findByRole('heading', { name: t('source.title') })
+    expect(invokeMock).toHaveBeenCalledWith('get_source_info', { docId: 'd-huge.md' })
+    expect(invokeMock).not.toHaveBeenCalledWith('read_document', expect.anything())
+  })
+
 
   it('rechecks the active tab on window focus', async () => {
     pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
@@ -519,6 +846,28 @@ describe('ReaderScreen (ui-spec §3.2)', () => {
     )
     await screen.findByText(t('document.relink.reassociated'))
     await screen.findByRole('heading', { level: 1, name: 'restored.md' })
+  })
+
+  it('explains a different-bytes relink as a new version before adopting (R07)', async () => {
+    recentsResult = [
+      {
+        docId: 'd-restored',
+        displayName: 'restored.md',
+        canonicalPath: '/docs/restored.md',
+        openedAtMs: 1,
+        available: false,
+      },
+    ]
+    pickFilesResult = { cancelled: false, paths: ['/docs/restored.md'] }
+    relinkStatus = 'new-version'
+    relinkText = '# 新版本\n\nchanged\n'
+    renderReader()
+    fireEvent.click(await screen.findByText('restored.md'))
+
+    await screen.findByText(t('document.relink.newVersion'))
+    await screen.findByRole('heading', { level: 1, name: 'restored.md' })
+    // The relink/adoption explanation is visible, never silently "synced".
+    expect(screen.queryByText(t('document.relink.reassociated'))).toBeNull()
   })
 
   it('opens the zoom overlay from a formula and closes it with Esc', async () => {

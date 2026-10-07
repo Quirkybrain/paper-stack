@@ -1,17 +1,30 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 
 import {
+  createTaskToken,
   documentModelCache,
+  sessionDisplayReplaced,
   sessionInvalidated,
   sessionReadSucceeded,
+  sessionRecovered,
   sessionTaskFailed,
   sessionTaskSucceeded,
   sessionUnavailable,
+  sessionUpdateCommitted,
+  selectHasPendingUpdate,
   type SessionAction,
   type TaskToken,
+  type UpdatePositionResult,
 } from '../../app/session'
 import { TaskAbortedError, parseDocumentWithFallback } from '../../document/worker/client'
-import type { ParseDocumentOptions } from '../../document/types'
+import {
+  classifyLargeDocument,
+  isOverComplexityBudget,
+  resolveLargeDocChoice,
+  type LargeDocChoice,
+  type LargeDocPromptReason,
+} from '../../document/modes/modes'
+import type { ParseDocumentOptions, ParseDocumentResult } from '../../document/types'
 import { isWriteBackSuppressed, resumeSuppressedWrites } from '../../app/write-suppression'
 import {
   PaperStackError,
@@ -24,6 +37,7 @@ import {
   watch,
 } from '../../services'
 import type {
+  AnchorRecord,
   DirectoryRoot,
   ErrorPayload,
   OpenEntry,
@@ -48,6 +62,7 @@ import {
   tabBanner,
   tabClose,
   tabDocReplace,
+  tabLargeDoc,
   tabOpen,
   tabPhase,
   tabSessionAction,
@@ -57,18 +72,41 @@ import {
   type ReaderTab,
   type ReaderViewMode,
 } from './reader-state'
+import {
+  buildAnchorRecord,
+  createPositionController,
+  restorePosition,
+  LayoutStabilizer,
+  type PositionController,
+} from './position/position'
+import {
+  effectiveUpdateMode,
+  positionMessageKey,
+  resolveUpdateDecision,
+  updatePositionForRestore,
+} from './update/update-model'
+import { resourceInvalidation } from './view/resource-invalidation'
 
 /**
- * Reader orchestration for wp-19 (ui-spec §3.2 minimal; models §1/§2/§7):
+ * Reader orchestration (ui-spec §3.2; models §1/§2/§4/§6/§7):
  * opening initial documents (startup queue + dialog + drop/event), reading via
  * `read_document`, parsing through the Worker pipeline, the loading/error
- * phases, tab lifecycle and the best-effort session save used by the quit
- * path.
+ * phases, tab lifecycle, the best-effort session save used by the quit path,
+ * and the wp-28/wp-29 flows consolidated here:
+ *
+ * - large-document modes (T-51/T-52): open-time size prompt, hard-limit
+ *   source-window mode, simplified-reading subset and cancel;
+ * - update flow (T-53): keep/follow decisions, banner state, explicit /
+ *   automatic commits with paired position results;
+ * - version correctness wiring (T-55): resource-only invalidation, relink
+ *   adoption, close-during-task discard;
+ * - anchor save/restore (T-54): throttled writes through the suppression
+ *   mirror and the §6 decision tree.
  *
  * All commits go through the wp-16 session reducer (contract §6): late reads,
- * parses and refreshes are dropped without visible effect. The update banner
- * only records `pendingVersion` (keep mode); submitting an update belongs to
- * wp-29 and is not faked here.
+ * parses and refreshes are dropped without visible effect. The update policy
+ * (`update-model.ts`) decides *when* to commit; it never bypasses the token /
+ * generation rule.
  */
 
 export interface OpenFailure {
@@ -80,6 +118,26 @@ export interface OpenFailure {
 export interface NavigateDocumentResult {
   docId: string
   anchorId: string | null
+}
+
+/** Open-time large-document prompt state (rendering-pipeline §5). */
+export interface LargeDocPromptState {
+  sizeBytes: number
+  reason: LargeDocPromptReason
+  /** `open` cancels by closing the tab; `complexity` keeps the full render. */
+  origin: 'open' | 'complexity'
+}
+
+/** Paired update-commit outcome (INV-VC-11 / INV-UM-08). */
+export interface UpdateCommitOutcome {
+  position: UpdatePositionResult
+  blockId: string | null
+  messageKey: 'update.position.exact' | 'update.position.approx'
+}
+
+export interface UpdateCommitNotice extends UpdateCommitOutcome {
+  /** Bumped per commit so the view can re-run its one-shot scroll effect. */
+  nonce: number
 }
 
 export interface ReaderControls {
@@ -125,10 +183,57 @@ export interface ReaderControls {
   /** Session-scoped update-mode override; `null` = follow the global default. */
   updateModeOverrideFor(tabId: string): UpdateMode | null
   setUpdateModeOverride(tabId: string, mode: UpdateMode): void
+  /** Effective mode for the tab: override or global default (INV-UM-07). */
+  updateModeFor(tabId: string): UpdateMode
+  /** Global settings sync from the settings host (default mode + records). */
+  syncGlobalSettings(next: { updateModeDefault?: UpdateMode; rememberRecords?: boolean }): void
   handleWatchChanged(payload: WatchChangedPayload): void
   recheckActive(): void
   saveSession(): Promise<SaveResult>
   handleCloseRequested(event: { preventDefault(): void }): Promise<void>
+
+  // -------------------------------------------------------------------------
+  // Large-document modes (T-51/T-52)
+  // -------------------------------------------------------------------------
+  largeDocPromptFor(tabId: string): LargeDocPromptState | null
+  chooseLargeDoc(tabId: string, choice: LargeDocChoice): void
+  cancelLargeDoc(tabId: string): void
+
+  // -------------------------------------------------------------------------
+  // Update flow (T-53)
+  // -------------------------------------------------------------------------
+  /** A non-empty document selection currently exists (INV-UM-03). */
+  selectionPresent: boolean
+  setInspectLayerActive(tabId: string, active: boolean): void
+  inspectLayerActiveFor(tabId: string): boolean
+  isPauseDismissed(tabId: string): boolean
+  dismissUpdatePause(tabId: string): void
+  /**
+   * Commits the tab's pending candidate through the §6 commit rule. `clearSelection`
+   * is only set by the explicit "更新并清除选区" action. Returns null when the
+   * candidate is gone or a stale parse result arrived (zero visible effect).
+   */
+  commitUpdate(
+    tabId: string,
+    options?: { clearSelection?: boolean },
+  ): Promise<UpdateCommitOutcome | null>
+  commitNoticeFor(tabId: string): UpdateCommitNotice | null
+  dismissCommitNotice(tabId: string): void
+
+  // -------------------------------------------------------------------------
+  // Anchors / positions (T-54)
+  // -------------------------------------------------------------------------
+  observePosition(tabId: string, anchor: AnchorRecord): void
+  flushPosition(tabId: string): void
+  /** Latest in-memory anchor (layout correction landing point). */
+  positionAnchorFor(tabId: string): AnchorRecord | null
+  /** Latest position-save failure, shown with a retry action (INV-AR-07). */
+  positionError: ErrorPayload | null
+  clearPositionError(): void
+  retryPositionSave(tabId: string): void
+  /** Single layout-stabilization correction signal (INV-AR-05). */
+  layoutCorrectionTick: number
+  notifyLayoutChange(): void
 }
 
 let tabSequence = 0
@@ -147,6 +252,16 @@ function nextTaskId(prefix: string): string {
 /** Default syntax options until settings are loaded (contract §3.5 defaults). */
 const DEFAULT_SYNTAX_MODE: SyntaxMode = 'technical'
 
+function documentSelectionPresent(): boolean {
+  if (typeof window === 'undefined') return false
+  return (window.getSelection()?.toString() ?? '').length > 0
+}
+
+function clearDocumentSelection(): void {
+  if (typeof window === 'undefined') return
+  window.getSelection()?.removeAllRanges()
+}
+
 export function useReader(): ReaderControls {
   const [state, dispatch] = useReducer(readerReducer, INITIAL_READER_STATE)
   const stateRef = useRef(state)
@@ -164,27 +279,106 @@ export function useReader(): ReaderControls {
   const [directory, setDirectory] = useState<DirectoryRoot | null>(null)
   const [relinkNotice, setRelinkNotice] = useState<string | null>(null)
   const syntaxModeRef = useRef<SyntaxMode>(DEFAULT_SYNTAX_MODE)
+  const rememberRecordsRef = useRef(true)
+  const updateModeDefaultRef = useRef<UpdateMode>('keep')
   const inlineMathRef = useRef(new Map<string, boolean>())
   const [inlineMathByTab, setInlineMathByTab] = useState<Record<string, boolean>>({})
   const [updateModeByTab, setUpdateModeByTab] = useState<Record<string, UpdateMode>>({})
+  const updateModeByTabRef = useRef(updateModeByTab)
+  const [updateModeDefault, setUpdateModeDefaultState] = useState<UpdateMode>('keep')
   const refreshingRef = useRef(new Set<string>())
   const closeAttemptedRef = useRef(false)
 
+  // -------------------------------------------------------------------------
+  // wp-28/wp-29 state: large-document prompts, update conditions, positions
+  // -------------------------------------------------------------------------
+
+  const [largeDocPrompts, setLargeDocPrompts] = useState<Record<string, LargeDocPromptState>>({})
+  const largeDocPromptsRef = useRef(largeDocPrompts)
+  const complexityDeclinedRef = useRef(new Set<string>())
+
+  const [selectionPresent, setSelectionPresent] = useState(false)
+  const selectionRef = useRef(false)
+  const inspectLayerRef = useRef(new Set<string>())
+  const [inspectLayerNonce, setInspectLayerNonce] = useState(0)
+  const pauseDismissedRef = useRef(new Set<string>())
+  const [pauseNonce, setPauseNonce] = useState(0)
+  const [commitNotices, setCommitNotices] = useState<Record<string, UpdateCommitNotice>>({})
+
+  const [positionError, setPositionError] = useState<ErrorPayload | null>(null)
+  // Created in an effect (never during render) so the controller owns timers
+  // without reading refs while rendering; callbacks access it through the ref.
+  const positionControllerRef = useRef<PositionController | null>(null)
+  useEffect(() => {
+    const controller = createPositionController({
+      savePosition: (request) => storage.savePosition(request),
+      isSuppressed: () => isWriteBackSuppressed('positions'),
+      rememberRecords: () => rememberRecordsRef.current,
+      onError: (error) => setPositionError(error),
+    })
+    positionControllerRef.current = controller
+    return () => {
+      positionControllerRef.current = null
+      controller.dispose()
+    }
+  }, [])
+
+  const [layoutCorrectionTick, setLayoutCorrectionTick] = useState(0)
+  const stabilizerRef = useRef<LayoutStabilizer | null>(null)
+  useEffect(() => {
+    const stabilizer = new LayoutStabilizer()
+    stabilizerRef.current = stabilizer
+    const unsubscribe = stabilizer.onCorrect(() => setLayoutCorrectionTick((tick) => tick + 1))
+    return () => {
+      unsubscribe()
+      stabilizer.dispose()
+      stabilizerRef.current = null
+    }
+  }, [])
+  const notifyLayoutChange = useCallback(() => {
+    stabilizerRef.current?.request()
+  }, [])
+
+  const maybeAutoCommitRef = useRef<(tabId: string) => void>(() => {})
+
+  const setPrompt = useCallback(
+    (tabId: string, prompt: LargeDocPromptState) => {
+      largeDocPromptsRef.current = { ...largeDocPromptsRef.current, [tabId]: prompt }
+      setLargeDocPrompts(largeDocPromptsRef.current)
+    },
+    [setLargeDocPrompts],
+  )
+
+  const removePrompt = useCallback(
+    (tabId: string) => {
+      if (!(tabId in largeDocPromptsRef.current)) return
+      const next = { ...largeDocPromptsRef.current }
+      delete next[tabId]
+      largeDocPromptsRef.current = next
+      setLargeDocPrompts(next)
+    },
+    [setLargeDocPrompts],
+  )
+
   /**
-   * Per-tab parse options for the single pipeline: the global syntax mode
-   * plus the current document's inline-dollar override (ui-spec §3.7). The
-   * inline map mirrors into the ref so async parse callbacks always read the
-   * latest value; the state copy drives the settings UI re-render.
+   * Per-tab parse options for the single pipeline: the global syntax mode,
+   * the current document's inline-dollar override (ui-spec §3.7) and the
+   * simplified-reading subset when that mode was chosen (R29).
    */
   const parseOptionsFor = useCallback(
-    (tabId: string): ParseDocumentOptions => ({
-      mode: syntaxModeRef.current,
-      inlineMath: inlineMathRef.current.get(tabId) ?? true,
-    }),
+    (tabId: string): ParseDocumentOptions => {
+      const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+      return {
+        mode: syntaxModeRef.current,
+        inlineMath: inlineMathRef.current.get(tabId) ?? true,
+        simplified: tab?.largeDocMode === 'simplified',
+      }
+    },
     [],
   )
 
-  // Settings: syntax mode feeds the parse options; a failure keeps defaults.
+  // Settings: syntax mode feeds the parse options; update defaults and the
+  // records preference feed the update/anchor flows. A failure keeps defaults.
   useEffect(() => {
     let cancelled = false
     void settings
@@ -192,6 +386,9 @@ export function useReader(): ReaderControls {
       .then((bundle) => {
         if (cancelled) return
         syntaxModeRef.current = bundle.global.syntaxMode
+        rememberRecordsRef.current = bundle.global.rememberRecords
+        updateModeDefaultRef.current = bundle.global.updateModeDefault
+        setUpdateModeDefaultState(bundle.global.updateModeDefault)
       })
       .catch(() => undefined)
     return () => {
@@ -226,12 +423,33 @@ export function useReader(): ReaderControls {
           tabId,
           sessionTaskSucceeded(token, version, { text, data: { parseResult: result } }),
         )
+        // Complexity budget (rendering-pipeline §5): the first parse can reveal
+        // an over-budget document that the size threshold did not catch. Offer
+        // the same simplified/source choice once per version; declining keeps
+        // the already-rendered full view and never re-prompts for this hash.
+        const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+        if (
+          tab &&
+          tab.largeDocMode === 'full' &&
+          largeDocPromptsRef.current[tabId] === undefined &&
+          result.stats.blockCount + result.stats.segmentCount > 0 &&
+          isOverComplexityBudget(result.stats)
+        ) {
+          const declineKey = `${tabId}:${version.contentHash}`
+          if (!complexityDeclinedRef.current.has(declineKey)) {
+            setPrompt(tabId, {
+              sizeBytes: version.sizeBytes,
+              reason: 'complexity',
+              origin: 'complexity',
+            })
+          }
+        }
       } catch (error) {
         if (error instanceof TaskAbortedError) return
         dispatchSession(tabId, sessionTaskFailed(token, toErrorPayload(error)))
       }
     },
-    [dispatchSession, parseOptionsFor],
+    [dispatchSession, parseOptionsFor, setPrompt],
   )
 
   /**
@@ -285,7 +503,13 @@ export function useReader(): ReaderControls {
   )
 
   const startRead = useCallback(
-    async (tabId: string, docId: string, purpose: 'initial' | 'refresh', generation: number) => {
+    async (
+      tabId: string,
+      docId: string,
+      purpose: 'initial' | 'refresh',
+      generation: number,
+      options: { skipParse?: boolean } = {},
+    ) => {
       const token: TaskToken = { docId, version: null, generation, taskId: nextTaskId('read') }
       if (purpose === 'initial') send(tabPhase(tabId, 'reading', null))
       try {
@@ -295,7 +519,13 @@ export function useReader(): ReaderControls {
         dispatchSession(tabId, sessionReadSucceeded(token, snapshot.version, snapshot.text))
         if (purpose === 'initial') {
           void watch.watchDocument({ docId }).catch(() => undefined)
-          void startParse(tabId, docId, snapshot.text, snapshot.version, generation)
+          if (!options.skipParse) {
+            void startParse(tabId, docId, snapshot.text, snapshot.version, generation)
+          }
+        } else {
+          // A stable read observed a candidate (or the display hash again);
+          // follow mode may now commit immediately (models §4.1).
+          maybeAutoCommitRef.current(tabId)
         }
       } catch (error) {
         if (PaperStackError.is(error) && error.isCancelled) return
@@ -304,6 +534,167 @@ export function useReader(): ReaderControls {
     },
     [dispatchSession, startParse, send],
   )
+
+  /**
+   * >50MiB hard limit (rendering-pipeline §5): no full decode, no full IPC
+   * transfer; only `get_source_info` establishes the display version for the
+   * source-window mode (`read_source_window`/`search_source` then run inside
+   * `SourceView`/the search session).
+   */
+  const startSourceWindow = useCallback(
+    async (tabId: string, docId: string, generation: number) => {
+      const token: TaskToken = { docId, version: null, generation, taskId: nextTaskId('source') }
+      try {
+        const info = await files.getSourceInfo(docId)
+        const current = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+        if (!current || current.session.generation !== generation) return
+        dispatchSession(tabId, sessionReadSucceeded(token, info.version))
+        send(tabPhase(tabId, 'ready', null))
+        void watch.watchDocument({ docId }).catch(() => undefined)
+      } catch (error) {
+        dispatchSession(tabId, sessionTaskFailed(token, toErrorPayload(error)))
+      }
+    },
+    [dispatchSession, send],
+  )
+
+  const commitUpdate = useCallback(
+    async (
+      tabId: string,
+      options: { clearSelection?: boolean } = {},
+    ): Promise<UpdateCommitOutcome | null> => {
+      const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+      const pending = tab?.session.pendingVersion ?? null
+      if (!tab || pending === null) return null
+      const generation = tab.session.generation
+      const cached = documentModelCache.get(tab.docId, pending.contentHash)
+      const rawText = cached?.rawText ?? null
+      if (rawText === null) return null
+
+      let parseResult = cached?.data.parseResult as ParseDocumentResult | undefined
+      const token = createTaskToken(tab.session, nextTaskId('update'), 'pending')
+      if (parseResult === undefined) {
+        if (token === null) return null
+        try {
+          const parsed = await parseDocumentWithFallback(
+            rawText,
+            { taskId: token.taskId, generation, docId: tab.docId },
+            parseOptionsFor(tabId),
+          )
+          parseResult = parsed.result
+        } catch (error) {
+          if (error instanceof TaskAbortedError) return null
+          // A pending-prefetch failure stays invisible (models §2.3): the
+          // banner remains and the user can retry the read.
+          dispatchSession(tabId, sessionTaskFailed(token, toErrorPayload(error)))
+          return null
+        }
+      }
+
+      // §6: a stale generation/candidate means the commit must be dropped with
+      // zero visible effect (candidate replaced, tab closed, relinked).
+      const current = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+      if (
+        !current ||
+        current.session.generation !== generation ||
+        current.session.pendingVersion?.contentHash !== pending.contentHash
+      ) {
+        return null
+      }
+
+      if (parseResult !== undefined && token !== null) {
+        dispatchSession(
+          tabId,
+          sessionTaskSucceeded(token, pending, {
+            text: rawText,
+            data: { parseResult },
+          }),
+        )
+      }
+
+      const anchor = positionControllerRef.current?.anchorFor(tabId) ?? null
+      const restore =
+        anchor === null
+          ? { kind: 'approx' as const, blockId: null, headingPath: null, reason: 'top' as const }
+          : restorePosition({
+              anchor,
+              targetVersionHash: pending.contentHash,
+              blocks: parseResult?.blocks ?? [],
+            })
+
+      if (options.clearSelection) clearDocumentSelection()
+      const position = updatePositionForRestore(restore)
+      dispatchSession(tabId, sessionUpdateCommitted(position))
+
+      // Committed boundary: record the restored anchor against the new version
+      // immediately, so a quit right after the update can still restore it.
+      const restoredBlock =
+        restore.blockId === null
+          ? null
+          : (parseResult?.blocks.find((block) => block.blockId === restore.blockId) ?? null)
+      if (restoredBlock) {
+        positionControllerRef.current?.observe(
+          tabId,
+          tab.docId,
+          buildAnchorRecord({
+            versionHash: pending.contentHash,
+            block: restoredBlock,
+            offsetRatio: restore.kind === 'exact' ? restore.offsetRatio : 0,
+          }),
+        )
+      } else {
+        positionControllerRef.current?.flush(tabId)
+      }
+
+      const outcome: UpdateCommitOutcome = {
+        position,
+        blockId: restore.blockId,
+        messageKey: positionMessageKey(position),
+      }
+      setCommitNotices((previous) => ({
+        ...previous,
+        [tabId]: { ...outcome, nonce: (previous[tabId]?.nonce ?? 0) + 1 },
+      }))
+      return outcome
+    },
+    [dispatchSession, parseOptionsFor, setCommitNotices],
+  )
+
+  const maybeAutoCommit = useCallback(
+    (tabId: string) => {
+      const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+      if (!tab) return
+      const decision = resolveUpdateDecision({
+        hasPending: selectHasPendingUpdate(tab.session),
+        mode: effectiveUpdateMode(updateModeByTabRef.current[tabId] ?? null, updateModeDefaultRef.current),
+        isActiveTab: stateRef.current.activeTabId === tabId,
+        hasSelection: selectionRef.current,
+        hasInspectLayer: inspectLayerRef.current.has(tabId),
+      })
+      if (decision.kind === 'follow-commit') void commitUpdate(tabId)
+    },
+    [commitUpdate],
+  )
+
+  useEffect(() => {
+    maybeAutoCommitRef.current = maybeAutoCommit
+  }, [maybeAutoCommit])
+
+  // Global selection tracking (INV-UM-03): a selection anywhere in the
+  // document pauses automatic updates; clearing it re-evaluates the condition.
+  useEffect(() => {
+    const update = () => {
+      const next = documentSelectionPresent()
+      selectionRef.current = next
+      setSelectionPresent(next)
+      if (!next) {
+        const active = stateRef.current.activeTabId
+        if (active !== null) maybeAutoCommitRef.current(active)
+      }
+    }
+    document.addEventListener('selectionchange', update)
+    return () => document.removeEventListener('selectionchange', update)
+  }, [])
 
   const openPaths = useCallback(
     async (paths: readonly string[], entry: OpenEntry) => {
@@ -331,6 +722,7 @@ export function useReader(): ReaderControls {
           if (!activationUsed) {
             activationUsed = true
             send(tabActivate(existing.tabId))
+            maybeAutoCommitRef.current(existing.tabId)
           }
           continue
         }
@@ -344,14 +736,33 @@ export function useReader(): ReaderControls {
         const activate = !activationUsed
         if (activate) activationUsed = true
         send(tabOpen(tab, activate))
-        void startRead(tab.tabId, docId, 'initial', tab.session.generation)
+
+        // Large-document classification (rendering-pipeline §5). The hard
+        // limit wins: the tab goes straight to the source-window mode with an
+        // explicit label; >10MiB asks before reading anything (cancel closes
+        // the freshly created tab without starting background work).
+        const classification = classifyLargeDocument({ sizeBytes: outcome.identity.sizeBytes })
+        if (classification.kind === 'sourceOnly') {
+          send(tabLargeDoc(tab.tabId, 'sourceWindow'))
+          send(tabView(tab.tabId, 'source'))
+          void startSourceWindow(tab.tabId, docId, tab.session.generation)
+        } else if (classification.kind === 'prompt') {
+          send(tabPhase(tab.tabId, 'largeDoc', null))
+          setPrompt(tab.tabId, {
+            sizeBytes: outcome.identity.sizeBytes,
+            reason: classification.reason,
+            origin: 'open',
+          })
+        } else {
+          void startRead(tab.tabId, docId, 'initial', tab.session.generation)
+        }
       }
       // Explicit open (entry != restore) lifts the cleared-category write
       // suppression, exactly like models §9.1 (`resume_recording` alternative).
       if (acceptedAny && entry !== 'restore') resumeSuppressedWrites()
       setOpenErrors(failures)
     },
-    [startRead, send],
+    [setPrompt, startRead, startSourceWindow, send],
   )
 
   const pickAndOpen = useCallback(async () => {
@@ -381,10 +792,12 @@ export function useReader(): ReaderControls {
   }, [])
 
   /**
-   * Unavailable recents relink (ui-spec §3.1): re-select through the system
-   * picker, attempt `relink_document` for the known docId when the document is
-   * still registered, and always open the chosen file afterwards. Cancel
-   * leaves every state unchanged.
+   * Unavailable recents relink (ui-spec §3.1/§3.8; R07): re-select through the
+   * system picker, attempt `relink_document` for the known docId when the tab
+   * is still open, adopt the result into that tab (same bytes → identity
+   * restored; different bytes → explained as a new version with an
+   * approximate position), and always open the chosen file afterwards.
+   * Cancel leaves every state unchanged.
    */
   const relinkRecent = useCallback(
     async (entry: RecentEntry) => {
@@ -397,13 +810,38 @@ export function useReader(): ReaderControls {
       }
       if (picked.cancelled || picked.paths.length === 0) return
       const newPath = picked.paths[0]
+      const tab = selectTabByDocId(stateRef.current, entry.docId)
       try {
         const result = await files.relinkDocument({ docId: entry.docId, newPath })
-        setRelinkNotice(
-          result.status === 'reassociated'
-            ? 'document.relink.reassociated'
-            : 'document.relink.newVersion',
-        )
+        if (tab) {
+          if (result.status === 'reassociated') {
+            // Same bytes: identity is restored without a version change.
+            setRelinkNotice('document.relink.reassociated')
+            dispatchSession(tab.tabId, sessionRecovered())
+          } else {
+            // Different bytes: explain first, then adopt as a new version of
+            // the same docId; the position can only be approximate.
+            setRelinkNotice('document.relink.newVersion')
+            dispatchSession(
+              tab.tabId,
+              sessionDisplayReplaced(result.snapshot.version, result.snapshot.text),
+            )
+            send(tabPhase(tab.tabId, 'parsing', null))
+            void startParse(
+              tab.tabId,
+              tab.docId,
+              result.snapshot.text,
+              result.snapshot.version,
+              tab.session.generation + 1,
+            )
+          }
+        } else {
+          setRelinkNotice(
+            result.status === 'reassociated'
+              ? 'document.relink.reassociated'
+              : 'document.relink.newVersion',
+          )
+        }
       } catch {
         // The record may come from an earlier session; the explicit
         // re-selection below is still the user's decision.
@@ -411,7 +849,7 @@ export function useReader(): ReaderControls {
       }
       await openPaths([newPath], 'recent')
     },
-    [openPaths],
+    [dispatchSession, openPaths, send, startParse],
   )
 
   const openRequest = useCallback(
@@ -494,6 +932,9 @@ export function useReader(): ReaderControls {
   const activateTab = useCallback(
     (tabId: string) => {
       send(tabActivate(tabId))
+      // Follow mode re-evaluates on activation (INV-UM-04): a candidate
+      // observed while the tab was in the background may now commit.
+      maybeAutoCommitRef.current(tabId)
     },
     [send],
   )
@@ -501,8 +942,23 @@ export function useReader(): ReaderControls {
   const closeTab = useCallback(
     (tabId: string) => {
       const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+      if (tab) {
+        // Committed boundary: persist the last reading position before the tab
+        // disappears; suppression/remember gates still apply.
+        positionControllerRef.current?.flush(tabId)
+      }
       send(tabClose(tabId))
+      removePrompt(tabId)
+      setCommitNotices((previous) => {
+        if (!(tabId in previous)) return previous
+        const next = { ...previous }
+        delete next[tabId]
+        return next
+      })
       inlineMathRef.current.delete(tabId)
+      updateModeByTabRef.current = Object.fromEntries(
+        Object.entries(updateModeByTabRef.current).filter(([key]) => key !== tabId),
+      )
       setInlineMathByTab((previous) => {
         if (!(tabId in previous)) return previous
         const next = { ...previous }
@@ -517,7 +973,7 @@ export function useReader(): ReaderControls {
       })
       if (tab) void watch.unwatchDocument(tab.docId).catch(() => undefined)
     },
-    [send],
+    [removePrompt, send, setCommitNotices, setInlineMathByTab, setUpdateModeByTab],
   )
 
   const closeActiveTab = useCallback(() => {
@@ -525,12 +981,67 @@ export function useReader(): ReaderControls {
     if (active) closeTab(active.tabId)
   }, [closeTab])
 
+  /**
+   * Large-document choice handling (T-51/T-52). `cancel` on the open-time
+   * prompt closes the freshly created tab (no read ever started, no ghost);
+   * on the complexity prompt it keeps the already rendered full view and
+   * declines re-prompting for that version.
+   */
+  const chooseLargeDoc = useCallback(
+    (tabId: string, choice: LargeDocChoice) => {
+      const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+      const prompt = largeDocPromptsRef.current[tabId]
+      if (!tab || !prompt) return
+      if (choice === 'cancel') {
+        removePrompt(tabId)
+        if (prompt.origin === 'open') {
+          // Nothing was read and no watch was registered: closing invalidates
+          // any future task and leaves no ghost tab (R05/IT04).
+          closeTab(tabId)
+        } else {
+          const hash = tab.session.displayVersion?.contentHash
+          if (hash !== undefined) complexityDeclinedRef.current.add(`${tabId}:${hash}`)
+        }
+        return
+      }
+      const mode = resolveLargeDocChoice(choice)
+      if (mode === null) return
+      removePrompt(tabId)
+      send(tabLargeDoc(tabId, mode))
+      if (mode === 'simplified') {
+        if (prompt.origin === 'complexity') {
+          // The full parse already happened and is in the cache; re-render the
+          // same display version with the simplified subset (no disk read).
+          void reparseTab(tabId)
+        } else {
+          void startRead(tabId, tab.docId, 'initial', tab.session.generation)
+        }
+        return
+      }
+      // Source-only choice: ≤50MiB keeps the decoded text in memory (SourceView
+      // renders it and in-memory search stays available); the >50MiB hard limit
+      // never reaches this dialog.
+      send(tabView(tabId, 'source'))
+      positionControllerRef.current?.flush(tabId)
+      if (prompt.origin === 'complexity') return
+      void startRead(tabId, tab.docId, 'initial', tab.session.generation, { skipParse: true })
+    },
+    [closeTab, removePrompt, reparseTab, send, startRead],
+  )
+
+  const cancelLargeDoc = useCallback(
+    (tabId: string) => {
+      chooseLargeDoc(tabId, 'cancel')
+    },
+    [chooseLargeDoc],
+  )
+
   const cycleTab = useCallback(
     (delta: number) => {
       const tabId = selectCycleTabId(stateRef.current, delta)
-      if (tabId) send(tabActivate(tabId))
+      if (tabId) activateTab(tabId)
     },
-    [send],
+    [activateTab],
   )
 
   const cancelTab = useCallback(
@@ -560,6 +1071,8 @@ export function useReader(): ReaderControls {
 
   const setViewMode = useCallback(
     (tabId: string, mode: ReaderViewMode) => {
+      const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+      if (tab && tab.viewMode !== mode) positionControllerRef.current?.flush(tabId)
       send(tabView(tabId, mode))
     },
     [send],
@@ -572,7 +1085,7 @@ export function useReader(): ReaderControls {
       setInlineMathByTab((previous) => ({ ...previous, [tabId]: enabled }))
       void reparseTab(tabId)
     },
-    [reparseTab],
+    [reparseTab, setInlineMathByTab],
   )
 
   const inlineMathFor = useCallback(
@@ -580,22 +1093,161 @@ export function useReader(): ReaderControls {
     [inlineMathByTab],
   )
 
-  /** Update-mode override for the current document (session-scoped). */
-  const setUpdateModeOverride = useCallback((tabId: string, mode: UpdateMode) => {
-    setUpdateModeByTab((previous) => ({ ...previous, [tabId]: mode }))
-  }, [])
+  /** Update-mode override for the current document (session-scoped, INV-UM-07). */
+  const setUpdateModeOverride = useCallback(
+    (tabId: string, mode: UpdateMode) => {
+      updateModeByTabRef.current = { ...updateModeByTabRef.current, [tabId]: mode }
+      setUpdateModeByTab(updateModeByTabRef.current)
+      maybeAutoCommitRef.current(tabId)
+    },
+    [setUpdateModeByTab],
+  )
 
   const updateModeOverrideFor = useCallback(
     (tabId: string): UpdateMode | null => updateModeByTab[tabId] ?? null,
     [updateModeByTab],
   )
 
-  const clearRelinkNotice = useCallback(() => setRelinkNotice(null), [])
+  const updateModeFor = useCallback(
+    (tabId: string): UpdateMode =>
+      effectiveUpdateMode(updateModeByTab[tabId] ?? null, updateModeDefault),
+    [updateModeByTab, updateModeDefault],
+  )
+
+  const syncGlobalSettings = useCallback(
+    (next: { updateModeDefault?: UpdateMode; rememberRecords?: boolean }) => {
+      if (next.rememberRecords !== undefined) rememberRecordsRef.current = next.rememberRecords
+      if (next.updateModeDefault !== undefined && next.updateModeDefault !== updateModeDefaultRef.current) {
+        updateModeDefaultRef.current = next.updateModeDefault
+        setUpdateModeDefaultState(next.updateModeDefault)
+        for (const tab of stateRef.current.tabs) {
+          if (updateModeByTabRef.current[tab.tabId] === undefined) maybeAutoCommitRef.current(tab.tabId)
+        }
+      }
+    },
+    [setUpdateModeDefaultState],
+  )
+
+  const setInspectLayerActive = useCallback(
+    (tabId: string, active: boolean) => {
+      let changed = false
+      if (active) {
+        if (!inspectLayerRef.current.has(tabId)) {
+          inspectLayerRef.current.add(tabId)
+          changed = true
+        }
+      } else {
+        changed = inspectLayerRef.current.delete(tabId)
+      }
+      if (!changed) return
+      setInspectLayerNonce((nonce) => nonce + 1)
+      if (!active) maybeAutoCommitRef.current(tabId)
+    },
+    [setInspectLayerNonce],
+  )
+
+  const inspectLayerActiveFor = useCallback(
+    (tabId: string): boolean => {
+      // The nonce re-renders the consumer after a membership change.
+      void inspectLayerNonce
+      return inspectLayerRef.current.has(tabId)
+    },
+    [inspectLayerNonce],
+  )
+
+  const pauseKeyFor = useCallback((tabId: string): string | null => {
+    const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+    const hash = tab?.session.pendingVersion?.contentHash
+    return hash === undefined ? null : `${tabId}:${hash}`
+  }, [])
+
+  const isPauseDismissed = useCallback(
+    (tabId: string): boolean => {
+      // Recompute when the candidate or the dismissal set changes.
+      void pauseNonce
+      const key = pauseKeyFor(tabId)
+      return key !== null && pauseDismissedRef.current.has(key)
+    },
+    [pauseKeyFor, pauseNonce],
+  )
+
+  const dismissUpdatePause = useCallback(
+    (tabId: string) => {
+      const key = pauseKeyFor(tabId)
+      if (key === null) return
+      pauseDismissedRef.current.add(key)
+      setPauseNonce((nonce) => nonce + 1)
+    },
+    [pauseKeyFor, setPauseNonce],
+  )
+
+  const commitNoticeFor = useCallback(
+    (tabId: string): UpdateCommitNotice | null => commitNotices[tabId] ?? null,
+    [commitNotices],
+  )
+
+  const dismissCommitNotice = useCallback(
+    (tabId: string) => {
+      setCommitNotices((previous) => {
+        if (!(tabId in previous)) return previous
+        const next = { ...previous }
+        delete next[tabId]
+        return next
+      })
+    },
+    [setCommitNotices],
+  )
+
+  const observePosition = useCallback(
+    (tabId: string, anchor: AnchorRecord) => {
+      const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
+      if (!tab) return
+      positionControllerRef.current?.observe(tabId, tab.docId, anchor)
+    },
+    [],
+  )
+
+  const flushPosition = useCallback(
+    (tabId: string) => {
+      positionControllerRef.current?.flush(tabId)
+    },
+    [],
+  )
+
+  const positionAnchorFor = useCallback(
+    (tabId: string): AnchorRecord | null => positionControllerRef.current?.anchorFor(tabId) ?? null,
+    [],
+  )
+
+  const clearPositionError = useCallback(() => {
+    positionControllerRef.current?.clearError()
+    setPositionError(null)
+  }, [setPositionError])
+
+  const retryPositionSave = useCallback(
+    (tabId: string) => {
+      positionControllerRef.current?.clearError()
+      setPositionError(null)
+      positionControllerRef.current?.retry(tabId)
+    },
+    [setPositionError],
+  )
 
   const refreshTab = useCallback(
     (tabId: string) => {
       const tab = stateRef.current.tabs.find((candidate) => candidate.tabId === tabId)
       if (!tab) return
+      // The >50MiB source-window mode never has in-memory text: a refresh via
+      // `read_document` would be rejected with PS_LIMIT_SIZE. The window view
+      // owns its version-checked reads (`get_source_info`/`read_source_window`).
+      const displayHash = tab.session.displayVersion?.contentHash
+      if (
+        tab.largeDocMode === 'sourceWindow' &&
+        (displayHash === undefined ||
+          documentModelCache.get(tab.docId, displayHash)?.rawText == null)
+      ) {
+        return
+      }
       if (refreshingRef.current.has(tabId)) return
       refreshingRef.current.add(tabId)
       void startRead(tabId, tab.docId, 'refresh', tab.session.generation).finally(() =>
@@ -609,9 +1261,13 @@ export function useReader(): ReaderControls {
     (payload: WatchChangedPayload) => {
       const tab = selectTabByDocId(stateRef.current, payload.docId)
       if (!tab) return
-      // Resource-only changes re-mount one block later (wp-26/wp-29); they
-      // never produce a document update banner (INV-VC-07).
-      if (payload.kind === 'resource') return
+      // Resource-only changes re-resolve just that resource (new `?v=` key);
+      // they never change the display version or show a document banner
+      // (contract §7.6; INV-VC-07).
+      if (payload.kind === 'resource') {
+        resourceInvalidation.bump(payload.docId, payload.resourcePath)
+        return
+      }
       if (payload.kind === 'removed') {
         dispatchSession(tab.tabId, sessionUnavailable())
         return
@@ -657,6 +1313,13 @@ export function useReader(): ReaderControls {
 
   const clearOpenErrors = useCallback(() => setOpenErrors([]), [])
 
+  const clearRelinkNotice = useCallback(() => setRelinkNotice(null), [])
+
+  const largeDocPromptFor = useCallback(
+    (tabId: string): LargeDocPromptState | null => largeDocPrompts[tabId] ?? null,
+    [largeDocPrompts],
+  )
+
   return {
     state,
     openErrors,
@@ -684,10 +1347,31 @@ export function useReader(): ReaderControls {
     setInlineMath,
     updateModeOverrideFor,
     setUpdateModeOverride,
+    updateModeFor,
+    syncGlobalSettings,
     handleWatchChanged,
     recheckActive,
     saveSession,
     handleCloseRequested,
+    largeDocPromptFor,
+    chooseLargeDoc,
+    cancelLargeDoc,
+    selectionPresent,
+    setInspectLayerActive,
+    inspectLayerActiveFor,
+    isPauseDismissed,
+    dismissUpdatePause,
+    commitUpdate,
+    commitNoticeFor,
+    dismissCommitNotice,
+    observePosition,
+    flushPosition,
+    positionAnchorFor,
+    positionError,
+    clearPositionError,
+    retryPositionSave,
+    layoutCorrectionTick,
+    notifyLayoutChange,
   }
 }
 

@@ -26,6 +26,8 @@ export interface ReaderToolbarProps {
   displayName?: string
   canonicalPath?: string
   hasPendingUpdate: boolean
+  /** D5 large-document mode label (simplified / source window), VC-18. */
+  modeBadge?: 'simplified' | 'sourceOnly' | null
   viewMode: ReaderViewMode
   /** True when the outline or a directory tree can be shown. */
   navAvailable: boolean
@@ -51,6 +53,7 @@ export function ReaderToolbar({
   displayName,
   canonicalPath,
   hasPendingUpdate,
+  modeBadge = null,
   viewMode,
   navAvailable,
   navOpen,
@@ -136,6 +139,8 @@ export function ReaderToolbar({
         {displayName ?? ''}
       </span>
       {hasPendingUpdate ? <StatusBadge kind="newVersion" /> : null}
+      {modeBadge === 'simplified' ? <StatusBadge kind="simplified" /> : null}
+      {modeBadge === 'sourceOnly' ? <StatusBadge kind="sourceOnly" /> : null}
 
       <span className="ps-toolbar-spacer" />
 

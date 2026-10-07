@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const invokeMock = vi.hoisted(() => vi.fn())
@@ -144,6 +144,9 @@ async function openDoc(text: string, heading = '标题'): Promise<void> {
 }
 
 async function openSearch(query: string, total: number): Promise<HTMLInputElement> {
+  // Flush mount effects so the global Ctrl+F listener is registered before the
+  // event is dispatched (the base suite had a rare lost-event flake here).
+  await act(async () => {})
   fireEvent.keyDown(window, { key: 'f', ctrlKey: true })
   const input = (await screen.findByRole('searchbox')) as HTMLInputElement
   fireEvent.change(input, { target: { value: query } })

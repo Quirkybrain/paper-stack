@@ -18,6 +18,11 @@ export interface ReaderUi {
   openInspect(target: InspectTarget): void
   /** UI05: open the independent zoom overlay for a diagram/formula/image. */
   openZoom(target: ZoomTarget): void
+  /**
+   * Layout-change notification (font/width/image decode) for the single
+   * stabilization correction (INV-AR-05); optional for standalone tests.
+   */
+  notifyLayoutChange?(): void
 }
 
 export const ReaderUiContext = createContext<ReaderUi | null>(null)

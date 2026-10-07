@@ -44,10 +44,20 @@ function collectElements(tree: Root, tagName: string): Element[] {
 
 describe('resolvePipelineOptions', () => {
   it('defaults to technical mode with inline math enabled', () => {
-    expect(resolvePipelineOptions()).toEqual({ mode: 'technical', inlineMath: true })
+    expect(resolvePipelineOptions()).toEqual({
+      mode: 'technical',
+      inlineMath: true,
+      simplified: false,
+    })
     expect(resolvePipelineOptions({ mode: 'standard' })).toEqual({
       mode: 'standard',
       inlineMath: true,
+      simplified: false,
+    })
+    expect(resolvePipelineOptions({ simplified: true })).toEqual({
+      mode: 'technical',
+      inlineMath: true,
+      simplified: true,
     })
   })
 })
@@ -180,6 +190,30 @@ describe('engine slots (⑧⑨⑩)', () => {
     for (const snapshot of snapshots) {
       expect(snapshot).toEqual({ hasScriptOrStyle: false, hasEventOrStyleProperties: false })
     }
+  })
+
+  it('skips every heavy engine in the simplified subset while keeping blocks/segments', async () => {
+    const calls: string[] = []
+    registerEngine('math', {
+      name: 'probe-math',
+      transform(tree: Root) {
+        calls.push('math')
+        return tree
+      },
+    })
+    const text = '# T\n\n行内 $y$\n\n```mermaid\ngraph TD;A-->B\n```\n'
+    const full = await parseDocument(text)
+    const simplified = await parseDocument(text, { simplified: true })
+    expect(calls).toEqual(['math'])
+    expect(simplified.status).toBe('ok')
+    expect(simplified.blocks.map((item) => item.blockId)).toEqual(
+      full.blocks.map((item) => item.blockId),
+    )
+    expect(simplified.segments.map((item) => item.segId)).toEqual(
+      full.segments.map((item) => item.segId),
+    )
+    expect(simplified.stats).toEqual(full.stats)
+    expect(simplified.hast).not.toBeNull()
   })
 
   it('treats engine output as trusted and does not re-sanitize it', async () => {

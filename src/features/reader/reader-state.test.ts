@@ -18,6 +18,7 @@ import {
   tabActivate,
   tabClose,
   tabDisplayLabels,
+  tabLargeDoc,
   tabOpen,
   tabPhase,
   tabSessionAction,
@@ -232,5 +233,18 @@ describe('reader phase transitions (contract §6)', () => {
     )
     expect(state.tabs[0].phase).toBe('cancelled')
     expect(state.tabs[0].session.displayVersion).toBeNull()
+  })
+
+  it('switches the D5 large-document mode without touching tab identity (R29)', () => {
+    let state = readerReducer(INITIAL_READER_STATE, tabOpen(tab('d-a'), true))
+    const tabId = state.tabs[0].tabId
+    expect(state.tabs[0].largeDocMode).toBe('full')
+    state = readerReducer(state, tabLargeDoc(tabId, 'simplified'))
+    expect(state.tabs[0].largeDocMode).toBe('simplified')
+    state = readerReducer(state, tabLargeDoc(tabId, 'sourceWindow'))
+    expect(state.tabs[0].largeDocMode).toBe('sourceWindow')
+    expect(state.tabs).toHaveLength(1)
+    expect(state.tabs[0].docId).toBe('d-a')
+    expect(state.tabs[0].tabId).toBe(tabId)
   })
 })
