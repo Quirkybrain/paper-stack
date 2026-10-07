@@ -23,7 +23,7 @@ interface ExpectedHit {
 interface QueryVector {
   query: string
   caseSensitive: boolean
-  expected: ExpectedHit[]
+  expected?: ExpectedHit[]
   frontend?: ExpectedHit[]
   rust?: ExpectedHit[]
 }
@@ -37,6 +37,8 @@ interface SearchCase {
 
 interface BoundaryCase extends SearchCase {
   kind: 'accepted-length-changing-fold' | 'contract-divergence'
+  /** Set when a divergence was resolved and only its legacy shell remains. */
+  resolvedIn?: string
 }
 
 interface SearchFileCase {
@@ -68,8 +70,8 @@ function hitsFor(corpus: string, query: string, caseSensitive: boolean): Expecte
 }
 
 describe('shared literal-search parity vectors (front-end side)', () => {
-  it('vector file is structurally complete (11 parity + 2 boundary cases)', () => {
-    expect(vectors.cases.length).toBeGreaterThanOrEqual(11)
+  it('vector file is structurally complete (12 parity + 2 boundary entries)', () => {
+    expect(vectors.cases.length).toBeGreaterThanOrEqual(12)
     expect(vectors.boundaryCases).toHaveLength(2)
     for (const item of vectors.cases) {
       // The explicit empty-corpus case is empty by design; every other case
@@ -118,6 +120,21 @@ describe('shared literal-search parity vectors (front-end side)', () => {
         // with the report's finding list.
         expect(frontend).not.toEqual(query.rust)
       }
+    }
+  })
+
+  it('resolved boundary divergences point at the shared parity case', () => {
+    for (const item of vectors.boundaryCases) {
+      if (item.queries.length > 0) continue
+      // wp-32a closed the Final_Sigma divergence by aligning the front-end
+      // fold to the Rust per-code-point fold. The post-fix shared expectation
+      // lives in `cases` (asserted by both this suite and the Rust
+      // contract_search_parity suite); only a legacy shell remains here until
+      // the out-of-scope Rust test stops requiring two divergence pins.
+      expect(item.resolvedIn, `${item.id} must name the resolving task`).toBeTruthy()
+      const shared = vectors.cases.find((candidate) => candidate.corpus === item.corpus)
+      expect(shared, `${item.id}: shared parity case for the same corpus`).toBeDefined()
+      expect(shared?.queries.length ?? 0).toBeGreaterThan(0)
     }
   })
 })

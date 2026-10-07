@@ -11,7 +11,7 @@ import './plugins/register'
 import { listEngines, type EngineContext } from './engines'
 import { remarkMathPlugin } from './plugins/katex'
 import { rehypeForceTaskCheckboxDisabled, sanitizeSchema } from './sanitize'
-import { utf8ByteLength, utf16RangeToUtf8Bytes } from './source-map'
+import { createSourceOffsetIndex, utf8ByteLength } from './source-map'
 import { runMdastTransforms } from './transforms'
 import type {
   DocumentDiagnostic,
@@ -68,8 +68,13 @@ export async function parseDocument(
     }
     const mdast = mdastProcessor.parse(text) as MdastRoot
 
+    // One shared offset index per document (F-32-2): block ranges, engine
+    // source ranges and diagnostics all resolve through the same single-pass
+    // checkpoint table instead of rescanning the text from 0 per offset.
+    const offsets = createSourceOffsetIndex(text)
+
     // ④: custom mdast transforms a→b→c, all pure functions.
-    const side = runMdastTransforms(mdast, text)
+    const side = runMdastTransforms(mdast, text, offsets)
 
     // ⑤–⑦: hast conversion, raw HTML parsing, sanitize and the read-only patch.
     const hastProcessor = unified()
@@ -90,13 +95,13 @@ export async function parseDocument(
           messageKey: input.messageKey,
           retryable: input.retryable,
           sourceRange: input.sourceRange
-            ? utf16RangeToUtf8Bytes(text, input.sourceRange)
+            ? offsets.rangeToBytes(input.sourceRange)
             : undefined,
           details: input.details,
         })
       },
       toSourceRangeBytes(range) {
-        return utf16RangeToUtf8Bytes(text, range)
+        return offsets.rangeToBytes(range)
       },
     }
 
@@ -134,7 +139,7 @@ export async function parseDocument(
       diagnostics,
       stats: {
         charsUtf16: text.length,
-        bytesUtf8: utf8ByteLength(text),
+        bytesUtf8: offsets.byteLength,
         blockCount: side.blocks.length,
         segmentCount: side.segments.length,
         headingCount: side.outline.length,

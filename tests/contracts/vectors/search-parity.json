@@ -1,7 +1,7 @@
 {
   "contract": "paperstack-ipc-r1",
   "note": "Shared literal-search parity vectors (ADR-007; contracts §2.1 command 38; NF11). Both the front-end search-core and the Rust search_source service execute these cases; expected offsets are computed from the normative rule, never from implementation output.",
-  "foldingRule": "caseSensitive=false folds both sides with Unicode default lowercase conversion (JS String.prototype.toLowerCase on the whole string / Rust char::to_lowercase per code point). No normalization, no regex, no tokenizing. Matches are leftmost non-overlapping, in document order. Offsets address the original text as UTF-8 bytes; lineNumber is 1-based and counts LF. Parity is asserted for folds where both implementations agree (ASCII, CJK, emoji, composed characters, Kelvin/Angstrom signs, sharp-s); known divergences (length-changing İ fold; JS context-sensitive Final_Sigma vs Rust per-code-point fold) are pinned per side in boundaryCases.",
+  "foldingRule": "caseSensitive=false folds both sides per Unicode code point with Unicode default lowercase conversion (front-end `foldLower` helper in src/features/search/search-core.ts / Rust char::to_lowercase). The front-end must NOT use whole-string String.prototype.toLowerCase: it applies the context-sensitive Final_Sigma rule (Σ at a word end -> ς) and diverged from Rust (F-32-1, fixed in wp-32a). No normalization, no regex, no tokenizing. Matches are leftmost non-overlapping, in document order. Offsets address the original text as UTF-8 bytes; lineNumber is 1-based and counts LF. The only remaining per-side divergence is the accepted length-changing İ fold, pinned in boundaryCases.",
   "cases": [
     {
       "id": "ascii-case-and-lines",
@@ -425,6 +425,35 @@
       ]
     },
     {
+      "id": "greek-final-sigma-per-code-point",
+      "note": "F-32-1 (wp-32a): both sides fold per code point, so U+03A3 folds to U+03C3 without Final_Sigma context. 'ΟΔΟΣ' folds to 'οδοσ' and no longer matches the final-sigma query 'οδος' (only the already-final 'οδος' word matches); symmetrically, 'οδοσ' matches only the folded 'ΟΔΟΣ'. Asserted identically by the front-end suite and the Rust contract_search_parity suite.",
+      "corpus": "ΟΔΟΣ οδος\n",
+      "queries": [
+        {
+          "query": "οδος",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 9,
+              "endByte": 17,
+              "lineNumber": 1
+            }
+          ]
+        },
+        {
+          "query": "οδοσ",
+          "caseSensitive": false,
+          "expected": [
+            {
+              "startByte": 0,
+              "endByte": 8,
+              "lineNumber": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
       "id": "empty-inputs",
       "note": "An empty query or empty corpus never matches.",
       "corpus": "anything\n",
@@ -499,33 +528,10 @@
     {
       "id": "greek-final-sigma-context-fold",
       "kind": "contract-divergence",
-      "note": "contracts §2.1 requires `caseSensitive=false` to fold with the same toLowerCase as the front-end. JS toLowerCase applies the Unicode Final_Sigma context rule (Σ at a word end -> ς), while Rust char::to_lowercase folds per code point without context (Σ -> σ). The front-end expectations below are the normative ones; the Rust values are the current (defective) behavior, surfaced here so the fix required in src-tauri/src/services/files.rs fold_segment/fold_query is tracked and re-verified.",
+      "resolvedIn": "wp-32a-perf",
+      "note": "RESOLVED by wp-32a: the front-end now folds per code point with the single `foldLower` helper, matching the Rust service, so this divergence no longer exists. The post-fix shared expectation for this corpus is asserted by BOTH suites through cases.greek-final-sigma-per-code-point. This boundary entry is retained with an empty query list ONLY because src-tauri/tests/contract_search_parity.rs (outside wp-32a's write scope) asserts exactly two boundary cases and the presence of kind 'contract-divergence'; the follow-up must update that Rust test (assert the shared parity case, drop the divergence pin) and delete this shell.",
       "corpus": "ΟΔΟΣ οδος\n",
-      "queries": [
-        {
-          "query": "οδος",
-          "caseSensitive": false,
-          "frontend": [
-            {
-              "startByte": 0,
-              "endByte": 8,
-              "lineNumber": 1
-            },
-            {
-              "startByte": 9,
-              "endByte": 17,
-              "lineNumber": 1
-            }
-          ],
-          "rust": [
-            {
-              "startByte": 9,
-              "endByte": 17,
-              "lineNumber": 1
-            }
-          ]
-        }
-      ]
+      "queries": []
     }
   ],
   "fileCases": [

@@ -168,3 +168,135 @@ export function positionToUtf16Range(
   if (typeof start !== 'number' || typeof end !== 'number') return null
   return { startUtf16: start, endUtf16: end }
 }
+
+/**
+ * Shared single-pass offset index (F-32-2/F-32-3; wp-32a).
+ *
+ * The standalone helpers above restart from index 0 on every call, so mapping
+ * many offsets of the same document (block ranges, engine source ranges,
+ * search hits) costs O(offsets × length) — the parse/query scaling defect in
+ * the wp-32 verification report. The index scans the text once, records
+ * checkpoints every `CHECKPOINT_INTERVAL` UTF-16 units (byte offset and 1-based
+ * LF line at each checkpoint), and then answers each query with a binary
+ * search plus a bounded local scan. Total mapping cost is O(length).
+ *
+ * Clamping and lone-surrogate behavior are identical to the standalone
+ * helpers (see their docs); `source-map.test.ts` cross-checks both on the same
+ * vectors.
+ */
+export interface SourceOffsetIndex {
+  /** Total UTF-8 byte length (lone surrogates count as U+FFFD). */
+  readonly byteLength: number
+  /** UTF-16 code-unit index → UTF-8 byte offset (clamps to code-point starts). */
+  utf16ToByte(utf16Index: number): number
+  /** UTF-8 byte offset → UTF-16 code-unit index (clamps to code-point starts). */
+  byteToUtf16(byteOffset: number): number
+  /** 1-based line of a UTF-16 index (LF only; the empty document is line 1). */
+  lineAtUtf16(utf16Index: number): number
+  /** `utf16RangeToUtf8Bytes` through this index. */
+  rangeToBytes(range: SourceRangeUtf16): SourceRangeBytes
+}
+
+/** Checkpoint spacing: query scans are bounded by this many UTF-16 units. */
+const CHECKPOINT_INTERVAL = 256
+
+export function createSourceOffsetIndex(text: string): SourceOffsetIndex {
+  const checkpointUtf16: number[] = [0]
+  const checkpointBytes: number[] = [0]
+  const checkpointLines: number[] = [1]
+
+  let bytes = 0
+  let line = 1
+  let nextCheckpoint = CHECKPOINT_INTERVAL
+  for (let index = 0; index < text.length; ) {
+    const width = codePointWidth(text, index)
+    // `\n` is BMP; a surrogate half can never equal it, so per-code-point
+    // counting matches per-unit counting for the line index.
+    if (width.units === 1 && text.charCodeAt(index) === 10) line += 1
+    index += width.units
+    bytes += width.bytes
+    if (index >= nextCheckpoint) {
+      const previous = checkpointUtf16[checkpointUtf16.length - 1]
+      if (index > previous) {
+        checkpointUtf16.push(index)
+        checkpointBytes.push(bytes)
+        checkpointLines.push(line)
+      }
+      nextCheckpoint = index + CHECKPOINT_INTERVAL
+    }
+  }
+  // The end is always a checkpoint, so `byteLength` lookups land exactly.
+  if (checkpointUtf16[checkpointUtf16.length - 1] < text.length) {
+    checkpointUtf16.push(text.length)
+    checkpointBytes.push(bytes)
+    checkpointLines.push(line)
+  }
+
+  // Largest checkpoint whose position is <= `target` (both key arrays are
+  // strictly increasing, so this is an exact lower-bound search).
+  function slotFor(values: readonly number[], target: number): number {
+    let low = 0
+    let high = values.length - 1
+    while (low < high) {
+      const middle = (low + high + 1) >> 1
+      if (values[middle] <= target) low = middle
+      else high = middle - 1
+    }
+    return low
+  }
+
+  function utf16ToByte(utf16Index: number): number {
+    const clamped = Math.max(0, Math.min(utf16Index, text.length))
+    const slot = slotFor(checkpointUtf16, clamped)
+    let position = checkpointUtf16[slot]
+    let result = checkpointBytes[slot]
+    while (position < clamped) {
+      const width = codePointWidth(text, position)
+      // Stop at a code-point boundary rather than counting half of a pair.
+      if (position + width.units > clamped) break
+      result += width.bytes
+      position += width.units
+    }
+    return result
+  }
+
+  function byteToUtf16(byteOffset: number): number {
+    const target = Math.max(0, byteOffset)
+    const slot = slotFor(checkpointBytes, target)
+    let position = checkpointUtf16[slot]
+    let scanned = checkpointBytes[slot]
+    while (position < text.length) {
+      const width = codePointWidth(text, position)
+      if (scanned + width.bytes > target) return position
+      scanned += width.bytes
+      position += width.units
+      if (scanned >= target) return position
+    }
+    return text.length
+  }
+
+  function lineAtUtf16(utf16Index: number): number {
+    const clamped = Math.max(0, Math.min(utf16Index, text.length))
+    const slot = slotFor(checkpointUtf16, clamped)
+    let position = checkpointUtf16[slot]
+    let result = checkpointLines[slot]
+    while (position < clamped) {
+      if (text.charCodeAt(position) === 10) result += 1
+      position += 1
+    }
+    return result
+  }
+
+  return {
+    byteLength: bytes,
+    utf16ToByte,
+    byteToUtf16,
+    lineAtUtf16,
+    rangeToBytes(range: SourceRangeUtf16): SourceRangeBytes {
+      return {
+        startByte: utf16ToByte(range.startUtf16),
+        endByte: utf16ToByte(range.endUtf16),
+      }
+    },
+  }
+}

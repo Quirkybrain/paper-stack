@@ -1,18 +1,21 @@
 import {
-  utf16IndexToUtf8ByteOffset,
+  createSourceOffsetIndex,
   utf8ByteOffsetToUtf16Index,
+  type SourceOffsetIndex,
 } from '../../document/source-map'
 import type { SearchSegment, SegmentKind } from '../../document/types'
-import { countLines } from '../reader/source/mapping'
 
 /**
  * In-page search execution (ADR-007; ui-spec §3.4; T-43, R17).
  *
  * Semantics are frozen by ADR-007 §Decision:
  * - literal substring only — no regex, no Unicode normalization, no tokenizing;
- * - `caseSensitive=false` folds both sides with `toLowerCase` exactly (a
- *   length-changing fold on exotic code points is accepted by the ADR; the
- *   scan clamps to the text bounds);
+ * - `caseSensitive=false` folds both sides with the single `foldLower` helper:
+ *   Unicode default lowercase applied per code point, matching the Rust
+ *   `search_source` service (F-32-1; whole-string `toLowerCase` would apply the
+ *   context-sensitive Final_Sigma rule and diverge). A length-changing fold on
+ *   exotic code points (İ) is accepted by the ADR; the scan clamps to the text
+ *   bounds;
  * - body scope searches the flat `SearchSegment[]` produced by the render
  *   pipeline (readable text, code, inline code, image alt, formula source,
  *   visible raw-HTML text); the source scope scans the decoded raw text, which
@@ -62,8 +65,34 @@ export function hitKey(hit: SearchHit): string {
     : `source:${hit.startByte}`
 }
 
+/**
+ * Unicode default lowercase applied per code point — the single folding rule
+ * for all in-page search (F-32-1, wp-32a).
+ *
+ * The Rust `search_source` service folds per code point with
+ * `char::to_lowercase`. Whole-string `String.prototype.toLowerCase` must not be
+ * used because it additionally applies the context-sensitive Final_Sigma rule
+ * (Σ at a word end → ς), which made the two implementations disagree on the
+ * `ΟΔΟΣ` vector. Final_Sigma is the only context-sensitive default-lowercase
+ * rule in Unicode SpecialCasing, so strings without U+03A3 fold identically
+ * under both strategies and take the native fast path.
+ *
+ * Length-changing folds (İ → i + combining dot) are accepted by ADR-007; the
+ * literal scan clamps match ranges back to the original text bounds.
+ */
+export function foldLower(value: string): string {
+  if (!value.includes('\u03A3')) return value.toLowerCase()
+  let folded = ''
+  for (let index = 0; index < value.length; ) {
+    const codePoint = value.codePointAt(index) ?? 0
+    folded += String.fromCodePoint(codePoint).toLowerCase()
+    index += codePoint > 0xffff ? 2 : 1
+  }
+  return folded
+}
+
 function fold(value: string, caseSensitive: boolean): string {
-  return caseSensitive ? value : value.toLowerCase()
+  return caseSensitive ? value : foldLower(value)
 }
 
 /**
@@ -119,11 +148,17 @@ export function findSourceHits(
   query: string,
   caseSensitive: boolean,
 ): SourceSearchHit[] {
-  return findMatchRanges(rawText, query, caseSensitive).map((range) => ({
+  const ranges = findMatchRanges(rawText, query, caseSensitive)
+  if (ranges.length === 0) return []
+  // One shared index per query (F-32-3): the previous per-hit conversions
+  // restarted from the text start (byte offset + line prefix), making a dense
+  // first query O(hits × length). The index answers every hit in one pass.
+  const offsets = createSourceOffsetIndex(rawText)
+  return ranges.map((range) => ({
     kind: 'source',
-    startByte: utf16IndexToUtf8ByteOffset(rawText, range.start),
-    endByte: utf16IndexToUtf8ByteOffset(rawText, range.end),
-    lineNumber: countLines(rawText.slice(0, range.start)),
+    startByte: offsets.utf16ToByte(range.start),
+    endByte: offsets.utf16ToByte(range.end),
+    lineNumber: offsets.lineAtUtf16(range.start),
   }))
 }
 
@@ -149,6 +184,10 @@ export function sourceHitsFromResult(matches: readonly {
  * Visible snippet for the result list. Body hits slice the segment text;
  * source hits slice the raw text through the byte offsets. Windowed source
  * mode has no in-memory text — the caller shows the line number instead.
+ *
+ * `offsetIndex` is optional: pass the document's shared `SourceOffsetIndex`
+ * (built for the same `rawText`) so a 200-row result list does not rescan the
+ * text twice per row (F-32-3). Without it the standalone converter is used.
  */
 export function hitSnippet(
   hit: SearchHit,
@@ -156,6 +195,7 @@ export function hitSnippet(
     segments: readonly SearchSegment[]
     rawText: string | null
     maxLength?: number
+    offsetIndex?: SourceOffsetIndex | null
   },
 ): string | null {
   const maxLength = options.maxLength ?? 120
@@ -172,8 +212,9 @@ export function hitSnippet(
   }
   if (options.rawText === null) return null
   const text = options.rawText
-  const start = utf8ByteOffsetToUtf16Index(text, hit.startByte)
-  const end = utf8ByteOffsetToUtf16Index(text, hit.endByte)
+  const index = options.offsetIndex ?? null
+  const start = index ? index.byteToUtf16(hit.startByte) : utf8ByteOffsetToUtf16Index(text, hit.startByte)
+  const end = index ? index.byteToUtf16(hit.endByte) : utf8ByteOffsetToUtf16Index(text, hit.endByte)
   const contextRadius = 24
   const from = Math.max(0, start - contextRadius)
   const to = Math.min(text.length, end + contextRadius)

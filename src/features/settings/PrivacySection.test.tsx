@@ -123,7 +123,12 @@ describe('PrivacySection', () => {
 
   it('starts with no selection and names the action once a category is chosen', async () => {
     renderPrivacy()
-    fireEvent.click(await screen.findByRole('button', { name: t('settings.privacy.clear') }))
+    const clearButton = await screen.findByRole('button', { name: t('settings.privacy.clear') })
+    // The product disables the action until the storage overview is loaded
+    // (overview === null). Wait for enabled so the click cannot land on a
+    // disabled button under full-suite load (F-32-4).
+    await waitFor(() => expect((clearButton as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(clearButton)
     const dialog = await screen.findByRole('dialog')
     const confirm = within(dialog).getByRole('button', {
       name: t('dialog.clear.action.generic'),
@@ -164,7 +169,12 @@ describe('PrivacySection', () => {
       return Promise.resolve(undefined)
     })
     renderPrivacy()
-    fireEvent.click(await screen.findByRole('button', { name: t('settings.privacy.clear') }))
+    const clearButton = await screen.findByRole('button', { name: t('settings.privacy.clear') })
+    // The product disables the action until the storage overview is loaded
+    // (overview === null). Wait for enabled so the click cannot land on a
+    // disabled button under full-suite load (F-32-4).
+    await waitFor(() => expect((clearButton as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(clearButton)
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('checkbox', { name: /位置与会话/ }))
     fireEvent.click(within(dialog).getByRole('button', { name: t('dialog.clear.action.generic') }))
@@ -176,7 +186,12 @@ describe('PrivacySection', () => {
 
   it('suppresses cleared write-back categories and refreshes the overview', async () => {
     renderPrivacy()
-    fireEvent.click(await screen.findByRole('button', { name: t('settings.privacy.clear') }))
+    const clearButton = await screen.findByRole('button', { name: t('settings.privacy.clear') })
+    // The product disables the action until the storage overview is loaded
+    // (overview === null). Wait for enabled so the click cannot land on a
+    // disabled button under full-suite load (F-32-4).
+    await waitFor(() => expect((clearButton as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(clearButton)
     const dialog = await screen.findByRole('dialog')
     fireEvent.click(within(dialog).getByRole('checkbox', { name: /最近阅读/ }))
     fireEvent.click(within(dialog).getByRole('checkbox', { name: /位置与会话/ }))
