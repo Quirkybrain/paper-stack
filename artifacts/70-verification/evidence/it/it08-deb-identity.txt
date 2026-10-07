@@ -1,0 +1,7 @@
+path=/home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/output/paperstack_0.1.0_amd64.deb size=11519100 mtime=2026-10-08 00:49:56.954695835 +0800
+b0f44fdba83b1bfa5bbca80293ee14c8dd1b25e32a602bd74bf098fa754b4968  /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/output/paperstack_0.1.0_amd64.deb
+Package: paperstack
+Version: 0.1.0
+Maintainer: Quirkybrain
+Architecture: amd64
+Depends: libwebkit2gtk-4.1-0, libgtk-3-0
