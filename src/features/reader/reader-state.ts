@@ -2,6 +2,7 @@ import {
   createSessionState,
   selectIsDisplayPrepared,
   sessionClosed,
+  sessionOpened,
   sessionReducer,
   type DocumentSessionState,
   type SessionAction,
@@ -87,6 +88,13 @@ export type ReaderAction =
   | { type: 'tab/phase'; tabId: string; phase: ReaderPhase; error?: ErrorPayload | null }
   | { type: 'tab/banner'; tabId: string; collapsed: boolean }
   | { type: 'tab/view'; tabId: string; mode: ReaderViewMode }
+  | {
+      type: 'tab/docReplace'
+      tabId: string
+      docId: string
+      canonicalPath: string
+      displayName: string
+    }
 
 export const tabOpen = (tab: ReaderTab, activate: boolean): ReaderAction => ({
   type: 'tab/open',
@@ -125,6 +133,21 @@ export const tabView = (tabId: string, mode: ReaderViewMode): ReaderAction => ({
   type: 'tab/view',
   tabId,
   mode,
+})
+
+/**
+ * Current-tab document navigation (models §5.2 "跨文档相对链接：默认当前标签
+ * 导航"): the tab keeps its identity and activation order but displays the
+ * target document. `session/opened` advances the generation so the previous
+ * document's late tasks cannot commit (contract §6).
+ */
+export const tabDocReplace = (
+  tabId: string,
+  target: { docId: string; canonicalPath: string; displayName: string },
+): ReaderAction => ({
+  type: 'tab/docReplace',
+  tabId,
+  ...target,
 })
 
 function activateTab(state: ReaderState, tabId: string): ReaderState {
@@ -269,6 +292,30 @@ export function readerReducer(state: ReaderState, action: ReaderAction): ReaderS
         ...state,
         tabs: state.tabs.map((candidate) =>
           candidate.tabId === action.tabId ? { ...candidate, viewMode: action.mode } : candidate,
+        ),
+      }
+    }
+
+    case 'tab/docReplace': {
+      const tab = state.tabs.find((candidate) => candidate.tabId === action.tabId)
+      if (!tab || tab.docId === action.docId) return state
+      const session = sessionReducer(tab.session, sessionOpened(action.docId))
+      return {
+        ...state,
+        tabs: state.tabs.map((candidate) =>
+          candidate.tabId === action.tabId
+            ? {
+                ...candidate,
+                docId: action.docId,
+                canonicalPath: action.canonicalPath,
+                displayName: action.displayName,
+                session,
+                phase: 'reading',
+                error: null,
+                bannerCollapsed: false,
+                viewMode: 'reading',
+              }
+            : candidate,
         ),
       }
     }

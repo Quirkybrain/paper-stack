@@ -132,7 +132,7 @@ export function CodeBlock({ node, className, children }: CodeBlockProps) {
       collapsed
         ? createElement(
             Button,
-            { variant: 'secondary', onClick: () => setExpanded(true) },
+            { variant: 'secondary', className: 'ps-code-expand', onClick: () => setExpanded(true) },
             t('code.action.expand', { count: lineCount }),
           )
         : expanded && lineCount > CODE_COLLAPSE_THRESHOLD_LINES

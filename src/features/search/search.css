@@ -1,0 +1,152 @@
+/* In-page search bar (ui-spec §3.4 UI03; VC-16 highlight styles). */
+
+.ps-search {
+  border-bottom: 1px solid var(--ps-color-border);
+  background: var(--ps-color-surface);
+  padding: var(--ps-space-2) var(--ps-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ps-space-2);
+}
+
+.ps-search-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--ps-space-2);
+  flex-wrap: wrap;
+}
+
+.ps-search-scope {
+  display: inline-flex;
+  border: 1px solid var(--ps-color-border);
+  border-radius: var(--ps-radius-sm);
+  overflow: hidden;
+}
+
+.ps-search-scope-option {
+  border: 0;
+  background: transparent;
+  color: var(--ps-color-muted);
+  padding: var(--ps-space-1) var(--ps-space-3);
+  min-height: var(--ps-control-h);
+  cursor: pointer;
+}
+
+.ps-search-scope-option[aria-pressed='true'] {
+  background: var(--ps-color-bg);
+  color: var(--ps-color-text);
+  font-weight: 600;
+}
+
+.ps-search-input {
+  flex: 1;
+  min-width: 180px;
+  min-height: var(--ps-control-h);
+  border: 1px solid var(--ps-color-border);
+  border-radius: var(--ps-radius-sm);
+  background: var(--ps-color-bg);
+  color: inherit;
+  padding: 0 var(--ps-space-2);
+}
+
+.ps-search-case {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ps-space-1);
+  color: var(--ps-color-muted);
+  white-space: nowrap;
+}
+
+.ps-search-counter {
+  min-width: 64px;
+  text-align: center;
+  color: var(--ps-color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ps-search-status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ps-space-1);
+}
+
+.ps-search-note {
+  margin: 0;
+  color: var(--ps-color-muted);
+}
+
+.ps-search-formula {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--ps-space-2);
+  color: var(--ps-color-warn);
+}
+
+.ps-search-formula-inspect {
+  border: 0;
+  background: transparent;
+  color: var(--ps-color-accent);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+
+.ps-search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.ps-search-result {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ps-space-2);
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: var(--ps-space-1) var(--ps-space-2);
+  border-radius: var(--ps-radius-sm);
+  cursor: pointer;
+}
+
+.ps-search-result:hover,
+.ps-search-result:focus-visible {
+  background: var(--ps-color-bg);
+}
+
+.ps-search-result-current {
+  border-color: var(--ps-color-accent);
+}
+
+.ps-search-result-line {
+  color: var(--ps-color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ps-search-result-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ps-search-result-badge {
+  color: var(--ps-color-warn);
+  white-space: nowrap;
+}
+
+/* VC-16: mark matches through the highlight variable; the current hit adds an
+   outline so the state never relies on color alone (ui-spec §6.5). */
+.ps-search-mark {
+  background: var(--ps-color-mark);
+  color: inherit;
+}
+
+.ps-search-mark-current {
+  outline: 2px solid var(--ps-color-focus);
+  outline-offset: 1px;
+}

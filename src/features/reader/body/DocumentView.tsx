@@ -1,5 +1,5 @@
-import type { Element } from 'hast'
-import { createElement, useMemo, type ReactNode } from 'react'
+import type { Element, Text } from 'hast'
+import { createContext, createElement, useContext, useMemo, type ReactNode } from 'react'
 import type { Components } from 'rehype-react'
 
 import { t } from '../../../app/i18n'
@@ -21,7 +21,13 @@ import { MermaidBlock } from './MermaidBlock'
  * Body renderer (ui-spec §3.2 `body/DocumentView.tsx`; rendering-pipeline
  * §2.11–§2.12): maps the engine-processed hast to React through
  * `renderDocument`, mounts blocks progressively, and supplies the reader's
- * component overrides (formula errors, images, Mermaid, links).
+ * component overrides (formula errors, images, Mermaid, links, search marks).
+ *
+ * The override components are module-level so their identities never change:
+ * search highlights and link handlers travel through `DocumentOverrideContext`
+ * instead of new `components` objects. Recreating the override functions would
+ * remount the whole document on every keystroke and lose block-local state
+ * (for example a code block's expanded state).
  */
 
 export interface DocumentViewProps {
@@ -30,12 +36,48 @@ export interface DocumentViewProps {
   result: ParseDocumentResult
   /** Session generation; changes invalidate progressive-mount progress. */
   generation: number
+  /**
+   * Block that must be mounted before focusing it (search/history locate);
+   * the progressive mount never skips a revealed block (ui-spec §3.4).
+   */
+  revealBlockId?: string | null
+  /** `<mark>` highlight ranges per `data-seg-id` (VC-16). */
+  searchHighlights?: readonly SearchHighlight[]
+  /** Document-link router: hash fragments and relative documents (R15/R16). */
+  onDocumentLink?: (href: string) => void
+}
+
+export interface SearchHighlightRange {
+  /** UTF-16 range inside the segment text. */
+  start: number
+  end: number
+  current?: boolean
+}
+
+export interface SearchHighlight {
+  segId: string
+  ranges: readonly SearchHighlightRange[]
 }
 
 /** rehype-react passes the source node with `passNode: true`. */
 type OverrideProps = Record<string, unknown> & {
   node?: Element
   children?: ReactNode
+}
+
+interface OverrideContextValue {
+  docId: string
+  rawText: string
+  result: ParseDocumentResult
+  highlightBySeg: ReadonlyMap<string, readonly SearchHighlightRange[]>
+  sourceExcerptFor(blockId: string): string | undefined
+  onDocumentLink?: (href: string) => void
+}
+
+const DocumentOverrideContext = createContext<OverrideContextValue | null>(null)
+
+function useOverrideContext(): OverrideContextValue | null {
+  return useContext(DocumentOverrideContext)
 }
 
 function classList(element: Element | undefined): readonly string[] {
@@ -51,12 +93,101 @@ function passthrough(tag: string, props: OverrideProps): ReactNode {
   return createElement(tag, rest, children)
 }
 
-function ImageOverride(props: OverrideProps & { docId: string }): ReactNode {
-  return createElement(ImageBlock, props as never)
+function blockContextFor(
+  context: OverrideContextValue,
+  node: Element | undefined,
+): BlockContextValue {
+  const blockId = node?.properties?.dataBlockId
+  const block =
+    typeof blockId === 'string'
+      ? context.result.blocks.find((candidate) => candidate.blockId === blockId)
+      : undefined
+  const range = block?.sourceRangeBytes ?? null
+  return {
+    blockId: block?.blockId ?? (typeof blockId === 'string' ? blockId : null),
+    headingPath: block?.headingPath ?? [],
+    range,
+    rawText: context.rawText,
+    diagnostics:
+      range === null
+        ? []
+        : context.result.diagnostics.filter(
+            (issue) =>
+              issue.sourceRange !== undefined &&
+              issue.sourceRange.startByte >= range.startByte &&
+              issue.sourceRange.startByte < range.endByte,
+          ),
+  }
 }
 
-/** Link routing subset (R15): fragments scroll; http(s) go to the system browser. */
+function SectionOverride(props: OverrideProps): ReactNode {
+  const context = useOverrideContext()
+  if (context === null) return passthrough('section', props)
+  const blockId = props.node?.properties?.dataBlockId
+  return createElement(
+    BlockContext.Provider,
+    { value: blockContextFor(context, props.node) },
+    createElement(ContentBlock, {
+      ...(props as Record<string, unknown>),
+      sourceExcerpt:
+        typeof blockId === 'string' ? context.sourceExcerptFor(blockId) : undefined,
+    } as never),
+  )
+}
+
+function SpanOverride(props: OverrideProps): ReactNode {
+  const context = useOverrideContext()
+  if (classList(props.node).includes(MATH_ERROR_CLASS)) {
+    return createElement(MathErrorBlock, props as never)
+  }
+  const kind = mathElementKind(props.node)
+  if (kind !== null) {
+    // Both inline and display KaTeX output are spans; the class marks the
+    // display wrapper (`span.katex-display`).
+    return createElement(MathBlock, { ...props, display: kind === 'display' } as never)
+  }
+  const segId =
+    typeof props.node?.properties?.dataSegId === 'string'
+      ? props.node.properties.dataSegId
+      : null
+  const ranges = segId !== null ? context?.highlightBySeg.get(segId) : undefined
+  const textChild = props.node?.children.find((child): child is Text => child.type === 'text')
+  if (ranges && ranges.length > 0 && textChild) {
+    const { node: _node, children: _children, ...rest } = props
+    void _node
+    void _children
+    return createElement('span', rest, renderHighlightedText(textChild.value, ranges))
+  }
+  return passthrough('span', props)
+}
+
+function DivOverride(props: OverrideProps): ReactNode {
+  if (classList(props.node).includes(MERMAID_BLOCK_CLASS) && props.node) {
+    return createElement(MermaidBlock, { source: extractMermaidSource(props.node) })
+  }
+  if (classList(props.node).includes(MATH_ERROR_CLASS)) {
+    return createElement(MathErrorBlock, props as never)
+  }
+  if (mathElementKind(props.node) === 'display') {
+    return createElement(MathBlock, { ...props, display: true } as never)
+  }
+  if (isCodeBlockNode(props.node)) {
+    return createElement(CodeBlock, { ...props } as never)
+  }
+  return passthrough('div', props)
+}
+
+function ImgOverride(props: OverrideProps): ReactNode {
+  const context = useOverrideContext()
+  return createElement(ImageBlock, { ...props, docId: context?.docId ?? '' } as never)
+}
+
+/** Link routing subset (R15/R16): fragments scroll/record; http(s) go to the
+ * system browser; relative Markdown documents route through the reader
+ * (current-tab navigation); anything else stays unclickable. */
 function AnchorOverride(props: OverrideProps): ReactNode {
+  const context = useOverrideContext()
+  const onDocumentLink = context?.onDocumentLink
   const { node: _node, children, ...rest } = props
   void _node
   const href = typeof rest.href === 'string' ? rest.href : undefined
@@ -68,11 +199,13 @@ function AnchorOverride(props: OverrideProps): ReactNode {
         ...rest,
         href,
         onClick: (event: { preventDefault(): void }) => {
-          const target = document.getElementById(href.slice(1))
-          if (target) {
-            event.preventDefault()
-            target.scrollIntoView()
+          event.preventDefault()
+          if (onDocumentLink) {
+            onDocumentLink(href)
+            return
           }
+          const target = document.getElementById(href.slice(1))
+          if (target) target.scrollIntoView()
         },
       },
       children,
@@ -92,13 +225,89 @@ function AnchorOverride(props: OverrideProps): ReactNode {
       children,
     )
   }
-  // Relative document links route in wp-26; not clickable until then.
+  if (onDocumentLink && !/^[a-z][a-z0-9+.-]*:/i.test(href)) {
+    return createElement(
+      'a',
+      {
+        ...rest,
+        href,
+        onClick: (event: { preventDefault(): void }) => {
+          event.preventDefault()
+          onDocumentLink(href)
+        },
+      },
+      children,
+    )
+  }
   return createElement('span', { className: 'ps-link-unsupported', title: href }, children)
 }
 
-export function DocumentView({ docId, rawText, result, generation }: DocumentViewProps) {
+const READER_COMPONENTS = {
+  section: SectionOverride,
+  span: SpanOverride,
+  div: DivOverride,
+  img: ImgOverride,
+  a: AnchorOverride,
+} as unknown as Partial<Components>
+
+function renderHighlightedText(
+  text: string,
+  ranges: readonly SearchHighlightRange[],
+): ReactNode {
+  const parts: ReactNode[] = []
+  let cursor = 0
+  ranges.forEach((range, index) => {
+    const start = Math.max(cursor, Math.min(range.start, text.length))
+    const end = Math.max(start, Math.min(range.end, text.length))
+    if (start > cursor) parts.push(text.slice(cursor, start))
+    if (end > start) {
+      parts.push(
+        createElement(
+          'mark',
+          {
+            key: `ps-mark-${index}`,
+            className: range.current ? 'ps-search-mark ps-search-mark-current' : 'ps-search-mark',
+            ...(range.current ? { 'data-search-current': 'true' } : {}),
+          },
+          text.slice(start, end),
+        ),
+      )
+    }
+    cursor = end
+  })
+  if (cursor < text.length) parts.push(text.slice(cursor))
+  return parts
+}
+
+export function DocumentView({
+  docId,
+  rawText,
+  result,
+  generation,
+  revealBlockId,
+  searchHighlights,
+  onDocumentLink,
+}: DocumentViewProps) {
   const blockCount = result.status === 'ok' ? result.blocks.length : 0
-  const visibleBlocks = useProgressiveMount(blockCount, { generation })
+  const revealIndex =
+    revealBlockId === undefined || revealBlockId === null
+      ? -1
+      : result.blocks.findIndex((block) => block.blockId === revealBlockId)
+  const visibleBlocks = useProgressiveMount(blockCount, {
+    generation,
+    ...(revealIndex >= 0 ? { revealIndex } : {}),
+  })
+
+  const highlightBySeg = useMemo(() => {
+    const map = new Map<string, SearchHighlightRange[]>()
+    for (const highlight of searchHighlights ?? []) {
+      const existing = map.get(highlight.segId) ?? []
+      existing.push(...highlight.ranges)
+      map.set(highlight.segId, existing)
+    }
+    for (const ranges of map.values()) ranges.sort((a, b) => a.start - b.start)
+    return map
+  }, [searchHighlights])
 
   const sourceExcerptFor = useMemo(() => {
     return (blockId: string): string | undefined => {
@@ -109,74 +318,17 @@ export function DocumentView({ docId, rawText, result, generation }: DocumentVie
     }
   }, [result, rawText])
 
-  const components = useMemo(() => {
-    const blockContextFor = (node: Element | undefined): BlockContextValue => {
-      const blockId = node?.properties?.dataBlockId
-      const block =
-        typeof blockId === 'string'
-          ? result.blocks.find((candidate) => candidate.blockId === blockId)
-          : undefined
-      const range = block?.sourceRangeBytes ?? null
-      return {
-        blockId: block?.blockId ?? (typeof blockId === 'string' ? blockId : null),
-        headingPath: block?.headingPath ?? [],
-        range,
-        rawText,
-        diagnostics:
-          range === null
-            ? []
-            : result.diagnostics.filter(
-                (issue) =>
-                  issue.sourceRange !== undefined &&
-                  issue.sourceRange.startByte >= range.startByte &&
-                  issue.sourceRange.startByte < range.endByte,
-              ),
-      }
-    }
-    const overrides: Record<string, (props: OverrideProps) => ReactNode> = {
-      section: (props) => {
-        const blockId = props.node?.properties?.dataBlockId
-        return createElement(
-          BlockContext.Provider,
-          { value: blockContextFor(props.node) },
-          createElement(ContentBlock, {
-            ...(props as Record<string, unknown>),
-            sourceExcerpt: typeof blockId === 'string' ? sourceExcerptFor(blockId) : undefined,
-          } as never),
-        )
-      },
-      span: (props) => {
-        if (classList(props.node).includes(MATH_ERROR_CLASS)) {
-          return createElement(MathErrorBlock, props as never)
-        }
-        const kind = mathElementKind(props.node)
-        if (kind !== null) {
-          // Both inline and display KaTeX output are spans; the class marks
-          // the display wrapper (`span.katex-display`).
-          return createElement(MathBlock, { ...props, display: kind === 'display' } as never)
-        }
-        return passthrough('span', props)
-      },
-      div: (props) => {
-        if (classList(props.node).includes(MERMAID_BLOCK_CLASS) && props.node) {
-          return createElement(MermaidBlock, { source: extractMermaidSource(props.node) })
-        }
-        if (classList(props.node).includes(MATH_ERROR_CLASS)) {
-          return createElement(MathErrorBlock, props as never)
-        }
-        if (mathElementKind(props.node) === 'display') {
-          return createElement(MathBlock, { ...props, display: true } as never)
-        }
-        if (isCodeBlockNode(props.node)) {
-          return createElement(CodeBlock, { ...props } as never)
-        }
-        return passthrough('div', props)
-      },
-      img: (props) => ImageOverride({ ...props, docId }),
-      a: (props) => AnchorOverride(props),
-    }
-    return overrides as unknown as Partial<Components>
-  }, [docId, rawText, result, sourceExcerptFor])
+  const overrideContext = useMemo<OverrideContextValue>(
+    () => ({
+      docId,
+      rawText,
+      result,
+      highlightBySeg,
+      sourceExcerptFor,
+      ...(onDocumentLink ? { onDocumentLink } : {}),
+    }),
+    [docId, rawText, result, highlightBySeg, sourceExcerptFor, onDocumentLink],
+  )
 
   const content = useMemo(() => {
     if (result.status !== 'ok' || !result.hast) return null
@@ -187,9 +339,9 @@ export function DocumentView({ docId, rawText, result, generation }: DocumentVie
         segments: result.segments,
         blockLimit: visibleBlocks,
       },
-      { components, translate: t, sourceExcerptFor },
+      { components: READER_COMPONENTS, translate: t, sourceExcerptFor },
     )
-  }, [result, components, sourceExcerptFor, visibleBlocks])
+  }, [result, sourceExcerptFor, visibleBlocks])
 
   if (result.status !== 'ok' || !result.hast) {
     return (
@@ -200,5 +352,9 @@ export function DocumentView({ docId, rawText, result, generation }: DocumentVie
     )
   }
 
-  return <div className="ps-document-body">{content}</div>
+  return (
+    <DocumentOverrideContext.Provider value={overrideContext}>
+      <div className="ps-document-body">{content}</div>
+    </DocumentOverrideContext.Provider>
+  )
 }
