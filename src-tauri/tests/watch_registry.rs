@@ -9,7 +9,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use notify::event::{
-    CreateKind, DataChange, EventAttributes, EventKind, ModifyKind, RemoveKind, RenameMode,
+    CreateKind, DataChange, EventAttributes, EventKind, MetadataKind, ModifyKind, RemoveKind,
+    RenameMode,
 };
 use notify::Event;
 use paperstack_lib::error::{AppError, ErrorCode};
@@ -237,10 +238,60 @@ fn removal_without_reappearance_reports_removed() {
         EventKind::Remove(RemoveKind::File),
         vec![fixture.doc.clone()],
     ));
+    // The removal hint is checked against the settled filesystem at flush:
+    // a path that is really gone is `removed`.
+    std::fs::remove_file(&fixture.doc).unwrap();
     clock.advance(window());
     let payloads = service.flush_due();
     assert_eq!(payloads.len(), 1);
     assert_eq!(payloads[0].kind, WatchKind::Removed);
+}
+
+#[test]
+fn removal_that_is_a_replacement_save_reports_modified_at_flush() {
+    // D-IT-2 regression: the notify stream of `write temp + rename over` ends
+    // with the *old inode's* removal event after the appearance hints
+    // (empirically: Modify(Name(Both)) → Modify(Metadata) → Remove(File)).
+    // "Last operation wins" alone reported `removed` for a document that
+    // exists again, bouncing the tab into the source-unavailable state.
+    let fixture = fixture();
+    let (backend, _state) = MockBackend::new();
+    let clock = ManualWatchTimer::new(0);
+    let mut service = service(&clock, backend);
+    service.watch_document("d-1", &fixture.doc, &[]).unwrap();
+
+    let temp_name = fixture.doc.parent().unwrap().join(".doc.md.tmp");
+    for event in [
+        event(
+            EventKind::Modify(ModifyKind::Name(RenameMode::From)),
+            vec![temp_name.clone()],
+        ),
+        event(
+            EventKind::Modify(ModifyKind::Name(RenameMode::To)),
+            vec![fixture.doc.clone()],
+        ),
+        event(
+            EventKind::Modify(ModifyKind::Name(RenameMode::Both)),
+            vec![temp_name, fixture.doc.clone()],
+        ),
+        event(
+            EventKind::Modify(ModifyKind::Metadata(MetadataKind::Any)),
+            vec![fixture.doc.clone()],
+        ),
+        event(
+            EventKind::Remove(RemoveKind::File),
+            vec![fixture.doc.clone()],
+        ),
+    ] {
+        service.handle_notify_event(&event);
+    }
+
+    // The replaced file exists at flush time (the fixture file is untouched);
+    // the settled hint must be a change, never "missing".
+    clock.advance(window());
+    let payloads = service.flush_due();
+    assert_eq!(payloads.len(), 1);
+    assert_eq!(payloads[0].kind, WatchKind::Modified);
 }
 
 #[test]
@@ -257,8 +308,45 @@ fn last_observed_operation_wins_inside_a_window() {
         EventKind::Remove(RemoveKind::File),
         vec![fixture.doc.clone()],
     ));
+    std::fs::remove_file(&fixture.doc).unwrap();
     clock.advance(window());
     assert_eq!(service.flush_due()[0].kind, WatchKind::Removed);
+}
+
+#[test]
+fn flush_time_presence_probe_decides_removed_vs_modified() {
+    // Deterministic seam, no real filesystem dependency: the injected probe
+    // is the only authority for the removed hint.
+    #[derive(Debug)]
+    struct Presence(bool);
+    impl paperstack_lib::services::watch::DocPresence for Presence {
+        fn exists(&self, _path: &Path) -> bool {
+            self.0
+        }
+    }
+
+    for (present, expected) in [(true, WatchKind::Modified), (false, WatchKind::Removed)] {
+        let fixture = fixture();
+        let (backend, _state) = MockBackend::new();
+        let clock = ManualWatchTimer::new(0);
+        let mut service = WatchService::with_timer_and_presence(
+            WatchConfig {
+                quiet_window: window(),
+            },
+            Box::new(clock.clone()),
+            Box::new(backend),
+            Box::new(Presence(present)),
+        );
+        service.watch_document("d-1", &fixture.doc, &[]).unwrap();
+        service.handle_notify_event(&event(
+            EventKind::Remove(RemoveKind::File),
+            vec![fixture.doc.clone()],
+        ));
+        clock.advance(window());
+        let payloads = service.flush_due();
+        assert_eq!(payloads.len(), 1);
+        assert_eq!(payloads[0].kind, expected, "present={present}");
+    }
 }
 
 // ---------------------------------------------------------------------------

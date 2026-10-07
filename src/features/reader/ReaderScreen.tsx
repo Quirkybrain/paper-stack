@@ -146,9 +146,35 @@ const EMPTY_SEGMENTS: readonly SearchSegment[] = []
 export const SEARCH_SOURCE_MAX_RESULTS = 500
 
 /**
+ * Percent-decodes one path segment. Malformed escape sequences, already-decoded
+ * segments and segments that would decode into a path separator are returned
+ * unchanged, so raw paths, decoded paths and hand-written literal `%` all
+ * resolve the same way and decoding can never change the path structure.
+ */
+function decodePathSegment(segment: string): string {
+  try {
+    const decoded = decodeURIComponent(segment)
+    return decoded.includes('/') ? segment : decoded
+  } catch {
+    return segment
+  }
+}
+
+/** Decodes each segment of a URL path without touching `/` separators. */
+function decodePath(path: string): string {
+  return path.split('/').map(decodePathSegment).join('/')
+}
+
+/**
  * Resolves a link href against the current document's canonical path
  * (models §5.2 "跨文档相对链接"). `./`, `../` and bare names are supported;
  * absolute paths pass through; fragments split off for the anchor restore.
+ *
+ * mdast/rehype normalize link destinations to percent-encoding, so the path
+ * portion is decoded per segment before resolution (D-IT-1/R15: a link to
+ * `中文文档.md` arrives as `%E4%B8%AD%E6%96%87%E6%96%87%E6%A1%A3.md`);
+ * decoding is per segment so an encoded `/` can never change the path
+ * structure, and the fragment keeps its single existing decode.
  */
 export function resolveDocumentLink(
   basePath: string,
@@ -158,9 +184,9 @@ export function resolveDocumentLink(
   const rawPath = hashIndex === -1 ? href : href.slice(0, hashIndex)
   const anchorId = hashIndex === -1 ? null : decodeURIComponent(href.slice(hashIndex + 1))
   if (rawPath.length === 0) return { path: basePath, anchorId }
-  if (rawPath.startsWith('/')) return { path: rawPath, anchorId }
+  if (rawPath.startsWith('/')) return { path: decodePath(rawPath), anchorId }
   const baseSegments = basePath.split('/').slice(0, -1)
-  const segments = rawPath.split('/')
+  const segments = rawPath.split('/').map(decodePathSegment)
   const resolved = [...baseSegments]
   for (const segment of segments) {
     if (segment === '' || segment === '.') continue

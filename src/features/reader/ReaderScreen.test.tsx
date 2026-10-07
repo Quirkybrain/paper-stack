@@ -37,7 +37,7 @@ vi.mock('@tauri-apps/api/window', () => ({
   }),
 }))
 
-import ReaderScreen from './ReaderScreen'
+import ReaderScreen, { resolveDocumentLink } from './ReaderScreen'
 import { documentModelCache } from '../../app/session'
 import { AppStoreProvider } from '../../app/store'
 import { t } from '../../app/i18n'
@@ -423,6 +423,38 @@ describe('ReaderScreen (ui-spec §3.2)', () => {
     await screen.findByText('NEW')
     expect(screen.queryByText(t('update.banner'))).toBeNull()
     expect(screen.queryByText('OLD')).toBeNull()
+  })
+
+  it('treats a replacement save as a normal change, never as source-unavailable (D-IT-2)', async () => {
+    // IT03 conditions: content selected, keep mode. The fixed Rust watcher
+    // settles a rename-over save as `modified` (the replaced inode's removal
+    // hint is corrected at flush time), so the tab must show the update
+    // banner with the selection action — never the unavailable banner.
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md@v1', '# 标题\n\nOLD\n')
+    texts.set('d-a.md@v2', '# 标题\n\nNEW\n')
+    renderReader()
+    const old = await screen.findByText('OLD')
+
+    const range = document.createRange()
+    range.selectNodeContents(old)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+    await act(async () => {
+      document.dispatchEvent(new Event('selectionchange'))
+    })
+
+    refreshHash = 'v2'
+    await act(async () => {
+      listeners.get('paperstack://watch-changed')?.({
+        payload: { docId: 'd-a.md', kind: 'modified', observedAtMs: 5 },
+      })
+    })
+    await screen.findByText(t('update.banner'))
+    expect(screen.queryByText(UNAVAILABLE_BANNER)).toBeNull()
+    expect(
+      screen.getByRole('button', { name: t('update.action.updateAndClearSelection') }),
+    ).toBeTruthy()
   })
 
   it('collapses the banner with 稍后 and reopens it from the textual marker (INV-UM-05)', async () => {
@@ -1217,6 +1249,14 @@ describe('ReaderScreen (ui-spec §3.2)', () => {
     renderReader()
     await screen.findByText('仍然可见')
 
+    // The removed hint is verified by a stable read (models §3.2 W3): the
+    // file is really gone, so that read fails with NOT_FOUND.
+    readError = {
+      code: 'PS_IO_NOT_FOUND',
+      category: 'io',
+      messageKey: 'error.io.notFound',
+      retryable: true,
+    }
     await act(async () => {
       listeners.get('paperstack://watch-changed')?.({
         payload: { docId: 'd-a.md', kind: 'removed', observedAtMs: 7 },
@@ -1253,6 +1293,12 @@ describe('ReaderScreen (ui-spec §3.2)', () => {
     renderReader()
     await screen.findByText('仍然可见')
 
+    readError = {
+      code: 'PS_IO_NOT_FOUND',
+      category: 'io',
+      messageKey: 'error.io.notFound',
+      retryable: true,
+    }
     await act(async () => {
       listeners.get('paperstack://watch-changed')?.({
         payload: { docId: 'd-a.md', kind: 'removed', observedAtMs: 7 },
@@ -1262,7 +1308,9 @@ describe('ReaderScreen (ui-spec §3.2)', () => {
       UNAVAILABLE_BANNER,
     )
 
-    // 重试 re-reads the same path through the stable refresh read.
+    // The source is readable again; 重试 re-reads the same path through the
+    // stable refresh read.
+    readError = null
     fireEvent.click(screen.getByRole('button', { name: t('common.retry') }))
     await waitFor(() =>
       expect(invokeMock).toHaveBeenCalledWith('read_document', {
@@ -1286,6 +1334,12 @@ describe('ReaderScreen (ui-spec §3.2)', () => {
     renderReader()
     await screen.findByText('仍然可见')
 
+    readError = {
+      code: 'PS_IO_NOT_FOUND',
+      category: 'io',
+      messageKey: 'error.io.notFound',
+      retryable: true,
+    }
     await act(async () => {
       listeners.get('paperstack://watch-changed')?.({
         payload: { docId: 'd-a.md', kind: 'removed', observedAtMs: 7 },
@@ -1295,12 +1349,6 @@ describe('ReaderScreen (ui-spec §3.2)', () => {
       UNAVAILABLE_BANNER,
     )
 
-    readError = {
-      code: 'PS_IO_NOT_FOUND',
-      category: 'io',
-      messageKey: 'error.io.notFound',
-      retryable: true,
-    }
     fireEvent.click(screen.getByRole('button', { name: t('common.retry') }))
     await waitFor(() =>
       expect(invokeMock).toHaveBeenCalledWith('read_document', {
@@ -1315,6 +1363,33 @@ describe('ReaderScreen (ui-spec §3.2)', () => {
       ).toBeTruthy(),
     )
     expect(screen.getByText('仍然可见')).toBeTruthy()
+  })
+
+  it('verifies a removed hint before unavailability and keeps a readable source on the pending flow (D-IT-2/W3)', async () => {
+    // IT03 frontend half: a replacement save can leave a stale `removed` hint
+    // in flight. The hint must trigger a stable read, and a still-readable
+    // source must reach the normal update banner without a manual retry.
+    pendingRequests = [{ paths: ['/docs/a.md'], cwd: null, source: 'cli' }]
+    texts.set('d-a.md@v1', '# 标题\n\nOLD\n')
+    texts.set('d-a.md@v2', '# 标题\n\nNEW\n')
+    renderReader()
+    await screen.findByText('OLD')
+
+    refreshHash = 'v2'
+    await act(async () => {
+      listeners.get('paperstack://watch-changed')?.({
+        payload: { docId: 'd-a.md', kind: 'removed', observedAtMs: 7 },
+      })
+    })
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith('read_document', {
+        req: { docId: 'd-a.md', purpose: 'refresh' },
+      }),
+    )
+    // Readable source: the normal pending/update flow, never “找不到原文件”.
+    await screen.findByText(t('update.banner'))
+    expect(screen.queryByText(UNAVAILABLE_BANNER)).toBeNull()
+    expect(screen.getByText('OLD')).toBeTruthy()
   })
 
   it('navigates in-app heading fragments through the outline anchors and records history (AT14/AT15)', async () => {
@@ -1365,6 +1440,24 @@ describe('ReaderScreen (ui-spec §3.2)', () => {
     // A failed navigation records no history (INV-NH-02).
     const back = screen.getByRole('button', { name: t('toolbar.back') }) as HTMLButtonElement
     expect(back.disabled).toBe(true)
+  })
+
+  it('navigates a percent-encoded non-ASCII document link after decoding (R15/D-IT-1)', async () => {
+    // IT02's failing sub-item: rehype emits the destination percent-encoded,
+    // so the link to a CJK filename must be decoded before open_documents.
+    pendingRequests = [{ paths: ['/docs/links.md'], cwd: null, source: 'cli' }]
+    texts.set('d-links.md', '# Links\n\n[中文](%E4%B8%AD%E6%96%87%E6%96%87%E6%A1%A3.md)\n')
+    renderReader()
+    await screen.findByText('中文')
+
+    fireEvent.click(screen.getByRole('link', { name: '中文' }))
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith('open_documents', {
+        req: { paths: ['/docs/中文文档.md'], entry: 'system' },
+      }),
+    )
+    // The target replaces the current tab (models §5.2) and renders normally.
+    await screen.findByRole('heading', { level: 1, name: '中文文档.md' })
   })
 
   it('restores the committed position on startup, exactly and silently for the same version (AT19)', async () => {
@@ -1675,11 +1768,21 @@ describe('wp-36a Review-B fixes (B-02/B-04/B-05/B-06/B-07)', () => {
     renderReader()
     await screen.findByRole('heading', { level: 1, name: 'a.md' })
 
+    // The source is really missing: the removed hint's stable read fails.
+    readError = {
+      code: 'PS_IO_NOT_FOUND',
+      category: 'io',
+      messageKey: 'error.io.notFound',
+      retryable: true,
+    }
     await act(async () => {
       listeners.get('paperstack://watch-changed')?.({
         payload: { docId: 'd-a.md', kind: 'removed', observedAtMs: 5 },
       })
     })
+    await screen.findByText(UNAVAILABLE_BANNER)
+    // The selected source is readable again for the following navigation.
+    readError = null
     pickFilesResult = { cancelled: false, paths: ['/docs/a.md'] }
     holdRelink = true
     relinkStatus = 'new-version'
@@ -1731,5 +1834,69 @@ describe('wp-36a Review-B fixes (B-02/B-04/B-05/B-06/B-07)', () => {
     await screen.findByText('B-OLD')
     expect(screen.queryByText('B-NEW')).toBeNull()
     await screen.findByText(t('update.banner'))
+  })
+})
+
+describe('resolveDocumentLink (models §5.2; R15/D-IT-1)', () => {
+  it('decodes percent-encoded path segments for spaces, CJK and emoji names', () => {
+    expect(resolveDocumentLink('/docs/base.md', './%E4%B8%AD%20file.md')).toEqual({
+      path: '/docs/中 file.md',
+      anchorId: null,
+    })
+    expect(
+      resolveDocumentLink('/docs/base.md', './%E4%B8%AD%E6%96%87%E6%96%87%E6%A1%A3.md'),
+    ).toEqual({ path: '/docs/中文文档.md', anchorId: null })
+    expect(resolveDocumentLink('/docs/base.md', '%F0%9F%93%84%20notes.md')).toEqual({
+      path: '/docs/📄 notes.md',
+      anchorId: null,
+    })
+  })
+
+  it('keeps the fragment split before decoding (path and fragment decode once each)', () => {
+    expect(
+      resolveDocumentLink('/docs/base.md', './%E4%B8%AD%E6%96%87.md#%E4%B8%AD%E6%96%87'),
+    ).toEqual({ path: '/docs/中文.md', anchorId: '中文' })
+    // A fragment-only href resolves to the current document, unchanged.
+    expect(resolveDocumentLink('/docs/base.md', '#%E4%B8%AD%E6%96%87')).toEqual({
+      path: '/docs/base.md',
+      anchorId: '中文',
+    })
+  })
+
+  it('resolves ./ and ../ around decoded segments', () => {
+    expect(resolveDocumentLink('/docs/sub/base.md', '../%E4%B8%AD%20file.md')).toEqual({
+      path: '/docs/中 file.md',
+      anchorId: null,
+    })
+    expect(
+      resolveDocumentLink(
+        '/docs/sub/deep/base.md',
+        '../../%E7%9B%AE%E5%BD%95/%E6%96%87%E6%A1%A3.md',
+      ),
+    ).toEqual({ path: '/docs/目录/文档.md', anchorId: null })
+  })
+
+  it('decodes absolute destinations and keeps decoded paths unchanged', () => {
+    expect(resolveDocumentLink('/docs/base.md', '/%E4%B8%AD%E6%96%87.md')).toEqual({
+      path: '/中文.md',
+      anchorId: null,
+    })
+    expect(resolveDocumentLink('/docs/base.md', './中文 文档.md')).toEqual({
+      path: '/docs/中文 文档.md',
+      anchorId: null,
+    })
+  })
+
+  it('keeps malformed escapes and encoded separators literal', () => {
+    // A literal `%` is not a valid escape: the raw segment passes through.
+    expect(resolveDocumentLink('/docs/base.md', './100%.md')).toEqual({
+      path: '/docs/100%.md',
+      anchorId: null,
+    })
+    // An encoded `/` must never change the path structure.
+    expect(resolveDocumentLink('/docs/base.md', './..%2Fescape.md')).toEqual({
+      path: '/docs/..%2Fescape.md',
+      anchorId: null,
+    })
   })
 })

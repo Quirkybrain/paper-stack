@@ -131,6 +131,29 @@ pub trait WatchBackend: Send + fmt::Debug {
     fn unwatch_path(&mut self, path: &Path) -> Result<(), AppError>;
 }
 
+/// Document-path presence probe consulted at flush time (T-15/D-IT-2).
+///
+/// A replacement save (`write temp` + `rename over`) makes notify emit the
+/// removal event of the *replaced inode* (and the parent directory's
+/// `IN_DELETE` for the old name) **after** the `MOVED_TO`/`Create` hints, so
+/// "last observed operation wins" alone would report `removed` for a path that
+/// exists again. The settled truth within the quiet window is the filesystem:
+/// a `removed` hint is only emitted when the document path is still missing at
+/// flush. Production probes the filesystem; tests inject a deterministic stub.
+pub trait DocPresence: Send + Sync + fmt::Debug {
+    fn exists(&self, path: &Path) -> bool;
+}
+
+/// Production presence probe (`fs::metadata`).
+#[derive(Debug, Default, Clone, Copy)]
+pub struct FsDocPresence;
+
+impl DocPresence for FsDocPresence {
+    fn exists(&self, path: &Path) -> bool {
+        fs::metadata(path).is_ok()
+    }
+}
+
 /// Calibration parameters of the watch service.
 #[derive(Debug, Clone)]
 pub struct WatchConfig {
@@ -355,6 +378,7 @@ pub struct WatchService {
     config: WatchConfig,
     timer: Box<dyn WatchTimer>,
     backend: Box<dyn WatchBackend>,
+    presence: Box<dyn DocPresence>,
     registrations: BTreeMap<String, Registration>,
     /// Refcount of backend-watched paths across registrations (no leaks, and
     /// a shared parent directory is watched once).
@@ -363,7 +387,12 @@ pub struct WatchService {
 
 impl WatchService {
     pub fn new(backend: Box<dyn WatchBackend>) -> Self {
-        Self::with_parts(WatchConfig::default(), Box::new(SystemWatchTimer), backend)
+        Self::with_parts(
+            WatchConfig::default(),
+            Box::new(SystemWatchTimer),
+            backend,
+            Box::new(FsDocPresence),
+        )
     }
 
     pub fn with_timer(
@@ -371,18 +400,31 @@ impl WatchService {
         timer: Box<dyn WatchTimer>,
         backend: Box<dyn WatchBackend>,
     ) -> Self {
-        Self::with_parts(config, timer, backend)
+        Self::with_timer_and_presence(config, timer, backend, Box::new(FsDocPresence))
+    }
+
+    /// Full seam for deterministic tests: injectable clock, backend and
+    /// document-presence probe.
+    pub fn with_timer_and_presence(
+        config: WatchConfig,
+        timer: Box<dyn WatchTimer>,
+        backend: Box<dyn WatchBackend>,
+        presence: Box<dyn DocPresence>,
+    ) -> Self {
+        Self::with_parts(config, timer, backend, presence)
     }
 
     fn with_parts(
         config: WatchConfig,
         timer: Box<dyn WatchTimer>,
         backend: Box<dyn WatchBackend>,
+        presence: Box<dyn DocPresence>,
     ) -> Self {
         Self {
             config,
             timer,
             backend,
+            presence,
             registrations: BTreeMap::new(),
             path_use: BTreeMap::new(),
         }
@@ -501,6 +543,12 @@ impl WatchService {
     /// Emits at most one payload per `docId` whose quiet window has expired
     /// (contracts §7.2; INV-WS-02). Payloads never contain content
     /// (INV-WS-03).
+    ///
+    /// Replacement-save correction (contracts §7.2–7.3; D-IT-2): when the
+    /// window's last document operation is `removed` but the path exists again
+    /// at flush time, the hint refers to the replaced inode — not to a missing
+    /// document — and is reported as `modified`. A genuine deletion reports
+    /// `removed` only after the whole quiet window has settled.
     pub fn flush_due(&mut self) -> Vec<WatchChangedPayload> {
         let now = self.timer.now_ms();
         let mut payloads = Vec::new();
@@ -516,6 +564,9 @@ impl WatchService {
                 continue;
             };
             let (kind, resource_path) = match pending.doc_op {
+                Some(DocOp::Removed) if self.presence.exists(&registration.doc_path) => {
+                    (WatchKind::Modified, None)
+                }
                 Some(op) => (op.kind(), None),
                 None => (
                     WatchKind::Resource,
@@ -680,7 +731,12 @@ impl WatchRuntime {
                 .with_source(error)
         })?;
         let backend: Box<dyn WatchBackend> = Box::new(NotifyBackend { watcher });
-        let mut service = WatchService::with_parts(config, Box::new(SystemWatchTimer), backend);
+        let mut service = WatchService::with_parts(
+            config,
+            Box::new(SystemWatchTimer),
+            backend,
+            Box::new(FsDocPresence),
+        );
 
         let join = thread::spawn(move || loop {
             for payload in service.flush_due() {

@@ -11,6 +11,7 @@ import './plugins/register'
 import { listEngines, type EngineContext } from './engines'
 import { remarkMathPlugin } from './plugins/katex'
 import { rehypeForceTaskCheckboxDisabled, sanitizeSchema } from './sanitize'
+import { parseSimplifiedDocument, shouldUseSimplifiedFastPath } from './simplified'
 import { createSourceOffsetIndex, utf8ByteLength } from './source-map'
 import { runMdastTransforms } from './transforms'
 import type {
@@ -67,6 +68,14 @@ export async function parseDocument(
 ): Promise<ParseDocumentResult> {
   const resolved = resolvePipelineOptions(options)
   const diagnostics: DocumentDiagnostic[] = []
+
+  // Simplified-reading fast path (rendering-pipeline §5; D-IT-3): the
+  // mandated degraded mode must stay usable on the 10MiB+ corpus, where the
+  // full mdast/hast pipeline scales super-linearly. Small simplified
+  // documents keep the exact pipeline-subset output (same blockId/segId).
+  if (resolved.simplified && shouldUseSimplifiedFastPath(text)) {
+    return parseSimplifiedDocument(text)
+  }
 
   try {
     // ①–③: CommonMark base AST; GFM subset and math only in technical mode.
