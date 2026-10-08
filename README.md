@@ -1,11 +1,12 @@
 # 纸栈 PaperStack
 
 纸栈 PaperStack 是 **Linux 优先、本地文件优先的只读技术文档阅读器**：直接打开本地 Markdown 文件阅读，
-不修改原文件、不上传正文，渲染全部离线完成。当前版本 **v0.1.0**（功能与验证已完成，处于发布准备阶段；
-**公开发行受 A9「对应源码入口」阻塞**，见「许可与开源信息」）。
+不修改原文件、不上传正文，渲染全部离线完成。当前版本 **v0.1.0** 已通过仓库级发布门禁；
+本轮计划先公开[源码仓库](https://github.com/Quirkybrain/paper-stack)，公开安装包留待后续。
+应用中的对应源码入口（A9）尚未配置，见「许可与开源信息」。
 
 - 所属者：Quirkybrain
-- 许可证：GPL-3.0-only；`LICENSE`（未改写 GPLv3 全文）与第三方声明 `THIRD_PARTY_NOTICES.md` 随仓库与安装包提供
+- 许可证：GPL-3.0-only；仓库提供 `LICENSE` 与 `THIRD_PARTY_NOTICES.md`；wp-50 本地包含当时版本的法律文件
 - 验证环境：Ubuntu 24.04 LTS x86_64；桌面验收在 X11 会话完成（**Wayland 未验证**，见
   [`docs/paperstack/known-limitations.md`](docs/paperstack/known-limitations.md)）
 
@@ -90,7 +91,7 @@ pnpm tauri build --no-bundle               # release 二进制（wp-48 构建日
 ./src-tauri/target/release/paperstack fixtures/reader-min/reader-min.md   # 需图形会话
 
 # — .deb 构建与提取运行（已执行） —
-pnpm tauri build --bundles deb             # 产物见下（wp-43 §6：BUILD_EXIT=0）
+pnpm tauri build --bundles deb             # wp-50 最终包重建已通过；产物见下
 dpkg-deb -x src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb /tmp/paperstack-deb
 /tmp/paperstack-deb/usr/bin/paperstack fixtures/reader-min/reader-min.md
 
@@ -110,12 +111,13 @@ src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb
 - `pnpm tauri build --no-bundle` 的 `beforeBuildCommand` 会自动先执行 `pnpm build`。
 - `pnpm tauri build --bundles deb` 已验证（`BUILD_EXIT=0`）：包元数据 `Package: paperstack`、
   `Version: 0.1.0`、`Depends: libwebkit2gtk-4.1-0, libgtk-3-0`；包内 `LICENSE`/`THIRD_PARTY_NOTICES.md`
-  与仓库根逐字节一致；提取运行、离线许可查看与干净退出见 `artifacts/60-implementation/wp-43-package.md` §6、
-  `packaging/README.md`。
+  在 wp-50 验证时与当时仓库根逐字节一致；提取运行、离线许可查看与干净退出见
+  `artifacts/80-release/package-verification.md` §1–§6。之后若源码、打包配置或声明改变，须重建并复验。
 - **`sudo dpkg -i` / `sudo apt install` 系统安装在当前环境未执行**（无 root/干净环境；维持 UNVERIFIED，
   见 `docs/paperstack/known-limitations.md`）。已执行的是 `dpkg-deb -x` 提取运行路径（IT08 同一路径）。
-- 当前 `output/paperstack_0.1.0_amd64.deb` 为 wp-43 打包产物，构建早于 wp-45/wp-47 修复；公开发布前
-  必须在最终修订上重新执行上述打包命令（见发布说明的发行状态）。
+- 本地 `output/paperstack_0.1.0_amd64.deb` 是 wp-50 从验收修订重建并验证的包，sha256
+  `f72e3dbab442e71dd0df9e0d2ebe90e5699b60960af2ab6824164ba8d4788799`；它未纳入 Git。
+  本轮只准备公开源码，不发布该包。后续声明或源码变更后，公开安装包须从最终修订重新构建、复验。
 - **调试构建**：不要直接运行 `cargo build` 产出的 debug 二进制——按 Tauri 约定它会加载 `devUrl`
   （`http://localhost:1420`），未运行开发服务器时会连接失败。需要可运行的调试构建时使用
   `pnpm tauri build --debug --no-bundle`（wp-23 §3.1 已验证可启动）。`pnpm dev` / `pnpm tauri dev`
@@ -160,19 +162,30 @@ src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb
 - Tauri asset scope 的 forbidden 集在进程内不可逆：撤销后同进程重开同一路径的图片保持阻止直到重启
   （安全优先的超额阻止）；
 - 界面当前仅简体中文（zh-CN）；系统主题/深色视觉走查未完成；
-- **A9（对应源码入口）未配置：发布阻塞**，关于页如实显示未配置原因，不提供伪造地址。
+- **A9（应用内对应源码入口）未配置**：公开安装包仍受阻；关于页如实显示未配置原因。
 
 ## 许可与开源信息
 
 - 许可证：**GPL-3.0-only**。`LICENSE` 为未改写的 GNU GPLv3 全文（674 行，sha256 `3972dc97…`），
-  随仓库与安装包（安装后位于 `/usr/lib/paperstack/`）提供，关于页可离线查看（IT08）。
+  随仓库提供；wp-50 本地包曾包含此全文（安装后位于 `/usr/lib/paperstack/`），关于页可离线查看（IT08）。
 - 第三方声明：`THIRD_PARTY_NOTICES.md`（npm production 闭包 263 个包/版本、Rust 运行期闭包 540 个 crate；
   生成器 `packaging/third-party-inventory.py`；**非法律审计**，MPL-2.0/EPL-2.0 等兼容性结论需法律复核）。
-- **对应源码入口（A9）：未配置（发布阻塞）**。关于页显示「未配置对应源码入口；公开发行前必须补齐。」
-  （R30/NF12）；在所有者提供真实可访问的对应源码地址之前，不做公开发行宣告，不放伪地址。
+- **对应源码入口（A9）：应用内尚未配置**。拟公开的源码仓库地址为
+  [Quirkybrain/paper-stack](https://github.com/Quirkybrain/paper-stack)；待可访问且版本匹配的源码修订确定后，
+  须将入口写入应用并验证。关于页目前仍显示「未配置对应源码入口；公开发行前必须补齐。」
+  （R30/NF12）；在此之前不对外发布安装包。
 - 版本元数据（`package.json` / `Cargo.toml` / `tauri.conf.json` / 关于页）一致为 0.1.0；
   `tauri-bundler` 2.12.1 不生成 deb `License:` 控制字段（SPDX 标识与许可全文在元数据/包内资源，
   见已知限制与 `packaging/README.md`）。
+
+## GitHub 源码发布范围
+
+本轮准备公开源码仓库，保留全部既有 Git 提交与分支历史。历史工程报告、日志、截图等
+`artifacts/` 证据文件已受 Git 跟踪；`.gitignore` 中的 `/artifacts/` 规则只影响新增未跟踪文件，
+不移除这些历史证据。仓库内的本机路径及提交者身份也会随完整历史公开。
+
+源码仓库不包含 `output/` 中的本地 `.deb`。公开安装包将另行发布，需先完成应用内 A9
+入口、第三方许可待核项，并在最终源码与声明修订上重新构建、验证安装包。
 
 ## 目录结构
 
@@ -187,7 +200,7 @@ fixtures/         固定样例（rendering、encoding、search、security、upda
 packaging/        .deb 打包配置、图标源、验证脚本与第三方清单生成器
 docs/paperstack/  v0.1.0 产品文档（使用指南、已知限制、发布说明）
 output/           本地打包产物（.deb；gitignored）
-artifacts/        项目工程记录（需求、架构、计划、实现报告、验证证据；gitignored）
+artifacts/        已跟踪的历史工程报告与验证证据（新增未跟踪文件由 .gitignore 忽略）
 ```
 
 ## 文档导航
