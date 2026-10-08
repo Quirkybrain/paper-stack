@@ -1,7 +1,7 @@
 # 纸栈 PaperStack 已知限制与未验证清单（v0.1.0）
 
 > 适用版本：v0.1.0 · 最后核对：2026-10-08
-> Producer: agent:technical-writer（wp-49-docs；依据见 `artifacts/60-implementation/wp-49-docs.md`）
+> Producer: agent:technical-writer（初稿 wp-49-docs；发布状态修订 wp-51-publication-docs）
 >
 > **声明（DR-05）**：本文所有「已验证」表述仅覆盖报告中实际执行并核对的范围；未执行或不可执行的检查一律
 > 标注 **UNVERIFIED**，不得读作通过。性能数字为**本机校准（12 核 / 15 GiB，非基准机）**，不构成达标声明。
@@ -76,15 +76,18 @@ OS 缓存场景保持 UNVERIFIED**；修复后 1 MiB 已进入「≤3 s 全文�
 - **2 MiB 复杂度提示重现（O-IT-2 / O-46-1，未定根因）**：在已选择简化阅读的 2 MiB 复杂度路径上，大文档
   提示可能再次出现并遮挡视图/指针；已记录并建议分诊，未修复。
 
-## 3. 发布阻塞：对应源码入口（A9）
+## 3. 公开安装包阻塞：对应源码入口（A9）
 
-- **A9「对应源码入口」未配置**：`AppInfo.legal.sourceEntryUrl = null`，关于页如实显示
-  「未配置对应源码入口；公开发行前必须补齐。」（R30/NF12）；
-- 系统验证将其列为 **发布阻塞**（`system-verification.md` G-06 / §10.3 B1）：在所有者提供真实可访问的
-  对应源码地址之前，**不做公开发行宣告，不放伪地址**；
-- 发行包现状：当前 `output/paperstack_0.1.0_amd64.deb` 为 wp-43 打包产物，构建早于 wp-45/wp-47 修复；
-  公开发布前必须在最终修订上重新执行 `pnpm tauri build --bundles deb` 并复验（打包机制已验证，
-  见 README「已验证命令」）。
+- **A9「对应源码入口」尚未写入应用**：`AppInfo.legal.sourceEntryUrl = null`，关于页如实显示
+  「未配置对应源码入口；公开发行前必须补齐。」（R30/NF12）。源码仓库地址已确定为
+  [Quirkybrain/paper-stack](https://github.com/Quirkybrain/paper-stack)，本轮可先公开源码；
+  公开安装包仍须先配置可访问且版本匹配的应用内入口并复验。
+- 原系统验证将 A9 列为 **公开分发阻塞**（`system-verification.md` G-06 / §10.3 B1）；
+  仓库级发布门禁已通过，公开源码与随后发布安装包是两个步骤。
+- **本地包状态**：wp-50 已从当时验收修订重建并复验 `output/paperstack_0.1.0_amd64.deb`，
+  sha256 `f72e3dbab442e71dd0df9e0d2ebe90e5699b60960af2ab6824164ba8d4788799`
+  （`artifacts/80-release/package-verification.md` §1–§6）。本轮不公开该包；后续源码或第三方声明变更后，
+  须在最终修订上重新构建并验证。
 
 ## 4. 打包与发行边界
 
