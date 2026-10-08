@@ -1,3 +1,0 @@
-cache_meta columns: ['cache_key', 'kind', 'rel_path', 'size_bytes', 'source_url_hash', 'created_at', 'last_access_at']
-  ('c-a2c48c6cdb4fc94f', 'remote-image', 'remote-images/c-a2c48c6cdb4fc94f', 8090, 'a2c48c6cdb4fc94f999404b0a1072c2de6a99a36b567e3bf09bf72e7515bb772', 1791378033708, 1791378033708)
-session_grants: []

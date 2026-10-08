@@ -1,5 +1,0 @@
-ts=1791376423474 level=info category=app event=startup version="0.1.0"
-ts=1791376423481 level=info category=auth event=startup_revalidation sessionRemoved=0 persistentChecked=0 persistentUnavailable=0
-ts=1791376424452 level=warn category=encoding event=command_failed code="PS_ENC_UNSUPPORTED" messageKey="error.encoding.unsupported" retryable=false
-ts=1791376437277 level=warn category=io event=command_failed code="PS_IO_EXPORT_BLOCKED" messageKey="error.io.exportBlocked" retryable=false
-ts=1791376440867 level=warn category=io event=command_failed code="PS_IO_EXPORT_BLOCKED" messageKey="error.io.exportBlocked" retryable=false

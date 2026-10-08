@@ -1,3 +1,0 @@
-     0x4200004 "Example Domain - Google Chrome": ("google-chrome" "Google-chrome")  2438x1640+82+40  +82+40
-     0x4400016 "google-chrome-stable": ("google-chrome-stable" "Google-chrome-stable")  200x200+0+0  +0+0
-     0x4400001 "google-chrome-stable": ("google-chrome-stable" "Google-chrome-stable")  10x10+10+10  +10+10

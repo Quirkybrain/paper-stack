@@ -1,3 +1,0 @@
-[2026-10-08T04:27:13+08:00] [run-before.sh] clean termination: WM_DELETE_WINDOW
-[2026-10-08T04:27:21+08:00] [run-before.sh] app alive after first close request; second WM_DELETE_WINDOW
-[2026-10-08T04:27:27+08:00] [run-before.sh] NON-CLEAN: falling back to SIGTERM

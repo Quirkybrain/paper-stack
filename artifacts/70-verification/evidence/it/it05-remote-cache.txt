@@ -1,1 +1,0 @@
--rw-rw-r-- 1 quirkybrain quirkybrain 8090 Oct  8 01:18 /home/quirkybrain/code/claude-code-swe-framework-tests/claude-code-swe-framwork-test-v1.1/op/PaperStack/artifacts/70-verification/evidence/it/cache-it05/com.quirkybrain.paperstack/remote-images/c-a2c48c6cdb4fc94f

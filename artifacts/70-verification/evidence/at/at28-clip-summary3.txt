@@ -1,3 +1,0 @@
-paperstack-diagnostics v1
-[1] error.encoding.unsupported (PS_ENC_UNSUPPORTED)
-  category: encoding

@@ -1,3 +1,0 @@
-996f5c6c1549136189d3dcb9922b70f65cbe5ee72f6b4821febbc71c833425e9  /tmp/opencode/ps-deb-it/usr/bin/paperstack
-3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986  /tmp/opencode/ps-deb-it/usr/lib/paperstack/LICENSE
-894703df263964da468aeebc669641f774e58f701bab9aefa150676563091f78  /tmp/opencode/ps-deb-it/usr/lib/paperstack/THIRD_PARTY_NOTICES.md

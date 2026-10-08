@@ -1,5 +1,0 @@
-HEAD cb79a827e3b6dd2736b490d6eb9b0e0a99cba77b branch task/wp-46-itrerun
-binary src-tauri/target/release/paperstack
-ee21ad20ff190ef6c4fceb6d0e2314394009e2c75a127f4697e016d282c404a7  src-tauri/target/release/paperstack
-size=28104136 mtime=2026-10-08 02:53:33.069566225 +0800
-git diff HEAD -- src src-tauri (excl tests):

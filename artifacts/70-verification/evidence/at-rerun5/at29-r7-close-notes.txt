@@ -1,3 +1,0 @@
-WM close timing on 11 MiB instance: 0.12s (first WM_DELETE_WINDOW, clean exit)
-grep 'NON-CLEAN|second WM_DELETE' runs.log: 0 matches (both AT29 runs)
-pgrep after section: no paperstack process remains

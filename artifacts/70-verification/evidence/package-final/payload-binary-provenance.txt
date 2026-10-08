@@ -1,3 +1,0 @@
-in-repo release binary sha256: 26c02d2d8f4d254abb9aaf332be8e0f8d1857c1f3cf097464bb0050835f6a8c3 (acceptance-verified AT Rev7/IT Rev3 no-bundle hash)
-deb payload binary sha256:     1f4e34c53fd7ae53f6e96710c5b93eb1b6bdc297c0eeeda63337d9dbcdd95bd3
-differing bytes: 3 (tauri-bundler bundle-type patch)

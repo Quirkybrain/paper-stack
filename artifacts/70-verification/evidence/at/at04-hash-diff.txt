@@ -1,8 +1,0 @@
-== fixtures sha256 diff ==
-IDENTICAL
-== copy sha256 diff ==
-IDENTICAL
-== fixtures file list diff ==
-IDENTICAL
-== copy file list diff ==
-IDENTICAL

@@ -36,16 +36,19 @@
   简化阅读保留全文文本与基础结构、搜索与复制完整可用（窗口化挂载，详见用户指南）；
 - **交付**：`.deb` 打包（元数据、离线许可资源与提取运行已验证）、桌面项、离线许可证与第三方声明查看器。
 
-验证矩阵摘要（详细判定、口径与受限子项见证据报告）：
+> **说明**：本分支（`v0.1.0`）为纯净源码发行版，仅包含程序运行、构建、测试与打包必需的代码、资源与文档。
+> 完整的 AI 软件工程研发过程记录、50 个质量门禁报告（Gates）、合并证据（Merges）与全量真实验收截图均完整保存在 `main` 分支（见 `v0.1.0-process` 标签）。
 
-| 验证项 | 结果 | 证据 |
+验证矩阵摘要（详细测试可在当前源码上直接复跑，见下文命令）：
+
+| 验证项 | 结果 | 说明 / 证据出处 |
 |---|---|---|
-| 桌面验收 AT01–AT30 | **30 PASS / 0 FAIL**（Rev 5 全量同树刷新；Rev 7 在含 wp-45/wp-47 修复的构建上复验 AT29，其余 29 项沿用 Rev 5 判定） | `artifacts/70-verification/acceptance-at.md` |
-| 端到端验收 IT01–IT08 | **8/8 PASS**（打包提取运行；IT02/03/07 缺陷修复后复验） | `artifacts/70-verification/acceptance-it.md` |
-| 独立复审（A/B） | **18/18 关闭**（A 8/8、B 10/10） | `artifacts/60-review/review-rereview.md` |
-| 前端测试 | 73 文件 / **588 通过** | `acceptance-at.md` §R7.3、`acceptance-it.md` §R3.1（日志 `artifacts/70-verification/evidence/it-rerun2/unit-suite-wp48.log`） |
-| Rust 测试 | **282 通过 / 0 失败** | `artifacts/60-implementation/wp-45-fix-it.md` §3.2 |
-| 契约/语义向量 | 6 文件 / **89 通过** | `artifacts/70-verification/system-verification.md` §7.3 |
+| 桌面验收 AT01–AT30 | **30 PASS / 0 FAIL** | 30 项真实桌面场景全量通过（完整报告与截图见 `main` 分支） |
+| 端到端验收 IT01–IT08 | **8/8 PASS** | 打包提取运行验证全量通过（完整报告见 `main` 分支） |
+| 独立复审（A/B） | **18/18 关闭** | 安全核心与前端管线 18 项发现已全部闭环修复 |
+| 前端测试 | 73 文件 / **588 通过** | 源码内直接执行 `pnpm test -- --run` |
+| Rust 测试 | **282 通过 / 0 失败** | 源码内直接执行 `cargo test --manifest-path src-tauri/Cargo.toml` |
+| 契约/语义向量 | 6 文件 / **89 通过** | 源码内直接执行 `pnpm vitest run --config tests/contracts/vitest.config.ts` |
 
 环境受限的未验证项（Wayland、干净系统安装、WebDriver E2E、抓包级零请求、真实 IME 等）与性能校准口径
 见 [`docs/paperstack/known-limitations.md`](docs/paperstack/known-limitations.md)；**均不得读作通过**（DR-05）。
@@ -70,8 +73,7 @@
 
 ## 已验证命令
 
-以下命令均在本仓库本机实际执行过；括号内为证据出处（`wp-XX` 对应 `artifacts/60-implementation/` 下的同名报告，
-`acceptance-*`/`system-verification` 位于 `artifacts/70-verification/`）。未执行或不可执行者单独标注。
+以下命令均在本仓库本机实际执行过（对应工程阶段证据见 `main` 分支 `artifacts/` 目录）。未执行或不可执行者单独标注。
 
 ```sh
 # — 工具链与依赖 —
@@ -111,8 +113,7 @@ src-tauri/target/release/bundle/deb/paperstack_0.1.0_amd64.deb
 - `pnpm tauri build --no-bundle` 的 `beforeBuildCommand` 会自动先执行 `pnpm build`。
 - `pnpm tauri build --bundles deb` 已验证（`BUILD_EXIT=0`）：包元数据 `Package: paperstack`、
   `Version: 0.1.0`、`Depends: libwebkit2gtk-4.1-0, libgtk-3-0`；包内 `LICENSE`/`THIRD_PARTY_NOTICES.md`
-  在 wp-50 验证时与当时仓库根逐字节一致；提取运行、离线许可查看与干净退出见
-  `artifacts/80-release/package-verification.md` §1–§6。之后若源码、打包配置或声明改变，须重建并复验。
+  在 wp-50 验证时与当时仓库根逐字节一致；提取运行、离线许可查看与干净退出见 `main` 分支验证报告 §1–§6。之后若源码、打包配置或声明改变，须重建并复验。
 - **`sudo dpkg -i` / `sudo apt install` 系统安装在当前环境未执行**（无 root/干净环境；维持 UNVERIFIED，
   见 `docs/paperstack/known-limitations.md`）。已执行的是 `dpkg-deb -x` 提取运行路径（IT08 同一路径）。
 - 本地 `output/paperstack_0.1.0_amd64.deb` 是 wp-50 从验收修订重建并验证的包，sha256

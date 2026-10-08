@@ -1,2 +1,0 @@
-ts=1791378021690 level=info category=app event=startup version="0.1.0"
-ts=1791378021695 level=info category=auth event=startup_revalidation sessionRemoved=0 persistentChecked=0 persistentUnavailable=0
