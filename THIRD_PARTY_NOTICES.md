@@ -1,6 +1,6 @@
 # 纸栈 PaperStack 第三方软件声明（Third-Party Notices）
 
-本文档随 PaperStack v0.1.0 分发，覆盖应用实际装载的第三方运行期组件，供离线查看（R30、NF12）。
+本文档清点 PaperStack v0.1.0 的候选第三方运行期依赖和已识别的渲染资源。源码仓库中的本次修订不会自动替换已构建的安装包；发布新包须重新构建并核验包内文本。
 
 ## 方法与范围（Method and Coverage）
 
@@ -8,7 +8,7 @@
 
 - npm 运行期闭包：`pnpm licenses list --prod --json`（263 个包/版本；pnpm 10.34.6）。
 - Rust 运行期闭包：`cargo metadata --locked` 解析图中从 `paperstack` 根包沿普通依赖边可达的 crate（540 个 crate；Rust 1.96.0）。
-- 渲染资源：KaTeX 字体、Shiki 语法/主题、Mermaid 按其安装包内 LICENSE/元数据记录。
+- 渲染资源：KaTeX 字体、Shiki 语法/主题、Mermaid 根据安装包元数据及 Shiki 所用上游资源包的版本化 NOTICE 记录；逐项授权仍有未决项。
 
 **引用的锁文件（结论应以真实锁文件为准）：**
 
@@ -18,16 +18,18 @@
 **明确的覆盖限制（本清单不是法律审计）：**
 
 1. npm 列为 **production 依赖闭包**（含传递依赖，含仅类型声明的 `@types/*`，其不注入运行时代码），不含 devDependencies；Rust 列为 **普通依赖运行期闭包**，不含 build-dependencies、dev-dependencies 与仅编译期使用的过程宏。
-2. 解析图是上界：按目标平台/feature 裁剪后未链接进最终二进制的 crate 仍可能出现在表中；反向漏列未发现（闭包由 cargo/pnpm 解析结果推导）。
-3. Shiki 的词法语法（grammar）与主题来自上游 TextMate 生态项目，其**逐件上游许可**未随 npm 包提供；表中按 Shiki 包（MIT）记录，实际随包发行的语法子集见下文“渲染资源”一节。
-4. KaTeX 字体、界面字体等字体文件随对应 npm 包按该包许可证发行；npm 包内无单独字体许可文件。
+2. 解析图是上界：按目标平台/feature 裁剪后未链接进最终二进制的 crate 仍可能出现在表中；依赖表不能单独证明最终载荷完整性或许可兼容性。
+3. Shiki 包的 MIT 元数据不能替代所含 TextMate 语法和主题各自的上游许可。精确版本的 `tm-grammars`/`tm-themes` 有 NOTICE，但本清单和既有安装包均未附其许可原文；`glsl`、`yaml` 两项语法还缺少上游逐件授权依据，详见下文。
+4. KaTeX 字体随 npm 包提供；包内未见单独字体许可文件。字体上游来源及逐项许可未在本清单独立核实。界面文字使用系统字体，不随包附带其字体文件。
 5. 许可证名称来自包元数据（SPDX 字段）或包内许可文件的人工可复核读取；本清单不构成法律意见，最终合规结论需由法律审计结合真实锁文件与上游通知确认。
 
-## GPL-3.0-only 兼容性说明（Compatibility Stance）
+## 许可兼容性状态（Compatibility Status）
 
-PaperStack 自身以 **GPL-3.0-only** 发行（未改写 GPLv3 全文见仓库根 `LICENSE`）。本清单所列运行期许可（MIT、Apache-2.0、ISC、BSD-2/3-Clause、MPL-2.0 或 Apache-2.0、EPL-2.0、Unlicense 等）均为开源/自由软件许可，未发现已知与 GPLv3 不兼容的运行期条目；其中 MPL-2.0/EPL-2.0 的 GPL 兼容性依赖其许可文本中的二次许可（secondary license）条款，最终兼容性结论应由法律审计确认。`(MPL-2.0 OR Apache-2.0)` 条目（DOMPurify）可在 GPL 兼容场景下按 Apache-2.0 使用。第三方条目保留其原始许可与作者，不统一改归 Quirkybrain（R30）。
+PaperStack 原创代码标识为 **GPL-3.0-only**（仓库根 `LICENSE` 是该 GPLv3 全文）。下表的 SPDX 标识来自依赖元数据，不能据此推断整个应用组合已通过许可兼容性核查。尤其是打入前端载荷的 `elkjs@0.9.3` 标识为 EPL-2.0。该版本的 `LICENSE.md` 第 3.2 节和 Exhibit A 要求初始贡献者附上明确的次级许可声明；版本 `0.9.3` 的上游源码仅有未填写许可名称的 Exhibit A 模板，未发现 GPL 次级许可声明。因此本清单**不能确认**其与 PaperStack GPL-3.0-only 应用组合的许可兼容性，不能将该版本按 GPL 次级许可处理。其他条目的元数据也不是对完整载荷的法律结论。第三方作品保留其各自权利人与许可，不统一改归 Quirkybrain（R30）。
 
-> 许可原文与完整性核对：`LICENSE`（GPL-3.0-only 全文）与本文档随安装包（`/usr/lib/paperstack/`）及应用“关于”页离线提供。
+`elkjs@0.9.3` 核对来源：[版本源码](https://github.com/kieler/elkjs/tree/0.9.3)、[该版本许可文本](https://github.com/kieler/elkjs/blob/0.9.3/LICENSE.md)；[上游关于新增 GPLv3 次级许可的议题](https://github.com/kieler/elkjs/issues/373)属于后续版本讨论，不适用于本锁定版本。公开二进制前须另行解决此项。
+
+> 随现有安装包离线提供的是 PaperStack 的 GPLv3 `LICENSE` 全文与本清单的旧版本；清单列举第三方许可证名称，不包含各依赖或上游渲染资源的全部许可证原文。
 
 ## npm production 依赖闭包（263 条）
 
@@ -854,10 +856,12 @@ PaperStack 自身以 **GPL-3.0-only** 发行（未改写 GPLv3 全文见仓库�
 
 | 资源 | 版本 | 许可/说明 |
 |---|---|---|
-| KaTeX（公式渲染） | 见 npm 表（`katex`） | MIT（Khan Academy and other contributors，包内 `LICENSE`）。`dist/fonts/` 随包发行的 KaTeX 字体无单独许可文件，按包许可证发行；字体源自 Computer Modern/AMS 字体族。 |
-| Shiki（代码高亮） | 见 npm 表（`shiki` 及 `@shikijs/*`） | MIT（Pine Wu、Anthony Fu，包内 `LICENSE`）。实际装载语法：`c`、`cpp`、`python`、`rust`、`java`、`javascript`、`typescript`、`bash`、`json`、`yaml`、`sql`；主题 `github-light`。语法/主题由上游TextMate 生态项目派生（大多为 MIT），上游逐件许可未随 npm 包提供，再分发前应核对上游。 |
-| Mermaid（图表渲染） | 见 npm 表（`mermaid`） | MIT（Knut Sveidqvist 等，包内 `LICENSE`）；其运行期依赖（d3、elkjs、khroma 等）见 npm 闭包。 |
+| KaTeX（公式渲染） | 见 npm 表（`katex`） | 包元数据与 `LICENSE` 为 MIT（Khan Academy and other contributors）。`dist/fonts/` 包内无单独字体许可文件；字体上游来源和逐项许可仍待独立核实。 |
+| Shiki（代码高亮） | `@shikijs/langs`/`themes` 4.5.0 | Shiki 自身的 `LICENSE` 为 MIT（Pine Wu、Anthony Fu）。直接选择 `c`、`cpp`、`python`、`rust`、`java`、`javascript`、`typescript`、`bash`、`json`、`yaml`、`sql` 与 `github-light`；其中 `cpp` 又导入 `cpp-macro`、`regexp`、`glsl`，`bash` 映射 `shellscript`。Shiki v4.5.0 锁定 `tm-grammars@1.32.22` 与 `tm-themes@1.12.12`。这两个包的 NOTICE 覆盖所选主题及多数语法，但语法 NOTICE 未列 `glsl.json`、`yaml.json`，对应原始仓库也未见明确许可文件；逐项授权未闭合。 |
+| Mermaid（图表渲染） | 见 npm 表（`mermaid`） | MIT（Knut Sveidqvist 等，包内 `LICENSE`）；其运行期依赖（d3、elkjs、khroma 等）见 npm 闭包；`elkjs@0.9.3` 的兼容性未决。 |
 | SQLite（经 `rusqlite` bundled 静态编译） | 见 Rust 表（`libsqlite3-sys`） | 公有领域（SQLite，https://sqlite.org/copyright.html）；编译进二进制的 amalgamation 随 `libsqlite3-sys` 发行。 |
 | 界面字体 | — | 不随包发行；使用系统字体回退（无第三方字体文件被再分发）。 |
+
+Shiki 精确上游依据：[v4.5.0 锁文件](https://github.com/shikijs/shiki/blob/v4.5.0/pnpm-lock.yaml)、[tm-grammars@1.32.22 NOTICE 包](https://registry.npmjs.org/tm-grammars/-/tm-grammars-1.32.22.tgz)、[tm-themes@1.12.12 NOTICE 包](https://registry.npmjs.org/tm-themes/-/tm-themes-1.12.12.tgz)、[`glsl` 原始项目](https://github.com/polym0rph/GLSL.tmbundle)、[`yaml` 原始项目](https://github.com/textmate/yaml.tmbundle)。
 
 > 本文件由 `packaging/third-party-inventory.py` 生成；更新依赖后重新运行 `python3 packaging/third-party-inventory.py > THIRD_PARTY_NOTICES.md`。
